@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "example:safe-materials",
+  "target_mod": "examplemod",
+  "target_version": ">=1.0.0",
+  "optional_dependencies": [],
+  "priority": 100,
+  "description": "Choose a conservative material carrier for one known item.",
+  "rules": [
+    {
+      "match": {
+        "exact_id": "examplemod:ingot"
+      },
+      "action": {
+        "type": "item_carrier_category",
+        "value": "material",
+        "override_native_polymer": false
+      }
+    }
+  ]
+}

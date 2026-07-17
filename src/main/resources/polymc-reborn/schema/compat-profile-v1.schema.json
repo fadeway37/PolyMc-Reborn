@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymcreborn.github.io/schema/compat-profile-v1.schema.json",
+  "title": "PolyMc Reborn compatibility profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "target_mod", "target_version", "optional_dependencies", "priority", "description", "rules"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "target_mod": { "type": "string", "minLength": 1 },
+    "target_version": { "type": "string", "minLength": 1 },
+    "optional_dependencies": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "priority": { "type": "integer", "minimum": -10000, "maximum": 10000 },
+    "description": { "type": "string", "minLength": 1 },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["match", "action"],
+        "properties": {
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "exact_id": { "type": "string" },
+              "namespace": { "type": "string" },
+              "glob": { "type": "string", "maxLength": 256, "pattern": "^[a-z0-9_./:*?\\-]+$" },
+              "registry_type": { "enum": ["item", "block", "entity", "gui"] },
+              "block_properties": { "type": "object", "additionalProperties": { "type": "string" } },
+              "owner_mod": { "type": "string" }
+            }
+          },
+          "action": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "value", "override_native_polymer"],
+            "properties": {
+              "type": { "enum": ["disable_auto_mapping", "item_carrier_category", "block_strategy", "vanilla_fallback_state", "entity_replacement", "gui_classification"] },
+              "value": { "type": "string" },
+              "override_native_polymer": { "type": "boolean" }
+            },
+            "allOf": [
+              { "if": { "properties": { "type": { "const": "disable_auto_mapping" } } }, "then": { "properties": { "value": { "const": "" } } } },
+              { "if": { "properties": { "type": { "const": "item_carrier_category" } } }, "then": { "properties": { "value": { "enum": ["food", "drink", "tool", "armor", "bow", "crossbow", "shield", "throwable", "block_item", "material"] } } } },
+              { "if": { "properties": { "type": { "const": "block_strategy" } } }, "then": { "properties": { "value": { "const": "textured-full-cube" } } } },
+              { "if": { "properties": { "type": { "const": "vanilla_fallback_state" } } }, "then": { "properties": { "value": { "maxLength": 256, "pattern": "^minecraft:[a-z0-9_./-]+(\\[[a-z0-9_=-]+(,[a-z0-9_=-]+)*\\])?$" } } } },
+              { "if": { "properties": { "type": { "const": "entity_replacement" } } }, "then": { "properties": { "value": { "maxLength": 256, "pattern": "^minecraft:[a-z0-9_./-]+$" } } } },
+              { "if": { "properties": { "type": { "const": "gui_classification" } } }, "then": { "properties": { "value": { "minLength": 1, "maxLength": 128, "pattern": "^[^\\s]+$" } } } }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymcreborn.github.io/schema/config-v1.schema.json",
+  "title": "PolyMc Reborn main configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "enabled",
+    "generate_resource_pack",
+    "persistent_mappings",
+    "safe_mode",
+    "log_decision_chains",
+    "packet_fallback_enabled",
+    "creative_reverse_mapping_enabled",
+    "override_native_polymer",
+    "report_formats",
+    "cache_limits",
+    "resource_extraction_limits"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "enabled": { "type": "boolean" },
+    "generate_resource_pack": { "type": "boolean" },
+    "persistent_mappings": { "type": "boolean" },
+    "safe_mode": { "type": "boolean" },
+    "log_decision_chains": { "type": "boolean" },
+    "packet_fallback_enabled": { "type": "boolean", "default": false },
+    "creative_reverse_mapping_enabled": { "type": "boolean" },
+    "override_native_polymer": { "type": "boolean" },
+    "report_formats": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["json", "markdown"] }
+    },
+    "cache_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_entries", "max_bytes"],
+      "properties": {
+        "max_entries": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "max_bytes": { "type": "integer", "minimum": 1, "maximum": 4294967296 }
+      }
+    },
+    "resource_extraction_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_files", "max_single_file_bytes", "max_total_bytes"],
+      "properties": {
+        "max_files": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "max_single_file_bytes": { "type": "integer", "minimum": 1, "maximum": 268435456 },
+        "max_total_bytes": { "type": "integer", "minimum": 1, "maximum": 8589934592 }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "polymc-reborn:builtin-safety",
+  "target_mod": "*",
+  "target_version": "*",
+  "optional_dependencies": [],
+  "priority": -1000,
+  "description": "Classify custom entities and GUIs without guessing a client projection.",
+  "rules": [
+    {
+      "match": { "registry_type": "entity" },
+      "action": {
+        "type": "disable_auto_mapping",
+        "value": "",
+        "override_native_polymer": false
+      }
+    },
+    {
+      "match": { "registry_type": "gui" },
+      "action": {
+        "type": "disable_auto_mapping",
+        "value": "",
+        "override_native_polymer": false
+      }
+    }
+  ]
+}
