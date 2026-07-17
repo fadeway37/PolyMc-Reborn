@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "polymc-reborn-gametest:item/basic_item"
+  }
+}

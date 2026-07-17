@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - 'reborn/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build, test, and server safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.daemon=false
+        -Dorg.gradle.parallel=false
+        -Dorg.gradle.vfs.watch=false
+
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Eclipse Temurin 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Set up Gradle dependency cache
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Verify Java runtime
+        run: java -version
+
+      - name: Run repository policy checks
+        run: bash scripts/ci/check-repository.sh
+
+      - name: Clean build
+        run: ./gradlew --no-daemon --stacktrace clean build
+
+      - name: Run unit tests explicitly
+        run: ./gradlew --no-daemon --stacktrace test
+
+      - name: Run Fabric GameTests
+        run: timeout --signal=TERM --kill-after=30s 15m ./gradlew --no-daemon --stacktrace runGameTest
+
+      - name: Run dedicated-server smoke test
+        run: timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --stacktrace runDedicatedServerSmoke
+
+      - name: Verify dedicated-server startup log
+        run: bash scripts/ci/check-server-smoke.sh
+
+      - name: Inspect distributable JAR
+        run: bash scripts/ci/check-release-jar.sh
+
+      - name: Verify build did not modify tracked inputs
+        run: bash scripts/ci/check-repository.sh --working-tree
+
+      - name: Upload distributable JAR
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: polymc-reborn-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            build/libs/*.jar
+            !build/libs/*-dev.jar
+            !build/libs/*-sources.jar
+            !build/libs/*-javadoc.jar
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diagnostics-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            build/reports/**
+            build/run/gameTest/logs/**
+            build/server-smoke/logs/**

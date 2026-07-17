@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "polymc-reborn-gametest",
+  "version": "1.0.0",
+  "name": "PolyMc Reborn GameTest Fixtures",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "io.github.polymcreborn.gametest.FixtureMod"
+    ],
+    "polymc": [
+      "io.github.polymcreborn.gametest.LegacyFixtureEntrypoint"
+    ],
+    "fabric-gametest": [
+      "io.github.polymcreborn.gametest.RebornGameTests"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "=26.1.2",
+    "polymc-reborn": "*",
+    "fabric-api": "*",
+    "polymer-core": "*"
+  }
+}
