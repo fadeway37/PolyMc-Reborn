@@ -1,42 +1,41 @@
 {
   "schemaVersion": 1,
-  "id": "polymc",
+  "id": "polymc-reborn",
   "version": "${version}",
-
-  "name": "PolyMc",
-  "description": "An attempt to make mods compatible with vanilla clients.",
+  "name": "PolyMc Reborn",
+  "description": "A conservative Polymer-backed compatibility platform for vanilla clients.",
   "authors": [
-    "TheEpicBlock"
+    "PolyMc Reborn contributors",
+    "TheEpicBlock and original PolyMc contributors (upstream)"
   ],
   "contact": {
-    "homepage": "https://github.com/TheEpicBlock/PolyMc",
-    "issues": "https://github.com/TheEpicBlock/PolyMc/issues",
-    "sources": "https://github.com/TheEpicBlock/PolyMc"
+    "homepage": "https://github.com/fadeway37/PolyMc-Reborn",
+    "issues": "https://github.com/fadeway37/PolyMc-Reborn/issues",
+    "sources": "https://github.com/fadeway37/PolyMc-Reborn"
   },
-
   "license": "LGPL-3.0-or-later",
-  "icon": "assets/polymc/icon.png",
-
   "environment": "server",
+  "provides": [
+    "polymc"
+  ],
   "entrypoints": {
     "main": [
-      "io.github.theepicblock.polymc.PolyMc"
+      "io.github.polymcreborn.core.PolyMcReborn"
     ]
   },
   "mixins": [
-    "polymc.mixins.json"
+    "polymc-reborn.mixins.json"
   ],
-  "accessWidener": "polymc.accesswidener",
-
   "depends": {
-    "fabricloader": ">=0.15.11",
-    "fabric-api": "*",
-    "minecraft": ">=1.21- <=1.21.1",
-    "java": ">=21"
-  },
-  "suggests": {
-    "quilt_networking": ">=4.0.0-beta.5"
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "=${minecraft_version}",
+    "java": ">=25",
+    "fabric-api": ">=${fabric_api_version}",
+    "polymer-core": "=${polymer_version}",
+    "polymer-blocks": "=${polymer_version}",
+    "polymer-resource-pack": "=${polymer_version}"
   },
   "breaks": {
+    "polymc-extra": "*"
   }
 }

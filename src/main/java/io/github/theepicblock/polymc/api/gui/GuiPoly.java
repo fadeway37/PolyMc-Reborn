@@ -1,6 +1,7 @@
 /*
  * PolyMc
  * Copyright (C) 2020-2020 TheEpicBlock_TEB
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,9 +18,11 @@
  */
 package io.github.theepicblock.polymc.api.gui;
 
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 
+/** Explicit legacy GUI adapter SPI. Generic automatic transaction projection is not provided. */
+@FunctionalInterface
 public interface GuiPoly {
-    ScreenHandler replaceScreenHandler(ScreenHandler base, ServerPlayerEntity player, int syncId);
+    AbstractContainerMenu replaceScreenHandler(AbstractContainerMenu base, ServerPlayer player, int syncId);
 }

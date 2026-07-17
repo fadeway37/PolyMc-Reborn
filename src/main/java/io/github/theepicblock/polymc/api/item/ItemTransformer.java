@@ -1,36 +1,31 @@
+/*
+ * PolyMc
+ * Copyright (C) 2020-2020 TheEpicBlock_TEB
+ * SPDX-License-Identifier: LGPL-3.0-or-later
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; If not, see <https://www.gnu.org/licenses>.
+ */
 package io.github.theepicblock.polymc.api.item;
 
 import io.github.theepicblock.polymc.api.PolyMap;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Transforms an item from the serverside to the clientside.
- * Used for global item polys.
- * @see io.github.theepicblock.polymc.api.PolyRegistry#registerGlobalItemPoly(ItemTransformer)
- */
+/** Legacy global transformer; execution is constrained to already projected server items. */
+@FunctionalInterface
 public interface ItemTransformer {
-    /**
-     * Transforms an ItemStack to its clientside version.
-     * @param original the original {@link ItemStack} that's used serverside.
-     * @param input {@link ItemStack} that might be transformed previously.
-     * @param player the player this item is being sent to
-     * @param location the location this item is sent from
-     * @return The {@link ItemStack} that should be sent to the client.
-     * @apiNote this method should never edit the incoming ItemStack. As that might have unspecified consequences for the actual serverside representation of the item.
-     */
-    default ItemStack transform(ItemStack original, ItemStack input, PolyMap polyMap, @Nullable ServerPlayerEntity player, @Nullable ItemLocation location) {
-        return transform(original, input, player, location);
-    }
-
-    @Deprecated
-    default ItemStack transform(ItemStack original, ItemStack input, @Nullable ServerPlayerEntity player, @Nullable ItemLocation location) {
-        return transform(input, player, location);
-    }
-
-    @Deprecated
-    default ItemStack transform(ItemStack input, @Nullable ServerPlayerEntity player, @Nullable ItemLocation location) {
-        return input;
-    }
+    ItemStack transform(ItemStack original, ItemStack input, PolyMap polyMap,
+                        @Nullable ServerPlayer player, @Nullable ItemLocation location);
 }

@@ -1,6 +1,7 @@
 /*
  * PolyMc
  * Copyright (C) 2020-2020 TheEpicBlock_TEB
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,34 +18,12 @@
  */
 package io.github.theepicblock.polymc.api.item;
 
-import io.github.theepicblock.polymc.api.DebugInfoProvider;
-import io.github.theepicblock.polymc.api.resource.ModdedResources;
-import io.github.theepicblock.polymc.api.resource.PolyMcResourcePack;
-import io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.Nullable;
 
-public interface ItemPoly extends DebugInfoProvider<Item> {
-    /**
-     * Transforms an ItemStack to its clientside version.
-     * <p>
-     * @param input the original {@link ItemStack} that's used serverside.
-     * @param location the place this item is being sent from
-     * @return The {@link ItemStack} that should be sent to the client.
-     * @apiNote this method should never edit the incoming ItemStack. As that might have unspecified consequences for the actual serverside representation of the item.
-     */
-    ItemStack getClientItem(ItemStack input, @Nullable ServerPlayerEntity player, @Nullable ItemLocation location);
-
-    /**
-     * Callback to add all resources needed for this item to a resource pack.
-     * @param item item this ItemPoly was registered to, for added context.
-     * @param moddedResources a container to retrieve modded assets from.
-     * @param pack resource pack the assets should be added to.
-     * @param logger a logger for this session. Will output to the person generating the assets
-     */
-    default void addToResourcePack(Item item, ModdedResources moddedResources, PolyMcResourcePack pack, SimpleLogger logger) {
-
-    }
+/** Legacy item projection contract using 26.1.2 official Minecraft types. */
+@FunctionalInterface
+public interface ItemPoly {
+    ItemStack getClientItem(ItemStack input, @Nullable ServerPlayer player, @Nullable ItemLocation location);
 }

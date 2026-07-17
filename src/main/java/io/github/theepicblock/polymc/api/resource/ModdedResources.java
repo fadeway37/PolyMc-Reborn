@@ -1,34 +1,28 @@
+/*
+ * PolyMc
+ * Copyright (C) 2020-2020 TheEpicBlock_TEB
+ * SPDX-License-Identifier: LGPL-3.0-or-later
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; If not, see <https://www.gnu.org/licenses>.
+ */
 package io.github.theepicblock.polymc.api.resource;
 
-import io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger;
-import net.minecraft.resource.InputSupplier;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
-import org.jetbrains.annotations.NotNull;
-
-import java.io.InputStream;
-import java.util.List;
 import java.util.Set;
 
-public interface ModdedResources extends AutoCloseable, ResourceContainer {
+/** Path-safe read-only view supplied to migrated legacy resource callbacks. */
+public interface ModdedResources {
+    byte[] getResource(String relativePath);
 
-    /**
-     * Gets all the files registered to this namespace:path. This is useful if a file can be defined in multiple places and need to be merged.
-     * For example, there can be multiple 'minecraft:lang/en_us.json' definitions. The vanilla client will merge all of these
-     */
-    @NotNull List<InputSupplier<InputStream>> getInputStreams(String namespace, String path);
-
-    /**
-     * @return all namespaces that are in this combined resource pack
-     */
-    @NotNull Set<String> getAllNamespaces();
-
-    @NotNull Set<Pair<Identifier,InputSupplier<InputStream>>> locateLanguageFiles();
-
-    ClientJarResources getClientJar(SimpleLogger logger);
-
-    /**
-     * @return A view of the resources in this class combined with the resources you'd get from {@link #getClientJar(SimpleLogger)}
-     */
-    ModdedResources includeClientJar(SimpleLogger logger);
+    Set<String> paths();
 }

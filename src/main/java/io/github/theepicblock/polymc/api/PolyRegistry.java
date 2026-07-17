@@ -1,6 +1,7 @@
 /*
  * PolyMc
  * Copyright (C) 2020-2020 TheEpicBlock_TEB
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,156 +18,105 @@
  */
 package io.github.theepicblock.polymc.api;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import io.github.theepicblock.polymc.api.block.BlockPoly;
-import io.github.theepicblock.polymc.api.block.BlockStateManager;
 import io.github.theepicblock.polymc.api.entity.EntityPoly;
 import io.github.theepicblock.polymc.api.gui.GuiPoly;
-import io.github.theepicblock.polymc.api.item.CustomModelDataManager;
-import io.github.theepicblock.polymc.api.item.ItemLocation;
 import io.github.theepicblock.polymc.api.item.ItemPoly;
 import io.github.theepicblock.polymc.api.item.ItemTransformer;
-import io.github.theepicblock.polymc.impl.PolyMapImpl;
-import net.minecraft.block.Block;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 
-/**
- * A class to register Polys.
- * Also contains helper stuff to help with the registration of Polys and help lower conflicts.
- * This eventually gets transformed to an {@link PolyMap}.
- */
-public class PolyRegistry {
-    protected final Map<SharedValuesKey<Object>, Object> sharedValues = new HashMap<>();
+/** Legacy registrations collected during initialization and frozen into the Reborn plan. */
+public final class PolyRegistry {
+    private final Map<Item, ItemPoly> itemPolys = new IdentityHashMap<>();
+    private final List<ItemTransformer> globalItemPolys = new ArrayList<>();
+    private final Map<Block, BlockPoly> blockPolys = new IdentityHashMap<>();
+    private final Map<MenuType<?>, GuiPoly> guiPolys = new IdentityHashMap<>();
+    private final Map<EntityType<?>, EntityPoly<?>> entityPolys = new IdentityHashMap<>();
+    private boolean frozen;
 
-    protected final Map<Item,ItemPoly> itemPolys = new HashMap<>();
-    protected final List<ItemTransformer> globalItemPolys = new ArrayList<>();
-    protected final Map<Block,BlockPoly> blockPolys = new HashMap<>();
-    protected final Map<ScreenHandlerType<?>,GuiPoly> guiPolys = new HashMap<>();
-    protected final Map<EntityType<?>,EntityPoly<?>> entityPolys = new HashMap<>();
-
-    /**
-     * Register a poly for an item.
-     * @param item item to associate poly with.
-     * @param poly poly to register.
-     */
-    public void registerItemPoly(Item item, ItemPoly poly) {
+    public synchronized void registerItemPoly(Item item, ItemPoly poly) {
+        checkMutable();
         itemPolys.put(item, poly);
     }
 
-    /**
-     * Registers a global item poly. This {@link ItemTransformer#transform(ItemStack, ServerPlayerEntity, ItemLocation)} shall be called for all items.
-     * <p>
-     * The order is dependent on the registration order. If it is registered earlier it'll be called earlier.
-     * @param poly poly to register.
-     */
-    public void registerGlobalItemPoly(ItemTransformer poly) {
+    public synchronized void registerGlobalItemPoly(ItemTransformer poly) {
+        checkMutable();
         globalItemPolys.add(poly);
     }
 
-    /**
-     * Register a poly for a block.
-     * @param block block to associate poly with.
-     * @param poly  poly to register.
-     */
-    public void registerBlockPoly(Block block, BlockPoly poly) {
+    public synchronized void registerBlockPoly(Block block, BlockPoly poly) {
+        checkMutable();
         blockPolys.put(block, poly);
     }
 
-    /**
-     * Register a poly for a gui.
-     * @param screenHandler screen handler to associate poly with.
-     * @param poly          poly to register.
-     */
-    public void registerGuiPoly(ScreenHandlerType<?> screenHandler, GuiPoly poly) {
+    public synchronized void registerGuiPoly(MenuType<?> screenHandler, GuiPoly poly) {
+        checkMutable();
         guiPolys.put(screenHandler, poly);
     }
 
-    /**
-     * Register a poly for an entity.
-     * @param entityType    entity type to associate poly with.
-     * @param poly          poly to register.
-     */
-    public <T extends Entity> void registerEntityPoly(EntityType<T> entityType, EntityPoly<T> poly) {
+    public synchronized <T extends Entity> void registerEntityPoly(EntityType<T> entityType, EntityPoly<T> poly) {
+        checkMutable();
         entityPolys.put(entityType, poly);
     }
 
-    /**
-     * Checks if the item has a registered {@link ItemPoly}.
-     * @param item item to check.
-     * @return True if a {@link ItemPoly} exists for the given item.
-     */
-    public boolean hasItemPoly(Item item) {
+    public synchronized boolean hasItemPoly(Item item) {
         return itemPolys.containsKey(item);
     }
 
-    /**
-     * Checks if the block has a registered {@link BlockPoly}.
-     * @param block block to check.
-     * @return True if an {@link BlockPoly} exists for the given block
-     */
-    public boolean hasBlockPoly(Block block) {
+    public synchronized boolean hasGlobalItemPolys() {
+        return !globalItemPolys.isEmpty();
+    }
+
+    public synchronized boolean hasBlockPoly(Block block) {
         return blockPolys.containsKey(block);
     }
 
-    /**
-     * Checks if the screen handler has a registered {@link GuiPoly}.
-     * @param screenHandler screen handler to check.
-     * @return True if a {@link GuiPoly} exists for the given screen handler.
-     */
-    public boolean hasGuiPoly(ScreenHandlerType<?> screenHandler) {
-        return guiPolys.containsKey(screenHandler);
+    public synchronized boolean hasGuiPoly(MenuType<?> menu) {
+        return guiPolys.containsKey(menu);
     }
 
-    /**
-     * Checks if the entity type has a registered {@link EntityPoly}.
-     * @param entityType entity type to check.
-     * @return True if a {@link EntityPoly} exists for the given screen handler.
-     */
-    public boolean hasEntityPoly(EntityType<?> entityType) {
-        return entityPolys.containsKey(entityType);
+    public synchronized boolean hasEntityPoly(EntityType<?> type) {
+        return entityPolys.containsKey(type);
     }
 
-    /**
-     * Gets the {@link CustomModelDataManager} allocated to assist during registration
-     * @deprecated Use {@code getSharedValues(CustomModelDataManager.KEY)} instead
-     */
-    @Deprecated(since = "4.0.0")
-    public CustomModelDataManager getCMDManager() {
-        return getSharedValues(CustomModelDataManager.KEY);
+    public synchronized PolyMap build() {
+        frozen = true;
+        return new PolyMap(itemPolys, globalItemPolys, blockPolys, guiPolys, entityPolys);
     }
 
-    /**
-     * Gets the {@link BlockStateManager} allocated to assist during registration
-     * @deprecated Use {@code getSharedValues(BlockStateManager.KEY)} instead
-     */
-    @Deprecated(since = "4.0.0")
-    public BlockStateManager getBlockStateManager() {
-        return getSharedValues(BlockStateManager.KEY);
+    public synchronized Map<Item, ItemPoly> itemPolys() {
+        return Collections.unmodifiableMap(new IdentityHashMap<>(itemPolys));
     }
 
-    public <T> T getSharedValues(SharedValuesKey<T> key) {
-        return (T)sharedValues.computeIfAbsent((SharedValuesKey<Object>)key, (key0) -> key0.createNew(this));
+    public synchronized List<ItemTransformer> globalItemPolys() {
+        return List.copyOf(globalItemPolys);
     }
 
-    /**
-     * Creates an immutable {@link PolyMap} containing all the registered polys
-     */
-    public PolyMap build() {
-        return new PolyMapImpl(
-                ImmutableMap.copyOf(itemPolys),
-                globalItemPolys.toArray(new ItemTransformer[0]),
-                ImmutableMap.copyOf(blockPolys),
-                ImmutableMap.copyOf(guiPolys),
-                ImmutableMap.copyOf(entityPolys),
-                ImmutableList.copyOf(sharedValues.entrySet().stream().map((entry) -> entry.getKey().createResources(entry.getValue())).filter(Objects::nonNull).iterator())
-        );
+    public synchronized Map<Block, BlockPoly> blockPolys() {
+        return Collections.unmodifiableMap(new IdentityHashMap<>(blockPolys));
+    }
+
+    public synchronized Map<MenuType<?>, GuiPoly> guiPolys() {
+        return Collections.unmodifiableMap(new IdentityHashMap<>(guiPolys));
+    }
+
+    public synchronized Map<EntityType<?>, EntityPoly<?>> entityPolys() {
+        return Collections.unmodifiableMap(new IdentityHashMap<>(entityPolys));
+    }
+
+    private void checkMutable() {
+        if (frozen) {
+            throw new IllegalStateException("Legacy PolyRegistry is frozen");
+        }
     }
 }

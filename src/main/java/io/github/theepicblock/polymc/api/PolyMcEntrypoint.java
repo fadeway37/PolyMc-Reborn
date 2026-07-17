@@ -1,6 +1,7 @@
 /*
  * PolyMc
  * Copyright (C) 2020-2020 TheEpicBlock_TEB
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,13 +22,11 @@ import io.github.theepicblock.polymc.api.resource.ModdedResources;
 import io.github.theepicblock.polymc.api.resource.PolyMcResourcePack;
 import io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger;
 
-/**
- * The entrypoint for all PolyMc related stuff to hook into PolyMc.
- */
+/** Source-migration bridge for extensions recompiled against Minecraft 26.1.2 official names. */
 public interface PolyMcEntrypoint {
     void registerPolys(PolyRegistry registry);
 
-    default void registerModSpecificResources(ModdedResources moddedResources, PolyMcResourcePack pack, SimpleLogger logger) {
-
+    default void registerModSpecificResources(ModdedResources resources, PolyMcResourcePack pack,
+                                              SimpleLogger logger) {
     }
 }

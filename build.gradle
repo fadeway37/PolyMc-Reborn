@@ -1,252 +1,168 @@
 plugins {
-	id 'fabric-loom' version '1.6-SNAPSHOT'
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
-	id 'org.ajoberstar.grgit' version '5.2.2'
 }
 
-sourceCompatibility = JavaVersion.VERSION_21
-targetCompatibility = JavaVersion.VERSION_21
-
-archivesBaseName = project.archives_base_name
-version = "${project.mod_version}${getVersionMetadata()}+${project.minecraft_version}"
 group = project.maven_group
+version = project.mod_version
+
+base {
+	archivesName = project.archives_base_name
+}
 
 repositories {
 	maven {
-		url "https://jitpack.io"
+		name = 'Nucleoid'
+		url = 'https://maven.nucleoid.xyz/'
 		content {
-			includeGroupAndSubgroups("com.github")
+			includeGroup 'eu.pb4'
+			includeGroup 'xyz.nucleoid'
 		}
 	}
-	maven {
-		url "https://maven.theepicblock.nl"
-		content {
-			includeGroup("nl.theepicblock")
-		}
-	}
-	maven {
-		url "https://maven.nucleoid.xyz"
-		content {
-			includeGroup("xyz.nucleoid")
-			includeGroup("eu.pb4")
-		}
-	}
-	maven {
-		name 'Quilt'
-		url 'https://maven.quiltmc.org/repository/release'
-		content {
-			includeGroupAndSubgroups("org.quiltmc")
-		}
-	}
-
-	maven {
-		name 'Modrinth'
-		url 'https://api.modrinth.com/maven'
-		content {
-			includeGroupAndSubgroups("maven.modrinth")
-		}
-	}
-
-	maven {
-		name = 'Ladysnake Mods'
-		url = 'https://maven.ladysnake.org/releases'
-	}
-
-	mavenLocal()
 }
 
-dependencies {
-	//to change the versions see the gradle.properties file
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation("net.fabricmc.fabric-api:fabric-api:${project.fabric_version}") {
-		exclude group: 'net.fabricmc', module: 'fabric-loader'
-	}
-
-	modImplementation include("nl.theepicblock:resource-locator-api:${project.resource_locator_api_version}") {
-		exclude group: 'net.fabricmc', module: 'fabric-loader'
-	}
-	modImplementation include("xyz.nucleoid:packet-tweaker:${project.packet_tweaker_version}") {
-		exclude group: 'net.fabricmc', module: 'fabric-loader'
-	}
-
-	// Compat
-	modCompileOnly("maven.modrinth:lithium:${project.lithium_version}")
-	modCompileOnly("com.github.iPortalTeam.ImmersivePortalsMod:imm_ptl_core:${project.immersive_portals_version}") {
-		exclude group: 'net.fabricmc', module: 'fabric-loader'
-		transitive(false)
-	}
-	modCompileOnly("com.github.iPortalTeam.ImmersivePortalsMod:q_misc_util:${project.immersive_portals_version}") {
-		exclude group: 'net.fabricmc', module: 'fabric-loader'
-		transitive(false)
-	}
-//	modCompileOnly("org.quiltmc.qsl.core:registry:${project.qsl_version}") {
-//		transitive(false)
-//	}
-}
-
-sourceSets {
-	common {
-		runtimeClasspath += main.runtimeClasspath
-		compileClasspath += main.compileClasspath
-	}
-	main {
-		runtimeClasspath += common.output
-		compileClasspath += common.output
-	}
-	testmod {
-		runtimeClasspath += main.runtimeClasspath + main.output
-		compileClasspath += main.compileClasspath + main.output
-	}
-	datagen {
-		runtimeClasspath += main.runtimeClasspath + common.output
-		compileClasspath += main.compileClasspath + common.output
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = 'polymc-reborn-gametest'
+		enableGameTests = true
+		enableClientGameTests = false
+		eula = true
 	}
 }
 
 loom {
+	serverOnlyMinecraftJar()
+
 	mods {
-		"polymc-datagen" {
-			sourceSet("datagen")
-		}
-		"polymc" {
-			sourceSet("main")
-		}
-		"polymc-testmod" {
-			sourceSet("testmod")
+		'polymc-reborn' {
+			sourceSet sourceSets.main
 		}
 	}
 
 	runs {
-		testmodClient {
-			client()
-			ideConfigGenerated project.rootProject == project
-			name = "Test Mod Client"
-			source sourceSets.testmod
-		}
-		testmodServer {
+		dedicatedServerSmoke {
 			server()
-			ideConfigGenerated project.rootProject == project
-			name = "Test Mod Server"
-			source sourceSets.testmod
-		}
-		gametest {
-			server()
-			name "Game Test"
-			vmArg "-Dfabric-api.gametest"
-			vmArg "-Dfabric-api.gametest.report-file=${project.buildDir}/junit.xml"
-			runDir "build/gametest"
-			source sourceSets.testmod
-		}
-		datagen {
-			server()
-			ideConfigGenerated false
-			source sourceSets.datagen
+			name = 'PolyMc Reborn Dedicated Server Smoke Test'
+			runDir = 'build/server-smoke'
+			vmArg '-Dpolymc-reborn.smoke-test=true'
+			programArg '--nogui'
 		}
 	}
-
-	accessWidenerPath = file("src/main/resources/polymc.accesswidener")
 }
 
-task testmodJar(type: Jar) {
-	archiveClassifier = "testmod-dev"
-	from sourceSets.testmod.output
+dependencies {
+	minecraft "com.mojang:minecraft:${minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+	implementation "eu.pb4:polymer-core:${polymer_version}"
+	implementation "eu.pb4:polymer-blocks:${polymer_version}"
+	implementation "eu.pb4:polymer-resource-pack:${polymer_version}"
+
+	testImplementation platform("org.junit:junit-bom:${junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-task remapTestmodJar(type: net.fabricmc.loom.task.RemapJarTask, dependsOn: testmodJar) {
-	archiveClassifier = "testmod"
-	input = testmodJar.archiveFile.get().asFile
-	addNestedDependencies = false
+tasks.register('prepareDedicatedServerSmoke') {
+	def runDirectory = layout.buildDirectory.dir('server-smoke')
+	outputs.files(runDirectory.map { directory -> [
+		directory.file('eula.txt').asFile,
+		directory.file('server.properties').asFile
+	] })
+	doLast {
+		def directory = runDirectory.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(directory)
+		java.nio.file.Files.writeString(directory.resolve('eula.txt'), 'eula=true\n')
+		java.nio.file.Files.writeString(directory.resolve('server.properties'),
+			'online-mode=false\nserver-port=0\nmotd=PolyMc Reborn smoke test\n')
+	}
 }
+
+tasks.named('runDedicatedServerSmoke') {
+	dependsOn tasks.named('prepareDedicatedServerSmoke')
+}
+
+def buildGitCommit = providers.environmentVariable('GITHUB_SHA').orElse(
+	providers.exec {
+		commandLine 'git', 'rev-parse', 'HEAD'
+		ignoreExitValue = true
+	}.standardOutput.asText.map { it.trim().isEmpty() ? 'unknown' : it.trim() }
+)
+def buildGitDirty = providers.exec {
+	commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+	ignoreExitValue = true
+}.standardOutput.asText.map { it.trim().isEmpty() ? 'false' : 'true' }
 
 processResources {
-	inputs.property "version", project.version
-
-	filesMatching("fabric.mod.json") {
-		expand "version": project.version
+	inputs.property 'version', project.version
+	inputs.property 'minecraft_version', project.minecraft_version
+	filesMatching('fabric.mod.json') {
+		expand version: project.version,
+			minecraft_version: project.minecraft_version,
+			loader_version: project.loader_version,
+			fabric_api_version: project.fabric_api_version,
+			polymer_version: project.polymer_version
 	}
 }
 
-// This includes the resources in build/polymc-datagen/<version>/ into the jar
-def datagenDir = "$rootProject.buildDir/polymc-datagen/$project.minecraft_version"
-sourceSets.main.resources.srcDirs += datagenDir
-
-runDatagen {
-	environment("output-dir", datagenDir)
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = 'UTF-8'
 }
 
-build.doLast {
-	if (!file(datagenDir).exists()) {
-		logger.error("!! Datagen hasn't been run. Vanilla ids aren't included in the build")
+tasks.withType(Javadoc).configureEach {
+	options.encoding = 'UTF-8'
+	options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+	testLogging {
+		events 'failed', 'skipped'
+		exceptionFormat = 'full'
 	}
 }
 
-task getClientSha1 {
-	doLast {
-		def loomExt = net.fabricmc.loom.LoomGradleExtension.get(project)
-		def mcProvider = loomExt.getMinecraftProvider()
-		println(mcProvider.getVersionInfo().download("client").sha1())
-	}
+tasks.withType(AbstractArchiveTask).configureEach {
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
 }
 
-def getVersionMetadata() {
-	if (grgit != null) {
-		def head = grgit.head()
-		def headTag = grgit.tag.list().find {
-			it.commit == head
-		}
-
-		if (headTag) {
-			return "" // This is a release
-		}
-
-		def id = head.abbreviatedId
-
-		// Flag the build if the build tree is not clean
-		if (!grgit.status().clean) {
-			id += "-dirty"
-		}
-
-		return "-rev.${id}"
+tasks.withType(Jar).configureEach {
+	from('LICENSE') {
+		rename { "${it}_${project.archives_base_name}" }
 	}
-	return "";
-}
-
-// Ensure that the encoding is set to UTF-8, no matter what the system default is
-// This fixes some edge cases with special characters not displaying correctly
-// See http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
-tasks.withType(JavaCompile) {
-	options.encoding = "UTF-8"
-
-	it.options.release = 21
+	from('NOTICE.md')
+	from('THIRD_PARTY_NOTICES.md')
+	manifest {
+		attributes(
+			'Implementation-Title': 'PolyMc Reborn',
+			'Implementation-Version': project.version,
+			'Minecraft-Version': project.minecraft_version,
+			'Git-Commit': buildGitCommit.get(),
+			'Git-Dirty': buildGitDirty.get()
+		)
+	}
 }
 
 java {
-	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-	// if it is present.
-	// If you remove this line, sources will not be generated.
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
 	withSourcesJar()
+	withJavadocJar()
 }
 
-jar {
-	from("LICENSE") {
-		rename { "${it}_${project.archivesBaseName}"}
-	}
+dependencyLocking {
+	lockAllConfigurations()
 }
 
 publishing {
 	publications {
 		mavenJava(MavenPublication) {
 			from components.java
-		}
-	}
-
-	repositories {
-		maven {
-			name = "teb"
-			credentials(PasswordCredentials)
-			url = "https://maven.theepicblock.nl"
 		}
 	}
 }
