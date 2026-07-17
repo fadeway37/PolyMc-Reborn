@@ -45,8 +45,10 @@ if ! grep -Eq '^LICENSE(_polymc-reborn)?$' "$entries_file"; then
     exit 1
 fi
 
-unzip -p "$release_jar" META-INF/MANIFEST.MF >"$manifest_file"
-unzip -p "$release_jar" fabric.mod.json >"$metadata_file"
+# ZIP/JAR manifests use CRLF by specification. MSYS may transparently convert
+# those line endings while Linux preserves them, so normalize before matching.
+unzip -p "$release_jar" META-INF/MANIFEST.MF | tr -d '\r' >"$manifest_file"
+unzip -p "$release_jar" fabric.mod.json | tr -d '\r' >"$metadata_file"
 
 for manifest_key in Implementation-Version Minecraft-Version Git-Commit Git-Dirty; do
     if ! grep -Eq "^${manifest_key}: .+" "$manifest_file"; then
@@ -55,7 +57,7 @@ for manifest_key in Implementation-Version Minecraft-Version Git-Commit Git-Dirt
     fi
 done
 
-if ! grep -Eq '^Minecraft-Version: 26\.1\.2\r?$' "$manifest_file"; then
+if ! grep -Eq '^Minecraft-Version: 26\.1\.2$' "$manifest_file"; then
     printf 'Manifest does not identify Minecraft 26.1.2.\n' >&2
     exit 1
 fi
