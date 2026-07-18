@@ -1,0 +1,284 @@
+name: Production Client Playtest
+
+on:
+  push:
+    branches:
+      - master
+      - 'reborn/**'
+  pull_request:
+    branches:
+      - master
+      - 'reborn/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-playtest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-client-playtest:
+    name: Isolated production client playtest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.daemon=false
+        -Dorg.gradle.parallel=false
+        -Dorg.gradle.vfs.watch=false
+      LIBGL_ALWAYS_SOFTWARE: 'true'
+      GALLIUM_DRIVER: llvmpipe
+
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Eclipse Temurin 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Set up Gradle dependency cache
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Install headless client libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes \
+            xvfb xauth \
+            libasound2t64 libgl1 libgl1-mesa-dri libglx-mesa0 libopenal1 mesa-utils \
+            libx11-6 libx11-xcb1 libxcursor1 libxext6 libxi6 libxinerama1 \
+            libxkbcommon0 libxrandr2 libxrender1 libxtst6 libxxf86vm1
+          xdg_runtime_dir="$RUNNER_TEMP/xdg-runtime"
+          mkdir -p "$xdg_runtime_dir"
+          chmod 700 "$xdg_runtime_dir"
+          printf 'XDG_RUNTIME_DIR=%s\n' "$xdg_runtime_dir" >> "$GITHUB_ENV"
+
+      - name: Verify Java runtime
+        run: java -version
+
+      - name: Run repository policy checks
+        run: bash scripts/ci/check-repository.sh
+
+      - name: Run playtest evidence negative self-tests
+        run: python3 -m unittest discover -s scripts/playtest -p 'test_aggregate_evidence.py' -v
+
+      - name: Run isolated production client playtest
+        id: production_playtest
+        shell: bash
+        run: |
+          set +e
+          xvfb-run --auto-servernum \
+            --server-args='-screen 0 1920x1080x24 -nolisten tcp' \
+            timeout --signal=TERM --kill-after=30s 30m \
+            ./gradlew --no-daemon --console=plain --stacktrace \
+            runProductionClientPlaytest
+          launcher_exit_code=$?
+          set -e
+          mkdir -p build/run/client-playtest-evidence-input
+          printf '%s\n' "$launcher_exit_code" \
+            > build/run/client-playtest-evidence-input/ci-launcher-exit-code.txt
+          exit "$launcher_exit_code"
+
+      - name: Materialize failed launcher evidence
+        if: ${{ always() && steps.production_playtest.outcome != 'success' }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          input_dir = root / "build" / "run" / "client-playtest-evidence-input"
+          input_dir.mkdir(parents=True, exist_ok=True)
+          state_file = input_dir / "orchestration-state.json"
+          exit_file = input_dir / "ci-launcher-exit-code.txt"
+          try:
+              exit_code = int(exit_file.read_text(encoding="utf-8").strip())
+          except (OSError, ValueError):
+              exit_code = None
+          timed_out = exit_code in {124, 137}
+          state = None
+          if state_file.is_file():
+              try:
+                  state = json.loads(state_file.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError):
+                  state = None
+          if not isinstance(state, dict):
+              state = {
+                  "schema_version": 1,
+                  "failures": [],
+                  "server": {
+                      "started": False,
+                      "readiness_marker": False,
+                      "tcp_ready": False,
+                      "exit_code": None,
+                      "timed_out": timed_out,
+                      "forced_termination": exit_code == 137,
+                      "clean_stop_requested": False,
+                      "clean_shutdown": False,
+                  },
+                  "client": {
+                      "started": False,
+                      "exit_code": exit_code,
+                      "timed_out": timed_out,
+                      "forced_termination": exit_code == 137,
+                  },
+              }
+          failures = state.get("failures")
+          failures = failures if isinstance(failures, list) else []
+          failures.append(f"CI playtest launcher exited with {exit_code!r} before valid evidence completed")
+          state["schema_version"] = 1
+          state["result"] = "failed"
+          state["failures"] = failures
+          state["failure_count"] = len(failures)
+          state["ci_launcher_exit_code"] = exit_code
+          temporary = state_file.with_name(state_file.name + ".tmp")
+          temporary.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+          os.replace(temporary, state_file)
+          orchestrator_log = input_dir / "orchestrator.log"
+          if not orchestrator_log.is_file():
+              orchestrator_log.write_text(
+                  "CI playtest launcher failed before the orchestrator log was created.\n",
+                  encoding="utf-8",
+              )
+          PY
+          python3 scripts/playtest/aggregate_evidence.py \
+            --project-root "$GITHUB_WORKSPACE" \
+            --input-dir "$GITHUB_WORKSPACE/build/run/client-playtest-evidence-input" \
+            --output-dir "$GITHUB_WORKSPACE/build/playtest" \
+            --client-log "$GITHUB_WORKSPACE/playtest/client-driver/build/run/client-playtest/logs/latest.log" \
+            --server-log "$GITHUB_WORKSPACE/build/run/client-playtest-server/logs/latest.log" \
+            --orchestrator-log "$GITHUB_WORKSPACE/build/run/client-playtest-evidence-input/orchestrator.log" \
+            --server-ready "$GITHUB_WORKSPACE/build/run/client-playtest-server/server-ready.json" \
+            || true
+
+      - name: Sanitize textual playtest evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          home = Path.home().resolve()
+          roots = [
+              workspace / "build" / "playtest",
+              workspace / "build" / "run" / "client-playtest-evidence-input",
+              workspace / "build" / "reports" / "client-playtest",
+              workspace / "build" / "run" / "client-playtest-server" / "logs",
+              workspace / "playtest" / "client-driver" / "build" / "run" / "client-playtest" / "logs",
+              workspace / "playtest" / "client-driver" / "build" / "reports",
+              workspace / "build" / "reports" / "problems",
+          ]
+          text_suffixes = {".html", ".json", ".log", ".md", ".out", ".txt", ".xml"}
+          replacement_paths = {
+              str(workspace): "<workspace>",
+              str(home): "<home>",
+          }
+          for variable, placeholder in (
+              ("RUNNER_TEMP", "<runner-temp>"),
+              ("JAVA_HOME", "<java-home>"),
+              ("GRADLE_USER_HOME", "<gradle-user-home>"),
+          ):
+              value = os.environ.get(variable)
+              if value:
+                  replacement_paths[str(Path(value).resolve())] = placeholder
+          replacements = sorted(replacement_paths.items(), key=lambda pair: len(pair[0]), reverse=True)
+          credential = re.compile(
+              r'(?i)(access[_-]?token|refresh[_-]?token|client[_-]?token|authorization|cookie|password|passwd|'
+              r'secret|token|credentials?|session[_-]?id)'
+              r'(\s*[:=]\s*["\']?)([^"\'\r\n,}]+)'
+          )
+          known_token = re.compile(
+              r'(?i)\b(?:bearer\s+[a-z0-9._~+/=-]{12,}|gh[pousr]_[a-z0-9]{20,}|'
+              r'github_pat_[a-z0-9_]{20,}|xox[baprs]-[a-z0-9-]{12,})\b'
+          )
+          local_path = re.compile(
+              r'(?<![:\w])/(?:home|tmp|var/tmp|opt/hostedtoolcache|workspace|work)/[^\r\n"\'<>|]+'
+          )
+          for root in roots:
+              if not root.is_dir():
+                  continue
+              for path in root.rglob("*"):
+                  if not path.is_file() or path.suffix.lower() not in text_suffixes:
+                      continue
+                  if path.stat().st_size > 32 * 1024 * 1024:
+                      continue
+                  try:
+                      value = path.read_text(encoding="utf-8")
+                  except UnicodeDecodeError:
+                      continue
+                  for original, replacement in replacements:
+                      value = value.replace(original, replacement)
+                  value = credential.sub(lambda match: match.group(1) + match.group(2) + "<redacted>", value)
+                  value = known_token.sub("<redacted-token>", value)
+                  value = local_path.sub("<local-path>", value)
+                  path.write_text(value, encoding="utf-8", newline="\n")
+          PY
+
+      - name: Upload playtest evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: client-playtest-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
+          include-hidden-files: false
+          path: |
+            build/playtest/**/*.json
+            build/playtest/**/*.log
+            build/playtest/**/*.md
+            build/playtest/**/*.png
+            build/playtest/**/*.txt
+            build/playtest/**/*.xml
+            build/run/client-playtest-evidence-input/**/*.json
+            build/run/client-playtest-evidence-input/**/*.log
+            build/run/client-playtest-evidence-input/**/*.png
+            build/run/client-playtest-evidence-input/**/*.txt
+            build/reports/client-playtest/**/*.html
+            build/reports/client-playtest/**/*.json
+            build/reports/client-playtest/**/*.log
+            build/reports/client-playtest/**/*.md
+            build/reports/client-playtest/**/*.png
+            build/reports/client-playtest/**/*.txt
+            build/reports/client-playtest/**/*.xml
+            build/run/client-playtest-server/logs/**/*.log
+            build/run/client-playtest-server/logs/**/*.txt
+            playtest/client-driver/build/run/client-playtest/logs/**/*.log
+            playtest/client-driver/build/run/client-playtest/logs/**/*.txt
+            playtest/client-driver/build/reports/**/*.html
+            playtest/client-driver/build/reports/**/*.json
+            playtest/client-driver/build/reports/**/*.log
+            playtest/client-driver/build/reports/**/*.md
+            playtest/client-driver/build/reports/**/*.png
+            playtest/client-driver/build/reports/**/*.txt
+            playtest/client-driver/build/reports/**/*.xml
+            build/reports/problems/problems-report.html
+            !**/world/**
+            !**/world_*/**
+            !**/saves/**
+            !**/auth/**
+            !**/*auth*.json
+            !**/*credential*
+            !**/launcher_accounts.json
+            !**/launcher_profiles.json
+            !**/usercache.json
+            !**/ops.json
+            !**/whitelist.json
+            !**/banned-*.json
