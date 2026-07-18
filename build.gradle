@@ -59,6 +59,13 @@ dependencies {
 	implementation "eu.pb4:polymer-core:${polymer_version}"
 	implementation "eu.pb4:polymer-blocks:${polymer_version}"
 	implementation "eu.pb4:polymer-resource-pack:${polymer_version}"
+	implementation "eu.pb4:polymer-virtual-entity:${polymer_version}"
+
+	productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+	productionRuntimeMods "eu.pb4:polymer-core:${polymer_version}"
+	productionRuntimeMods "eu.pb4:polymer-blocks:${polymer_version}"
+	productionRuntimeMods "eu.pb4:polymer-resource-pack:${polymer_version}"
+	productionRuntimeMods "eu.pb4:polymer-virtual-entity:${polymer_version}"
 
 	testImplementation platform("org.junit:junit-bom:${junit_version}")
 	testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -82,6 +89,239 @@ tasks.register('prepareDedicatedServerSmoke') {
 
 tasks.named('runDedicatedServerSmoke') {
 	dependsOn tasks.named('prepareDedicatedServerSmoke')
+}
+
+def playtestServerPort = providers.gradleProperty('playtestServerPort').orElse('25576')
+def playtestPackPort = providers.gradleProperty('playtestPackPort').orElse('25577')
+def playtestServerRunRoot = layout.buildDirectory.dir('run')
+def playtestServerDirectory = layout.buildDirectory.dir('run/client-playtest-server')
+def playtestReportDirectory = providers.gradleProperty('playtestReportDir')
+	.map { new File(it).absoluteFile }
+	.orElse(layout.buildDirectory.dir('reports/client-playtest').map { it.asFile })
+def productionReleaseJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+def productionJarNameArgument = productionReleaseJar.map { archive ->
+	'-Dpolymc-reborn.playtest.productionJarName=' + archive.asFile.name
+}
+def productionJarSha256Argument = productionReleaseJar.map { archive ->
+	def digest = java.security.MessageDigest.getInstance('SHA-256')
+	archive.asFile.withInputStream { input ->
+		def buffer = new byte[8192]
+		for (int read = input.read(buffer); read >= 0; read = input.read(buffer)) {
+			if (read > 0) {
+				digest.update(buffer, 0, read)
+			}
+		}
+	}
+	'-Dpolymc-reborn.playtest.productionJarSha256=' + java.util.HexFormat.of().formatHex(digest.digest())
+}
+def productionArtifactReport = layout.buildDirectory.file('reports/release/production-artifact.txt')
+
+tasks.register('verifyProductionArtifactSemantics') {
+	group = 'verification'
+	description = 'Verifies that the official-named Loom output is the final Java 25 production artifact.'
+	dependsOn tasks.named('jar')
+	inputs.file(productionReleaseJar)
+	outputs.file(productionArtifactReport)
+	doLast {
+		def loomExtension = project.extensions.getByName('loom')
+		if (!loomExtension.dontRemapOutputs()) {
+			throw new GradleException('Expected official-named Loom output with dontRemapOutputs enabled')
+		}
+		if (tasks.findByName('remapJar') != null) {
+			throw new GradleException('Unexpected remapJar task: official Minecraft names must ship directly')
+		}
+
+		def releaseJar = productionReleaseJar.get().asFile
+		if (releaseJar.name.contains('-dev') || releaseJar.name.contains('-sources')
+				|| releaseJar.name.contains('-javadoc')) {
+			throw new GradleException('Production artifact uses a non-distributable classifier: '
+				+ releaseJar.name)
+		}
+
+		def classCount = 0
+		def metadata
+		def mappingNamespace
+		new java.util.jar.JarFile(releaseJar).withCloseable { archive ->
+			mappingNamespace = archive.manifest?.mainAttributes
+				?.getValue('Fabric-Mapping-Namespace')
+			def metadataEntry = archive.getJarEntry('fabric.mod.json')
+			if (metadataEntry == null) {
+				throw new GradleException('Production artifact has no fabric.mod.json')
+			}
+			metadata = new groovy.json.JsonSlurper().parse(archive.getInputStream(metadataEntry))
+			archive.entries().each { entry ->
+				if (!entry.directory && entry.name.endsWith('.class')) {
+					classCount++
+					archive.getInputStream(entry).withCloseable { input ->
+						def header = input.readNBytes(8)
+						def validHeader = header.length == 8
+							&& header[0] == (byte) 0xCA && header[1] == (byte) 0xFE
+							&& header[2] == (byte) 0xBA && header[3] == (byte) 0xBE
+						def major = validHeader
+							? java.nio.ByteBuffer.wrap(header).getShort(6) & 0xffff
+							: -1
+						if (major != 69) {
+							throw new GradleException('Production class is not Java 25 major 69: '
+								+ entry.name + ' (major ' + major + ')')
+						}
+					}
+				}
+			}
+		}
+		if (classCount == 0) {
+			throw new GradleException('Production artifact contains no Java classes')
+		}
+		if (mappingNamespace != 'official') {
+			throw new GradleException('Production artifact mapping namespace is '
+				+ mappingNamespace + '; expected official')
+		}
+		if (metadata.id != 'polymc-reborn' || metadata.version != project.version.toString()
+				|| metadata.environment != 'server') {
+			throw new GradleException('Production artifact has unexpected Fabric metadata')
+		}
+		def artifactSha256 = productionJarSha256Argument.get().split('=', 2)[1]
+
+		def reportFile = productionArtifactReport.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(reportFile.parent)
+		java.nio.file.Files.writeString(reportFile,
+			'artifact=' + releaseJar.name + '\n'
+				+ 'loom_dont_remap_outputs=true\n'
+				+ 'remap_task_present=false\n'
+				+ 'mapping_namespace=official\n'
+				+ 'class_major=69\n'
+				+ 'class_count=' + classCount + '\n'
+				+ 'sha256=' + artifactSha256 + '\n')
+	}
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('verifyProductionArtifactSemantics')
+}
+
+tasks.register('playtestFixturesJar', Jar) {
+	dependsOn tasks.named('gametestClasses')
+	from sourceSets.gametest.output
+	archiveClassifier = 'playtest-fixtures'
+	destinationDirectory = layout.buildDirectory.dir('playtest-libs')
+}
+
+tasks.register('prepareProductionServerPlaytest') {
+	inputs.property('playtestServerPort', playtestServerPort)
+	inputs.property('playtestPackPort', playtestPackPort)
+	outputs.upToDateWhen { false }
+	outputs.files(playtestServerDirectory.map { directory -> [
+		directory.file('eula.txt').asFile,
+		directory.file('server.properties').asFile
+	] })
+	doLast {
+		def directory = playtestServerDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+		def safeRunRoot = playtestServerRunRoot.get().asFile.toPath().toAbsolutePath().normalize()
+		def expectedDirectory = safeRunRoot.resolve('client-playtest-server').normalize()
+		if (!directory.startsWith(safeRunRoot) || directory.equals(safeRunRoot)
+				|| !directory.equals(expectedDirectory)) {
+			throw new GradleException('Refusing to prepare unexpected playtest server directory: '
+				+ directory)
+		}
+		delete directory.toFile()
+		java.nio.file.Files.createDirectories(directory)
+		java.nio.file.Files.writeString(directory.resolve('eula.txt'), 'eula=true\n')
+		java.nio.file.Files.writeString(directory.resolve('server.properties'),
+			'online-mode=false\nserver-ip=127.0.0.1\nserver-port=' + playtestServerPort.get()
+				+ '\nlevel-seed=PolyMc-Reborn-0.2-playtest\ngenerate-structures=false\n'
+				+ 'max-players=1\nspawn-animals=false\nspawn-monsters=false\nspawn-npcs=false\n'
+				+ 'difficulty=normal\n'
+				+ 'spawn-protection=0\nview-distance=5\nsimulation-distance=5\n'
+				+ 'enable-command-block=false\nmax-tick-time=0\npause-when-empty-seconds=-1\n'
+				+ 'motd=PolyMc Reborn isolated client playtest\n')
+	}
+}
+
+tasks.register('assemblePlaytestServer') {
+	group = 'verification'
+	description = 'Builds the production JAR, server fixture JAR, and fresh isolated server configuration.'
+	dependsOn tasks.named('verifyProductionArtifactSemantics'), tasks.named('playtestFixturesJar'),
+		tasks.named('prepareProductionServerPlaytest')
+}
+
+tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.ServerProductionRunTask) {
+	dependsOn tasks.named('verifyProductionArtifactSemantics'), tasks.named('playtestFixturesJar'),
+		tasks.named('prepareProductionServerPlaytest')
+	mods.setFrom(productionReleaseJar, configurations.named('productionRuntimeMods'),
+		tasks.named('playtestFixturesJar').flatMap { it.archiveFile })
+	runDir = playtestServerDirectory
+	programArgs.add('--nogui')
+	jvmArgs.add('-Dpolymc-reborn.playtest.enabled=true')
+	jvmArgs.add(productionJarNameArgument)
+	jvmArgs.add(productionJarSha256Argument)
+	jvmArgs.add('-Dpolymc-reborn.playtest.stopFile=' + playtestServerDirectory.get()
+		.file('stop.request').asFile.absolutePath)
+	jvmArgs.add('-Dpolymc-reborn.playtest.readyFile=' + playtestServerDirectory.get()
+		.file('server-ready.json').asFile.absolutePath)
+	jvmArgs.add('-Dpolymc-reborn.playtest.reportDir=' + playtestReportDirectory.get().absolutePath)
+	jvmArgs.add(playtestPackPort.map { '-Dpolymc-reborn.playtest.packPort=' + it })
+	doFirst {
+		def expectedReleaseJar = productionReleaseJar.get().asFile.canonicalFile
+		def matchingReleaseJars = mods.files.findAll { candidate ->
+			candidate.canonicalFile == expectedReleaseJar
+		}
+		if (matchingReleaseJars.size() != 1) {
+			throw new GradleException('Production playtest must load exactly one release JAR; found '
+				+ matchingReleaseJars.size())
+		}
+		def unexpectedProjectJars = mods.files.findAll { candidate ->
+			candidate.parentFile?.canonicalFile == expectedReleaseJar.parentFile?.canonicalFile
+				&& candidate.canonicalFile != expectedReleaseJar
+				&& candidate.name.startsWith(project.archives_base_name + '-')
+		}
+		if (!unexpectedProjectJars.isEmpty()) {
+			throw new GradleException('Production playtest contains duplicate project JARs: '
+				+ unexpectedProjectJars.collect { it.name }.sort().join(', '))
+		}
+	}
+}
+
+def playtestEvidenceDirectory = layout.buildDirectory.dir('playtest')
+def clientDriverProject = project(':playtest:client-driver')
+
+tasks.register('cleanPlaytest', Delete) {
+	group = 'verification'
+	description = 'Deletes only generated isolated-client playtest runs and evidence.'
+	delete playtestEvidenceDirectory
+	delete layout.buildDirectory.dir('run/client-playtest-evidence-input')
+	delete layout.buildDirectory.dir('reports/client-playtest')
+	delete playtestServerDirectory
+	delete clientDriverProject.layout.buildDirectory.dir('run/client-playtest')
+}
+
+tasks.register('verifyPlaytestClientIsolation') {
+	group = 'verification'
+	description = 'Rejects a client driver containing PolyMc Reborn, Polymer, or server fixture code.'
+	dependsOn ':playtest:client-driver:verifyIsolatedClientDriver'
+}
+
+tasks.register('runProductionClientPlaytest', Exec) {
+	group = 'verification'
+	description = 'Runs the isolated two-process production server and real Fabric client playtest.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	workingDir rootDir
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+			file('scripts/playtest/run-client-playtest.ps1').absolutePath
+	} else {
+		commandLine 'bash', file('scripts/playtest/run-client-playtest.sh').absolutePath
+	}
+}
+
+tasks.register('runClientPlaytest') {
+	group = 'verification'
+	description = 'Alias for the production isolated-client playtest.'
+	dependsOn tasks.named('runProductionClientPlaytest')
+}
+
+tasks.register('runPlaytest') {
+	group = 'verification'
+	description = 'Runs the complete isolated production client/server playtest.'
+	dependsOn tasks.named('runProductionClientPlaytest')
 }
 
 def buildGitCommit = providers.environmentVariable('GITHUB_SHA').orElse(

@@ -14,3 +14,5 @@ plugins {
 }
 
 rootProject.name = 'PolyMc-Reborn'
+
+include 'playtest:client-driver'

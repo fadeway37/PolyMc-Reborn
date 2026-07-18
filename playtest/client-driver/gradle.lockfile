@@ -1,0 +1,9 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+net.fabricmc.fabric-api:fabric-api-base:2.0.3+ece063234c=mainCompileDependencyResolve,mainRuntimeDependencyResolve,productionRuntimeMods
+net.fabricmc.fabric-api:fabric-client-gametest-api-v1:5.1.0+0a5283664c=mainCompileDependencyResolve,mainRuntimeDependencyResolve,productionRuntimeMods
+net.fabricmc.fabric-api:fabric-resource-loader-v1:2.0.10+7c44c7324c=mainCompileDependencyResolve,mainRuntimeDependencyResolve,productionRuntimeMods
+net.fabricmc:fabric-loader:0.19.3=mainCompileDependencyResolve,mainRuntimeDependencyResolve
+org.jetbrains:annotations:26.0.2=mainCompileDependencyResolve
+empty=

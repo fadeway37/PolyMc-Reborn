@@ -13,11 +13,17 @@ report_failure() {
     failures=$((failures + 1))
 }
 
-if [[ ! -f gradle.lockfile ]]; then
-    report_failure 'gradle.lockfile is missing; dependency resolution must be locked'
-elif ! git ls-files --error-unmatch gradle.lockfile >/dev/null 2>&1; then
-    report_failure 'gradle.lockfile exists but is not tracked'
-fi
+required_lockfiles=(
+    'gradle.lockfile'
+    'playtest/client-driver/gradle.lockfile'
+)
+for lockfile in "${required_lockfiles[@]}"; do
+    if [[ ! -f "$lockfile" ]]; then
+        report_failure "$lockfile is missing; every Gradle project must lock dependency resolution"
+    elif ! git ls-files --error-unmatch "$lockfile" >/dev/null 2>&1; then
+        report_failure "$lockfile exists but is not tracked"
+    fi
+done
 
 mapfile -t tracked_jars < <(git ls-files | grep -Ei '\.jar$' || true)
 for jar_path in "${tracked_jars[@]}"; do
@@ -27,7 +33,9 @@ for jar_path in "${tracked_jars[@]}"; do
 done
 
 mapfile -t tracked_runtime_outputs < <(
-    git ls-files | grep -E '^(build|\.gradle|run|config|cache)/' || true
+    git ls-files | grep -E \
+        '^(build|\.gradle|run|config|cache)/|^playtest/client-driver/(build|\.gradle|run|config|cache)/' \
+        || true
 )
 for output_path in "${tracked_runtime_outputs[@]}"; do
     report_failure "Generated/runtime path is tracked: $output_path"

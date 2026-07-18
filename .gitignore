@@ -1,5 +1,9 @@
 /.gradle/
 /build/
+/playtest/client-driver/build/
+/playtest/external-cache/
+**/__pycache__/
+*.py[cod]
 /out/
 /run/
 /.idea/

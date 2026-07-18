@@ -1,0 +1,187 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = 'polymc-reborn-client-driver'
+}
+
+repositories {
+	// Minecraft, Fabric Loader, and Fabric API are resolved from Loom's official repositories.
+}
+
+loom {
+	clientOnlyMinecraftJar()
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${loader_version}"
+	implementation fabricApi.module('fabric-client-gametest-api-v1', fabric_api_version)
+	implementation fabricApi.module('fabric-resource-loader-v1', fabric_api_version)
+
+	productionRuntimeMods fabricApi.module('fabric-client-gametest-api-v1', fabric_api_version)
+	productionRuntimeMods fabricApi.module('fabric-resource-loader-v1', fabric_api_version)
+}
+
+processResources {
+	inputs.property 'version', project.version
+	filesMatching('fabric.mod.json') {
+		expand version: project.version
+	}
+}
+
+def isolatedClientRunRoot = layout.buildDirectory.dir('run')
+def isolatedClientRunDirectory = layout.buildDirectory.dir('run/client-playtest')
+
+tasks.register('prepareIsolatedProductionClientRun') {
+	group = 'verification'
+	description = 'Recreates only the bounded isolated-client production run directory.'
+	outputs.upToDateWhen { false }
+	doLast {
+		def safeRunRoot = isolatedClientRunRoot.get().asFile.toPath().toAbsolutePath().normalize()
+		def directory = isolatedClientRunDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+		def expectedDirectory = safeRunRoot.resolve('client-playtest').normalize()
+		if (!directory.startsWith(safeRunRoot) || directory.equals(safeRunRoot)
+				|| !directory.equals(expectedDirectory)) {
+			throw new GradleException('Refusing to prepare unexpected isolated-client directory: '
+				+ directory)
+		}
+		delete directory.toFile()
+		java.nio.file.Files.createDirectories(directory)
+	}
+}
+
+tasks.register('runIsolatedProductionClientDriver', net.fabricmc.loom.task.prod.ClientProductionRunTask) {
+	group = 'verification'
+	description = 'Runs only the minimal isolated Minecraft client driver; use the root playtest tasks for orchestration.'
+	dependsOn tasks.named('jar'), tasks.named('prepareIsolatedProductionClientRun')
+	runDir = isolatedClientRunDirectory
+	useXVFB = providers.environmentVariable('CI').map { it == 'true' }.orElse(false)
+	jvmArgs.add('-Dfabric.client.gametest')
+	jvmArgs.add('-Dfabric.client.gametest.disableNetworkSynchronizer=true')
+	jvmArgs.add('-Dfabric.client.gametest.modid=polymc-reborn-client-driver')
+	jvmArgs.add(providers.gradleProperty('playtestAddress')
+		.map { '-Dpolymc-reborn.playtest.address=' + it }
+		.orElse('-Dpolymc-reborn.playtest.address=127.0.0.1:25576'))
+	jvmArgs.add(providers.gradleProperty('playtestReportDir')
+		.map { '-Dpolymc-reborn.playtest.reportDir=' + new File(it).absolutePath }
+		.orElse('-Dpolymc-reborn.playtest.reportDir=' + rootProject.layout.buildDirectory
+			.dir('reports/client-playtest').get().asFile.absolutePath))
+	jvmArgs.add(providers.gradleProperty('playtestPackSha256')
+		.map { '-Dpolymc-reborn.playtest.packSha256=' + it }
+		.orElse('-Dpolymc-reborn.playtest.packSha256=missing'))
+	jvmArgs.add(providers.gradleProperty('playtestPackSha1')
+		.map { '-Dpolymc-reborn.playtest.packSha1=' + it }
+		.orElse('-Dpolymc-reborn.playtest.packSha1=missing'))
+}
+
+tasks.register('verifyIsolatedClientDriver') {
+	group = 'verification'
+	description = 'Checks that the production client runtime contains no Reborn, Polymer, or fixture code.'
+	dependsOn tasks.named('jar')
+
+	doLast {
+		def runtimeMods = configurations.getByName('productionRuntimeMods')
+		def forbiddenComponents = runtimeMods.incoming.resolutionResult.allComponents
+			.collect { component -> component.id }
+			.findAll { identifier ->
+				identifier instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
+			}
+			.collect { identifier ->
+				[identifier.group, identifier.module, identifier.version]
+			}
+			.findAll { coordinate ->
+				def moduleName = coordinate[1].toLowerCase(java.util.Locale.ROOT)
+				moduleName == 'polymc-reborn'
+					|| moduleName == 'polymc'
+					|| moduleName.startsWith('polymer-')
+					|| moduleName.contains('playtest-fixture')
+			}
+			.collect { coordinate -> coordinate.join(':') }
+			.sort()
+		if (!forbiddenComponents.isEmpty()) {
+			throw new GradleException('Isolated client has forbidden runtime Mod dependencies: '
+				+ forbiddenComponents.join(', '))
+		}
+
+		def forbiddenProjectDependencies = configurations
+			.collectMany { configuration -> configuration.dependencies }
+			.findAll { dependency -> dependency instanceof org.gradle.api.artifacts.ProjectDependency }
+			.collect { dependency -> dependency.toString() }
+			.unique()
+			.sort()
+		if (!forbiddenProjectDependencies.isEmpty()) {
+			throw new GradleException('Isolated client has project dependencies: '
+				+ forbiddenProjectDependencies.join(', '))
+		}
+
+		def driverJar = tasks.named('jar', Jar).get().archiveFile.get().asFile
+		def forbiddenEntries = []
+		def fabricMetadata
+		new java.util.zip.ZipFile(driverJar).withCloseable { archive ->
+			archive.entries().each { entry ->
+				def name = entry.name
+				if (!entry.isDirectory() && ((name.startsWith('io/github/polymcreborn/')
+						&& !name.startsWith('io/github/polymcreborn/playtest/client/'))
+						|| name.startsWith('io/github/theepicblock/polymc/'))) {
+					forbiddenEntries.add(name)
+				}
+			}
+			def metadataEntry = archive.getEntry('fabric.mod.json')
+			if (metadataEntry == null) {
+				throw new GradleException('Client driver JAR has no fabric.mod.json: ' + driverJar.name)
+			}
+			fabricMetadata = new groovy.json.JsonSlurper().parse(archive.getInputStream(metadataEntry))
+		}
+		if (!forbiddenEntries.isEmpty()) {
+			throw new GradleException('Client driver JAR contains forbidden server/API classes: '
+				+ forbiddenEntries.sort().join(', '))
+		}
+		if (fabricMetadata.id != 'polymc-reborn-client-driver'
+				|| fabricMetadata.environment != 'client') {
+			throw new GradleException('Client driver metadata must use id polymc-reborn-client-driver '
+				+ 'and environment client')
+		}
+		def declaredModIds = []
+		['depends', 'recommends', 'suggests'].each { section ->
+			if (fabricMetadata[section] instanceof Map) {
+				declaredModIds.addAll(fabricMetadata[section].keySet().collect { it.toString() })
+			}
+		}
+		def forbiddenDeclaredIds = declaredModIds.findAll { modId ->
+			modId == 'polymc-reborn' || modId == 'polymc'
+				|| modId.startsWith('polymer') || modId.contains('fixture')
+		}.sort()
+		if (!forbiddenDeclaredIds.isEmpty()) {
+			throw new GradleException('Client driver metadata declares forbidden Mod IDs: '
+				+ forbiddenDeclaredIds.join(', '))
+		}
+
+		logger.lifecycle('Verified isolated client: {} contains only driver classes and {} permitted runtime Mod components.',
+			driverJar.name, runtimeMods.incoming.resolutionResult.allComponents.size())
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = 'UTF-8'
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+dependencyLocking {
+	lockAllConfigurations()
+}
