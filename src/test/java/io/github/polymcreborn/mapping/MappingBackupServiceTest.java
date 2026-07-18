@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class MappingBackupServiceTest {
     private static final String MINECRAFT = "26.1.2";
@@ -107,11 +108,104 @@ class MappingBackupServiceTest {
     }
 
     @Test
+    void interruptedPendingMetadataWriteFailsClosedWithoutTouchingPrimary() throws IOException {
+        var store = new PersistentMappingStore(temporaryDirectory);
+        store.save(List.of(mapping("demo:current", "minecraft:paper")));
+        byte[] current = Files.readAllBytes(store.path());
+        var service = service();
+        var pendingMetadata = service.pendingPath().resolveSibling(
+                "mappings-v1.rollback-pending.meta.json");
+        Files.writeString(pendingMetadata, "{}", StandardCharsets.UTF_8);
+
+        var failure = assertThrows(MappingStoreException.class,
+                () -> service.activatePendingRollback(MINECRAFT, VERSION));
+
+        assertTrue(failure.getMessage().contains("Incomplete pending rollback"));
+        assertArrayEquals(current, Files.readAllBytes(store.path()));
+        assertTrue(Files.exists(pendingMetadata));
+    }
+
+    @Test
+    void tamperedPendingRollbackFailsClosedAndRemainsAvailableForDiagnosis() throws IOException {
+        var store = new PersistentMappingStore(temporaryDirectory);
+        store.save(List.of(mapping("demo:rollback", "minecraft:paper")));
+        var service = service();
+        var backup = service.backupCurrent(MINECRAFT, VERSION);
+        store.save(List.of(mapping("demo:current", "minecraft:stone")));
+        byte[] current = Files.readAllBytes(store.path());
+        service.prepareRollback(backup.id(), MINECRAFT, VERSION);
+        Files.writeString(service.pendingPath(), "{}", StandardCharsets.UTF_8);
+
+        var failure = assertThrows(MappingStoreException.class,
+                () -> service.activatePendingRollback(MINECRAFT, VERSION));
+
+        assertTrue(failure.getMessage().contains("checksum mismatch"));
+        assertArrayEquals(current, Files.readAllBytes(store.path()));
+        assertTrue(Files.exists(service.pendingPath()));
+        assertTrue(Files.exists(service.pendingPath().resolveSibling(
+                "mappings-v1.rollback-pending.meta.json")));
+    }
+
+    @Test
+    void malformedBackupMetadataRootIsReportedAsMappingError() throws IOException {
+        var store = new PersistentMappingStore(temporaryDirectory);
+        store.save(List.of(mapping("demo:backup", "minecraft:paper")));
+        var service = service();
+        var backup = service.backupCurrent(MINECRAFT, VERSION);
+        Path metadata = temporaryDirectory.resolve("backups/mappings/" + backup.id() + ".meta.json");
+        Files.writeString(metadata, "[]", StandardCharsets.UTF_8);
+
+        var failure = assertThrows(MappingStoreException.class,
+                () -> service.prepareRollback(backup.id(), MINECRAFT, VERSION));
+
+        assertTrue(failure.getMessage().contains("Invalid backup metadata"));
+    }
+
+    @Test
+    void pendingRollbackForAnotherMinecraftVersionCannotReplacePrimary() throws IOException {
+        var store = new PersistentMappingStore(temporaryDirectory);
+        store.save(List.of(mapping("demo:rollback", "minecraft:paper")));
+        var service = service();
+        var backup = service.backupCurrent(MINECRAFT, VERSION);
+        store.save(List.of(mapping("demo:current", "minecraft:stone")));
+        byte[] current = Files.readAllBytes(store.path());
+        service.prepareRollback(backup.id(), MINECRAFT, VERSION);
+
+        var failure = assertThrows(MappingStoreException.class,
+                () -> service.activatePendingRollback("26.2", VERSION));
+
+        assertTrue(failure.getMessage().contains("targets Minecraft 26.1.2"));
+        assertArrayEquals(current, Files.readAllBytes(store.path()));
+        assertTrue(Files.exists(service.pendingPath()));
+    }
+
+    @Test
     void rejectsPathTraversalBackupIdentifiers() {
         var service = service();
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.prepareRollback("../../server.properties", MINECRAFT, VERSION));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.prepareRollback("..\\..\\server.properties", MINECRAFT, VERSION));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.prepareRollback("C:/server.properties", MINECRAFT, VERSION));
+    }
+
+    @Test
+    void rejectsBackupDirectorySymlinkThatEscapesConfiguredRoot() throws IOException {
+        Path root = temporaryDirectory.resolve("root");
+        Path outside = temporaryDirectory.resolve("outside");
+        Files.createDirectories(root.resolve("backups"));
+        Files.createDirectories(outside);
+        try {
+            Files.createSymbolicLink(root.resolve("backups/mappings"), outside);
+        } catch (UnsupportedOperationException | IOException | SecurityException unavailable) {
+            assumeTrue(false, "symbolic links are unavailable: " + unavailable.getClass().getSimpleName());
+        }
+
+        var failure = assertThrows(IllegalArgumentException.class,
+                () -> new MappingBackupService(root));
+        assertTrue(failure.getMessage().contains("symbolic link"));
     }
 
     private MappingBackupService service() {

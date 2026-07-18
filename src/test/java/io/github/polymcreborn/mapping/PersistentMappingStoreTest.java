@@ -132,6 +132,21 @@ class PersistentMappingStoreTest {
                 "missing_namespace", ContentType.ITEM, "", "item", "minecraft:paper", "",
                 "0.1", "0.1"));
         assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
+                "Demo:Uppercase", ContentType.ITEM, "", "item", "minecraft:paper", "",
+                "0.1", "0.1"));
+        assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
+                "demo:item", ContentType.ITEM, "active=true", "item", "minecraft:paper", "",
+                "0.1", "0.1"));
+        assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
+                "demo:block", ContentType.BLOCK, "active", "item", "minecraft:paper", "",
+                "0.1", "0.1"));
+        assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
+                "demo:item", ContentType.ITEM, "", "item", "not a carrier", "",
+                "0.1", "0.1"));
+        assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
+                "demo:item", ContentType.ITEM, "", "bad strategy", "minecraft:paper", "",
+                "0.1", "0.1"));
+        assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
                 "demo:item", ContentType.ITEM, "", "item", "minecraft:paper", "not-a-hash",
                 "0.1", "0.1"));
         var duplicate = mapping("demo:item", ContentType.ITEM, "minecraft:paper");

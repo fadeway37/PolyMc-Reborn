@@ -25,6 +25,7 @@ import java.util.Set;
 /** Strict mappings-v1.json store preserving old assignments and producing stable bytes. */
 public final class PersistentMappingStore {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    private static final long MAX_MAPPING_BYTES = 32L * 1024L * 1024L;
     private static final Set<String> ROOT_FIELDS = Set.of(
             "schema_version", "mapping_algorithm_version", "mappings");
     private static final Set<String> ENTRY_FIELDS = Set.of(
@@ -42,6 +43,11 @@ public final class PersistentMappingStore {
             return MappingStoreDocument.empty();
         }
         try {
+            long size = Files.size(path);
+            if (size > MAX_MAPPING_BYTES) {
+                throw new MappingStoreException(path,
+                        "Mapping file exceeds hard limit " + MAX_MAPPING_BYTES + "; data was not read");
+            }
             return parse(Files.readAllBytes(path), path);
         } catch (MappingStoreException exception) {
             throw exception;
@@ -57,6 +63,10 @@ public final class PersistentMappingStore {
     }
 
     MappingStoreDocument parse(byte[] bytes, Path logicalPath) {
+        if (bytes.length > MAX_MAPPING_BYTES) {
+            throw new MappingStoreException(logicalPath,
+                    "Mapping data exceeds hard limit " + MAX_MAPPING_BYTES + "; data was not parsed");
+        }
         try (var reader = new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8)) {
             var root = JsonParser.parseReader(reader).getAsJsonObject();
             ConfigManager.rejectUnknown(logicalPath, "$", root, ROOT_FIELDS);

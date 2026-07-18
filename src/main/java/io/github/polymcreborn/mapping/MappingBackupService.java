@@ -94,10 +94,11 @@ public final class MappingBackupService {
     }
 
     public List<BackupInfo> listBackups() {
-        if (Files.notExists(backupsDirectory)) {
+        var safeBackupsDirectory = contained(backupsDirectory);
+        if (Files.notExists(safeBackupsDirectory)) {
             return List.of();
         }
-        try (var paths = Files.list(backupsDirectory)) {
+        try (var paths = Files.list(safeBackupsDirectory)) {
             var metadataPaths = paths.filter(path -> path.getFileName().toString().endsWith(".meta.json"))
                     .sorted().toList();
             var result = new ArrayList<BackupInfo>();
@@ -119,8 +120,8 @@ public final class MappingBackupService {
         var pending = new PendingRollback(1, backupId, validated.info().sha256(), minecraftVersion,
                 validated.document().mappingAlgorithmVersion());
         try {
-            AtomicFiles.write(pendingPath, validated.bytes());
-            AtomicFiles.write(pendingMetadataPath, json(pending));
+            AtomicFiles.write(contained(pendingPath), validated.bytes());
+            AtomicFiles.write(contained(pendingMetadataPath), json(pending));
             return new RollbackPreparation(backupId,
                     safetyBackup == null ? null : safetyBackup.id(), pendingPath.getFileName().toString());
         } catch (IOException exception) {
@@ -164,8 +165,8 @@ public final class MappingBackupService {
             } else {
                 AtomicFiles.write(store.path(), bytes);
             }
-            Files.delete(pendingPath);
-            Files.delete(pendingMetadataPath);
+            Files.delete(contained(pendingPath));
+            Files.delete(contained(pendingMetadataPath));
             return true;
         } catch (IOException exception) {
             throw new MappingStoreException(pendingPath, "Could not activate pending rollback", exception);
@@ -218,14 +219,16 @@ public final class MappingBackupService {
     }
 
     private BackupMetadata readBackupMetadata(Path metadataPath) throws IOException {
-        var rootObject = JsonParser.parseString(Files.readString(metadataPath, StandardCharsets.UTF_8))
-                .getAsJsonObject();
-        ConfigManager.rejectUnknown(metadataPath, "$", rootObject, BACKUP_FIELDS);
-        ConfigManager.requireFields(metadataPath, "$", rootObject, BACKUP_FIELDS);
         try {
+            var rootObject = JsonParser.parseString(Files.readString(metadataPath, StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            ConfigManager.rejectUnknown(metadataPath, "$", rootObject, BACKUP_FIELDS);
+            ConfigManager.requireFields(metadataPath, "$", rootObject, BACKUP_FIELDS);
             var metadata = GSON.fromJson(rootObject, BackupMetadata.class);
             metadata.validate();
             return metadata;
+        } catch (MappingStoreException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
             throw new MappingStoreException(metadataPath,
                     "Invalid backup metadata: " + exception.getMessage(), exception);
@@ -233,14 +236,16 @@ public final class MappingBackupService {
     }
 
     private PendingRollback readPendingMetadata() throws IOException {
-        var rootObject = JsonParser.parseString(Files.readString(pendingMetadataPath, StandardCharsets.UTF_8))
-                .getAsJsonObject();
-        ConfigManager.rejectUnknown(pendingMetadataPath, "$", rootObject, PENDING_FIELDS);
-        ConfigManager.requireFields(pendingMetadataPath, "$", rootObject, PENDING_FIELDS);
         try {
+            var rootObject = JsonParser.parseString(Files.readString(pendingMetadataPath, StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            ConfigManager.rejectUnknown(pendingMetadataPath, "$", rootObject, PENDING_FIELDS);
+            ConfigManager.requireFields(pendingMetadataPath, "$", rootObject, PENDING_FIELDS);
             var pending = GSON.fromJson(rootObject, PendingRollback.class);
             pending.validate();
             return pending;
+        } catch (MappingStoreException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
             throw new MappingStoreException(pendingMetadataPath,
                     "Invalid pending rollback metadata: " + exception.getMessage(), exception);
@@ -248,11 +253,12 @@ public final class MappingBackupService {
     }
 
     private byte[] boundedRead(Path path) throws IOException {
-        long size = Files.size(path);
+        var safePath = contained(path);
+        long size = Files.size(safePath);
         if (size > MAX_MAPPING_BYTES) {
-            throw new MappingStoreException(path, "Mapping file exceeds hard limit " + MAX_MAPPING_BYTES);
+            throw new MappingStoreException(safePath, "Mapping file exceeds hard limit " + MAX_MAPPING_BYTES);
         }
-        return Files.readAllBytes(path);
+        return Files.readAllBytes(safePath);
     }
 
     private String uniqueBackupId(String base) {
@@ -285,7 +291,34 @@ public final class MappingBackupService {
         if (!normalized.startsWith(root)) {
             throw new IllegalArgumentException("Mapping operation escaped its configured root");
         }
+        try {
+            Path rootAnchor = resolvedAnchor(root);
+            Path existing = normalized;
+            while (existing != null && Files.notExists(existing)) {
+                existing = existing.getParent();
+            }
+            if (existing != null && existing.startsWith(root)) {
+                Path realExisting = existing.toRealPath();
+                if (!realExisting.startsWith(rootAnchor)) {
+                    throw new IllegalArgumentException(
+                            "Mapping operation encountered a symbolic link outside its configured root");
+                }
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not verify mapping path containment", exception);
+        }
         return normalized;
+    }
+
+    private static Path resolvedAnchor(Path desired) throws IOException {
+        Path existing = desired;
+        while (existing != null && Files.notExists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) {
+            throw new IOException("Mapping root has no existing filesystem ancestor");
+        }
+        return existing.toRealPath().resolve(existing.relativize(desired)).normalize();
     }
 
     private static byte[] json(Object value) {
