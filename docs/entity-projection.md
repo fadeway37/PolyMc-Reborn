@@ -38,7 +38,8 @@ The fixture explicitly maps its real custom entity to an armor stand, exposes a
 visible name/glow, and counts callbacks against the real entity. The isolated
 client scenario observes spawn/movement and sends real use/attack input. The
 retained 2026-07-18 local Playtest passed both callbacks and the corresponding
-client screenshots; GitHub Actions remains a separately reported gate.
+client screenshots; GitHub Actions Client Playtest `29641300974` repeated the
+complete scenario successfully.
 
 | Capability | 0.2 implementation |
 | --- | --- |

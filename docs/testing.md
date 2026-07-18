@@ -142,8 +142,13 @@ fresh directories. The retained final run reports 53/53 aggregate checks,
 34/34 client steps, 17/17 screenshot artifacts, client/server exit code zero,
 no timeout, no forced termination, and a clean server stop. It observed exactly
 two joins/disconnects, two resource-pack pushes/GETs, and two byte-identical
-client pack-cache files. GitHub Actions is not covered by this local statement
-and requires its own run ID and artifact review.
+client pack-cache files. GitHub Actions Client Playtest run
+[`29641300974`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300974)
+passed the same 53/53 checks and 34/34 client steps under Ubuntu 24.04/Xvfb;
+standard CI run
+[`29641300985`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300985)
+also passed. Their evidence and release-JAR artifacts were downloaded to the
+ignored `build/github-artifacts/` directory and inspected.
 
 ## Resource-pack stability
 

@@ -138,9 +138,13 @@ Local verification on 2026-07-18 completed `runClientPlaytest`,
 bundle contains 53/53 passing aggregate checks, 34/34 passing client steps, and
 all 17 required screenshots. Its authoritative server observations include two
 joins, two disconnects, three GUI opens/closes, two entity callbacks, and two
-resource-pack pushes/GETs. This does not claim a GitHub Actions result; record
-the actual workflow run ID and downloaded-artifact inspection separately in the
-release handoff.
+resource-pack pushes/GETs. GitHub Actions run
+[`29641300974`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300974)
+also passed 53/53 checks and 34/34 client steps under Ubuntu 24.04/Xvfb. Its
+5,353,727-byte evidence artifact was downloaded, parsed, and visually sampled;
+standard CI run
+[`29641300985`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300985)
+also passed and its distribution JAR was inspected.
 
 ## Separate P1 layers
 

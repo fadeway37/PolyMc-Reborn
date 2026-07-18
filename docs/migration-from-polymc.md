@@ -123,7 +123,8 @@ error by design.
 - Restart reuses the same mapping bytes/assignments.
 - `runPlaytest` uses the isolated client allow-list and produces complete
   `build/playtest` evidence. The 2026-07-18 local release-candidate run passed
-  53/53 checks and 34/34 client steps; CI remains a separately cited result.
+  53/53 checks and 34/34 client steps; GitHub Actions Client Playtest
+  `29641300974` repeated the result successfully.
 
 The detailed compatibility matrix is in
 [legacy-api-compatibility.md](legacy-api-compatibility.md).

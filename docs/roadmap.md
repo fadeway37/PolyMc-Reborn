@@ -29,8 +29,8 @@ Implemented engineering scope:
 
 The exact local Client, Production Client, and aggregate Playtest commands
 passed on 2026-07-18 and their retained evidence was inspected. GitHub Actions
-remains a separate `NOT RUN` release gate until a run ID and downloaded artifact
-are verified.
+Client Playtest `29641300974` and standard CI `29641300985` also passed; their
+downloaded evidence and release-JAR artifacts were inspected.
 
 ## P1 work not completed for 0.2
 

@@ -57,8 +57,9 @@ principles; alpha versions are tied to an exact Minecraft version.
 Local verification on 2026-07-18 completed `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` successfully. The retained
 final bundle reports 53/53 checks, 34/34 client steps, and 17/17 screenshots.
-GitHub Actions verification remains a separate result until a concrete run ID
-and downloaded artifact have been inspected.
+GitHub Actions Client Playtest `29641300974` and standard CI `29641300985`
+completed successfully, and their evidence/JAR artifacts were downloaded and
+inspected.
 
 ## [0.1.0-alpha.1+26.1.2]
 

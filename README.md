@@ -189,8 +189,11 @@ matrix are separate P1 layers and are not implemented or claimed by this
 release. On 2026-07-18 the local `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` commands each completed
 successfully; the retained final evidence reports 53/53 checks, 34/34 client
-steps, and 17/17 screenshots. A GitHub Actions result is a separate gate and
-must be cited by run ID after it completes. See
+steps, and 17/17 screenshots. GitHub Actions Client Playtest run
+[`29641300974`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300974)
+and standard CI run
+[`29641300985`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300985)
+both completed successfully; both downloaded artifacts were inspected. See
 [testing.md](docs/testing.md) and [client-playtest.md](docs/client-playtest.md).
 
 The distributable JAR and sources/Javadoc JARs are written to `build/libs/`.
