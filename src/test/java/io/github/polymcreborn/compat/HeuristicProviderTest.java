@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HeuristicProviderTest {
@@ -43,7 +42,9 @@ class HeuristicProviderTest {
         assertEquals("textured-full-cube", simpleDecision.strategy());
         assertTrue(simpleDecision.warnings().isEmpty());
         assertEquals(MappingStatus.HEURISTIC, stateDecision.status());
-        assertFalse(stateDecision.warnings().isEmpty());
+        assertTrue(stateDecision.warnings().isEmpty());
+        assertTrue(stateDecision.resourceDependencies().contains("assets/demo/blockstates/cube.json"));
+        assertTrue(stateDecision.reasonChain().stream().anyMatch(reason -> reason.contains("Every safe server state")));
     }
 
     @Test
@@ -54,10 +55,13 @@ class HeuristicProviderTest {
                 "has_block_entity", "false"));
         var entity = block(Map.of("full_cube", "true", "stable_shape", "true",
                 "has_block_entity", "true"));
+        var unsafeBreaking = block(Map.of("full_cube", "true", "stable_shape", "true",
+                "has_block_entity", "false", "breaking_semantics_safe", "false"));
 
         assertTrue(provider.evaluate(nonFull, MappingContext.vanillaSafe()).isEmpty());
         assertTrue(provider.evaluate(dynamic, MappingContext.vanillaSafe()).isEmpty());
         assertTrue(provider.evaluate(entity, MappingContext.vanillaSafe()).isEmpty());
+        assertTrue(provider.evaluate(unsafeBreaking, MappingContext.vanillaSafe()).isEmpty());
     }
 
     @Test

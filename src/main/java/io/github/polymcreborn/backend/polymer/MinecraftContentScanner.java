@@ -65,7 +65,10 @@ public final class MinecraftContentScanner {
             attributes.put("full_cube", Boolean.toString(analysis.fullCube()));
             attributes.put("stable_shape", Boolean.toString(analysis.stableShape()));
             attributes.put("has_block_entity", Boolean.toString(analysis.hasBlockEntity()));
+            attributes.put("breaking_semantics_safe", Boolean.toString(analysis.breakingSemanticsSafe()));
             attributes.put("state_count", Integer.toString(analysis.stateCount()));
+            attributes.put("default_state", analysis.defaultState());
+            attributes.put("block_states", String.join(";", analysis.stateKeys()));
             attributes.put("shape_analysis_failed", Boolean.toString(analysis.failed()));
             if (analysis.failed()) {
                 attributes.put("shape_analysis_error", analysis.failureType());
@@ -79,6 +82,8 @@ public final class MinecraftContentScanner {
     private static BlockAnalysis analyzeBlock(Block block) {
         try {
             var states = block.getStateDefinition().getPossibleStates();
+            var stateKeys = states.stream().map(BlockStateKey::canonicalProperties).sorted().toList();
+            String defaultState = BlockStateKey.canonicalProperties(block.defaultBlockState());
             boolean hasBlockEntity = states.stream().anyMatch(state -> state.hasBlockEntity());
             var properties = new java.util.TreeMap<String, String>();
             block.getStateDefinition().getProperties().stream()
@@ -93,21 +98,31 @@ public final class MinecraftContentScanner {
                                 CollisionContext.empty())));
                 boolean stableShape = !block.hasDynamicShape() && states.stream().noneMatch(state ->
                         state.isSignalSource() || state.hasAnalogOutputSignal());
-                return new BlockAnalysis(fullCube, stableShape, hasBlockEntity, states.size(), properties,
-                        false, "");
+                float carrierDestroySpeed = net.minecraft.world.level.block.Blocks.NOTE_BLOCK.defaultBlockState()
+                        .getDestroySpeed(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+                boolean breakingSemanticsSafe = states.stream().allMatch(state -> {
+                    float destroySpeed = state.getDestroySpeed(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+                    return Float.isFinite(destroySpeed) && destroySpeed >= 0.0F
+                            && destroySpeed <= carrierDestroySpeed
+                            && !state.requiresCorrectToolForDrops();
+                });
+                return new BlockAnalysis(fullCube, stableShape, hasBlockEntity, breakingSemanticsSafe,
+                        states.size(), properties,
+                        defaultState, stateKeys, false, "");
             } catch (RuntimeException exception) {
-                return failedAnalysis(hasBlockEntity, states.size(), properties, exception);
+                return failedAnalysis(hasBlockEntity, states.size(), properties, defaultState, stateKeys, exception);
             }
         } catch (RuntimeException exception) {
             // If even state metadata is unsafe to inspect, assume the most conservative block shape and BE facts.
-            return failedAnalysis(true, 0, Map.of(), exception);
+            return failedAnalysis(true, 0, Map.of(), "", List.of(), exception);
         }
     }
 
     private static BlockAnalysis failedAnalysis(boolean hasBlockEntity, int stateCount,
-                                                Map<String, String> properties, RuntimeException exception) {
-        return new BlockAnalysis(false, false, hasBlockEntity, stateCount, properties, true,
-                exception.getClass().getName());
+                                                Map<String, String> properties, String defaultState,
+                                                List<String> stateKeys, RuntimeException exception) {
+        return new BlockAnalysis(false, false, hasBlockEntity, false, stateCount, properties, defaultState,
+                stateKeys, true, exception.getClass().getName());
     }
 
     private void scanEntities(List<ContentDescriptor> output) {
@@ -138,6 +153,23 @@ public final class MinecraftContentScanner {
         if (item instanceof BlockItem) {
             return "block_item";
         }
+        // A mod subclassing a vanilla interaction type provides stronger evidence than an
+        // unbound component map during the early registry phase.
+        if (item instanceof net.minecraft.world.item.BowItem) {
+            return "bow";
+        }
+        if (item instanceof net.minecraft.world.item.CrossbowItem) {
+            return "crossbow";
+        }
+        if (item instanceof net.minecraft.world.item.ShieldItem) {
+            return "shield";
+        }
+        if (item instanceof net.minecraft.world.item.SnowballItem
+                || item instanceof net.minecraft.world.item.EggItem
+                || item instanceof net.minecraft.world.item.EnderpearlItem
+                || item instanceof net.minecraft.world.item.ThrowablePotionItem) {
+            return "throwable";
+        }
         final var components = componentsIfBound(item);
         if (components == null) {
             return "material";
@@ -154,6 +186,9 @@ public final class MinecraftContentScanner {
         }
         if (components.has(DataComponents.CHARGED_PROJECTILES)) {
             return "crossbow";
+        }
+        if (components.has(DataComponents.KINETIC_WEAPON)) {
+            return "bow";
         }
         if (components.has(DataComponents.TOOL) || components.has(DataComponents.WEAPON)) {
             return "tool";
@@ -189,10 +224,13 @@ public final class MinecraftContentScanner {
         return namespace.equals("minecraft") || namespace.equals("brigadier");
     }
 
-    private record BlockAnalysis(boolean fullCube, boolean stableShape, boolean hasBlockEntity, int stateCount,
-                                 Map<String, String> blockProperties, boolean failed, String failureType) {
+    private record BlockAnalysis(boolean fullCube, boolean stableShape, boolean hasBlockEntity,
+                                 boolean breakingSemanticsSafe, int stateCount,
+                                 Map<String, String> blockProperties, String defaultState, List<String> stateKeys,
+                                 boolean failed, String failureType) {
         private BlockAnalysis {
             blockProperties = Map.copyOf(new java.util.TreeMap<>(blockProperties));
+            stateKeys = stateKeys.stream().sorted().toList();
         }
     }
 }

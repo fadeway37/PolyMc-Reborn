@@ -79,15 +79,28 @@ public final class HeuristicProvider implements CompatibilityProvider {
         if (descriptor.booleanAttribute("has_block_entity")) {
             return Optional.empty();
         }
-        var warning = Integer.parseInt(descriptor.attributes().getOrDefault("state_count", "1")) > 1
-                ? List.of("MVP may collapse visually equivalent block states when no explicit state model is available")
-                : List.<String>of();
+        if (descriptor.attributes().containsKey("breaking_semantics_safe")
+                && !descriptor.booleanAttribute("breaking_semantics_safe")) {
+            return Optional.empty();
+        }
+        int stateCount = Integer.parseInt(descriptor.attributes().getOrDefault("state_count", "1"));
+        String registryId = descriptor.registryId();
+        String namespace = namespace(registryId);
+        String path = registryId.substring(registryId.indexOf(':') + 1);
+        var resources = new java.util.ArrayList<String>();
+        resources.add("assets/" + namespace);
+        if (stateCount > 1) {
+            resources.add("assets/" + namespace + "/blockstates/" + path + ".json");
+        }
         return Optional.of(new MappingDecision(descriptor, MappingStatus.HEURISTIC, id(), "polymer",
-                "textured-full-cube", "polymer:allocated-full-block", 0.9, warning.isEmpty() ? 5 : 15,
+                "textured-full-cube", "polymer:allocated-full-block", 0.9, stateCount > 1 ? 8 : 5,
                 List.of("Collision and outline shapes are stable full cubes",
                         "No block entity is associated with the block",
-                        "Polymer Blocks will allocate a safe textured full-block carrier"),
-                List.of("assets/" + namespace(descriptor.registryId())), warning, null));
+                        "Breaking speed and correct-tool requirements do not outrun the vanilla carrier",
+                        stateCount > 1
+                                ? "Every safe server state will require a distinct, resolvable Polymer carrier"
+                                : "Polymer Blocks will allocate a safe textured full-block carrier"),
+                resources, List.of(), null));
     }
 
     private static String namespace(String identifier) {
