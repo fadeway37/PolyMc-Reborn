@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "status": "NOT_TESTED",
+  "researched_on": "2026-07-18",
+  "maximum_download_bytes": 52428800,
+  "enabled_artifacts": [],
+  "inspected_artifacts": [
+    {
+      "project_id": "jDGGUJ9V",
+      "project_slug": "bubblellaneous",
+      "project_url": "https://modrinth.com/mod/bubblellaneous",
+      "source_url": "https://github.com/bbfh-dev/bubblellaneous-pack",
+      "license": "CC-BY-SA-4.0",
+      "version": "3.0.3+mod",
+      "version_id": "x8ZQ7W3e",
+      "game_versions": [
+        "1.21.11",
+        "26.1",
+        "26.1.1",
+        "26.1.2"
+      ],
+      "loaders": [
+        "fabric",
+        "forge",
+        "neoforge",
+        "quilt"
+      ],
+      "filename": "bubblellaneous-3.0.3.jar",
+      "download_url": "https://cdn.modrinth.com/data/jDGGUJ9V/versions/x8ZQ7W3e/bubblellaneous-3.0.3.jar",
+      "size_bytes": 12244731,
+      "sha1": "a30787d47133b4a23e608fbc9a16597aa9894287",
+      "sha256": "70daf7d061281a54ec832e921bcd3f1f0424d86465da8e8ba5b6091dc4471b5f",
+      "sha512": "54d04bd73b4eac940faa183e5584c965ed1ce1ac2bb5fc8a14bebd17e50834cb77c31031f7d81923bbd041b0451b23fad7a8ca8f07947e580ef660acebde531f",
+      "selected": false,
+      "inspection": {
+        "class_entries": 0,
+        "data_entries": 5795,
+        "asset_entries": 4237
+      },
+      "exclusion": "Data/resource-pack artifact with no Java classes; it does not exercise custom registry-object projection."
+    },
+    {
+      "project_id": "AMZruzFM",
+      "project_slug": "silly-eatables",
+      "project_url": "https://modrinth.com/mod/silly-eatables",
+      "source_url": "https://github.com/Classics-Craftworks/Silly-Eatables",
+      "license": "MIT",
+      "version": "v4.3.1+mod",
+      "version_id": "oVpaJYK7",
+      "game_versions": [
+        "26.1.2"
+      ],
+      "loaders": [
+        "fabric"
+      ],
+      "filename": "SillyEatables_v4.3.1+mod_mc1.21.9-26.2.jar",
+      "download_url": "https://cdn.modrinth.com/data/AMZruzFM/versions/oVpaJYK7/SillyEatables_v4.3.1%2Bmod_mc1.21.9-26.2.jar",
+      "size_bytes": 43254,
+      "sha1": "269cf96c2c5eeffc1ccfe0c169227ed41183e3b3",
+      "sha256": "a1a83db6cea2803e4f1fcb22d78a01dbfbcc8c58668952d22eb65b896fefc412",
+      "sha512": "2a5ce52ec8e5316f164d8f31bd4e54839952d539593d5c0669de9694016b1398722e2f064c41eaec59633efca8d446cdd81365f75169473763deaf42928c1fec",
+      "selected": false,
+      "inspection": {
+        "class_entries": 0,
+        "data_entries": 72,
+        "asset_entries": 0
+      },
+      "exclusion": "Recipe/data artifact with no Java classes; it does not register custom items or blocks."
+    }
+  ],
+  "excluded_projects": [
+    {
+      "project_slug": "immersive-armors",
+      "version": "1.8.0+26.1.2",
+      "version_id": "pNvZzj5v",
+      "license": "GPL-3.0-only",
+      "source_url": "https://github.com/Luke100000/ImmersiveArmors",
+      "reason": "Official metadata requires the mod on the client."
+    },
+    {
+      "project_slug": "improved-crystals",
+      "version": "1.0.1",
+      "version_id": "DWSYJIz0",
+      "license": "MIT",
+      "source_url": "https://github.com/Thumpbacker/ImprovedCrystals",
+      "reason": "Official metadata requires the mod on the client."
+    },
+    {
+      "project_slug": "amethyst-addon",
+      "license": "LicenseRef-All-Rights-Reserved",
+      "source_url": null,
+      "reason": "No source link and client-required metadata; no exact eligible Fabric artifact was returned by the filtered version API."
+    },
+    {
+      "project_slug": "oxidizium",
+      "license": "MIT",
+      "source_url": "https://github.com/Tater-Certified/Oxidizium",
+      "reason": "Rust-backed rewrite/optimization project rather than a bounded content-registration fixture."
+    }
+  ]
+}

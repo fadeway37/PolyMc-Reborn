@@ -1,128 +1,137 @@
 # Compatibility model
 
-Compatibility is decided per canonical registry entry and per client profile.
-It is not a Boolean attached to an entire mod. A mod can have native items,
-explicitly adapted blocks, unsupported entities, and a fallback menu in the
-same report.
+Compatibility is decided per canonical registry entry and client profile, not
+as one Boolean for an entire mod. One mod can contain native items, explicitly
+adapted menus, heuristic full cubes, and unsupported entities in the same
+report.
 
 ## Provider resolution order
 
-The default tiers, highest first, are:
+The deterministic tiers, highest first, are:
 
-1. **Native Polymer implementation**
-2. **Administrator forced rule**
-3. **Explicit PolyMc Reborn Java adapter**
-4. **Legacy PolyMc adapter**
-5. **Bundled declarative compatibility profile**
-6. **Automatic heuristic provider**
-7. **Safe fallback**
-8. **Unsupported**
+1. native Polymer implementation;
+2. administrator forced rule;
+3. explicit PolyMc Reborn Java adapter;
+4. legacy PolyMc adapter;
+5. bundled declarative compatibility profile;
+6. automatic heuristic provider;
+7. safe fallback;
+8. unsupported.
 
-An administrator rule does not normally displace tier 1. It can do so only if
-the matching rule explicitly requests native override **and** the main
-configuration has `override_native_polymer: true`. Otherwise the native result
-wins and the forced-provider candidate trace explains that the global gate is
-disabled when a forced rule matched.
+Tier 2 cannot normally displace tier 1. Native replacement requires both a
+matching rule that explicitly requests it and
+`override_native_polymer: true`. Otherwise native wins and the full candidate
+trace records why the administrator candidate was rejected.
 
-Provider instances within a tier sort by stable provider ID. Inside the
-declarative provider, profiles sort by numeric priority descending and then
-profile ID; rules retain their explicit JSON array order. Discovery order is
-canonical registry ID followed by content kind. Provider registration order
-and map iteration never break a tie.
+Providers inside a tier sort by stable provider ID. Profiles sort by priority
+descending then ID; profile rules retain explicit array order. Discovery sorts
+canonical registry ID then content kind. Registration or map iteration never
+breaks a tie.
 
-## Statuses
+## Statuses and decision records
 
 | Status | Meaning |
 | --- | --- |
-| `NATIVE` | The registered content already supplies a Polymer implementation/overlay. |
-| `EXPLICIT` | A new Java adapter explicitly handles the entry. |
-| `LEGACY` | A recompiled legacy `polymc` adapter supplied the mapping. |
-| `PROFILE` | A validated declarative rule supplied the decision. |
-| `HEURISTIC` | Conservative automatic analysis selected a representation. |
-| `FALLBACK` | A safe but materially degraded representation is used. |
-| `UNSUPPORTED` | No safe representation was found; the entry is reported. |
-| `ERROR` | Invalid configuration, corrupt persistence, backend failure, or another error prevented a valid decision. |
+| `NATIVE` | registered content already has Polymer behavior |
+| `EXPLICIT` | a reviewed Reborn Java adapter handles the entry |
+| `LEGACY` | a recompiled legacy adapter supplied the candidate |
+| `PROFILE` | a validated declarative rule supplied the decision |
+| `HEURISTIC` | conservative automatic analysis chose a representation |
+| `FALLBACK` | a safe but materially degraded presentation is used |
+| `UNSUPPORTED` | no safe representation was found |
+| `ERROR` | invalid input, persistence, capacity, or backend failure prevented a valid decision |
 
-A status is not a quality score. `NATIVE` describes origin, while confidence
-and degradation describe the selected behavior.
+A status is not a quality score. Each `MappingDecision` separately records the
+registry/content IDs, owner mod, provider/backend, strategy, carrier/state,
+confidence, degradation, complete ordered reason/candidate chain, resources,
+warnings, and failure reason. `/why` and machine reports preserve accepted and
+rejected candidates in stable order.
 
-## Decision record
-
-Every `MappingDecision` records at least:
-
-- registry ID and registry/content type;
-- owner mod ID;
-- selected provider and backend IDs;
-- strategy and client carrier/state;
-- status, confidence, and degradation level;
-- complete ordered candidate/reason chain;
-- required model, texture, or other resources;
-- warnings and failure reason;
-
-The `why` command renders both accepted and rejected candidates. Machine reports
-keep stable field/array ordering so changes are reviewable.
-
-## Content rules in 0.1
+## Content rules in 0.2
 
 ### Items
 
-The heuristic may select a food/drink, tool, armor, bow/crossbow-like,
-shield-like, throwable, block-item, or generic material carrier only when
-server-visible item behavior/components justify it. At the pre-freeze overlay
-boundary, unbound 26.1 components temporarily use a generic floor. At
-`SERVER_STARTING`, before players can join, Reborn locks the bound semantic
-carrier into the overlay, final plan, report, and persistent mapping store.
-Packet serialization performs no carrier discovery or filesystem access.
-Client-only renderers are never inferred. Unsupported custom
-data components are removed from the client projection, while safe display
-name, lore, count, damage, item-model reference, and supported visual effects
-are preserved where the Polymer/Minecraft API permits.
+The heuristic chooses a food/drink, tool, armor, bow/crossbow, shield,
+throwable, block-item, or generic material carrier only when bound server data
+supports that category. The carrier is fixed before players join. Packet-time
+projection performs no discovery or filesystem access. Safe display data,
+count, damage, model reference, and supported effects are retained where the
+Minecraft/Polymer APIs permit; unknown custom client components are filtered.
+Client-only renderers are never inferred.
 
-### Blocks
+### Stateful full-cube blocks
 
-Automatic block mapping requires full collision and outline cubes, no unsafe
-block-entity client contract, and state properties that can be represented
-deterministically. Complex or dynamic shapes, doors, beds, fences, stairs,
-multi-block structures, and special redstone behavior are not generic MVP
-targets. Their report explains the failed predicate.
+Automatic mapping requires complete stable collision/outline cubes, no unsafe
+block-entity presentation contract, and an unambiguous bounded `variants` model
+graph. Property names/values are canonicalized and each safe state receives a
+persisted carrier. Existing assignments replay first; new registry-ID/state
+keys append without reordering valid assignments.
 
-### Entities and menus
+Complex/dynamic shapes, ambiguous or multipart resources, doors, beds, fences,
+stairs, multi-block structures, special redstone behavior, and unsafe block
+entities are not automatic targets. Their failed predicate is reported. A
+protocol-safety quarantine overlay for unsupported/error blocks remains
+explicitly `UNSUPPORTED`/`ERROR`; it is not a claim that visuals or behavior are
+compatible.
 
-Discovery and native/explicit decisions are supported. Automatic visual entity
-selection and generic menu projection are not. An entry without an explicit
-safe implementation is `UNSUPPORTED` or a clearly described `FALLBACK`.
+### Explicit entities
+
+An entity is projected only by native Polymer behavior or a reviewed explicit
+adapter. The adapter names a registered vanilla virtual surrogate, a bounded
+offset/distance, and approved callbacks. The real entity remains authoritative.
+Automatic surrogate choice, equipment/passenger/leash synchronization, broad
+metadata, and dimension specialization are not implemented.
+
+An unsupported/error custom entity type is registered server-only at freeze
+time and receives an invisible marker quarantine solely for registry safety.
+It remains `UNSUPPORTED`/`ERROR`; no render or interaction compatibility is
+claimed.
+
+### Explicit standard-container menus
+
+A GUI adapter exposes the real server `Container`, a complete bijective mapping
+for a vanilla generic 9xN screen, and an interaction policy. Transactions remain
+server-authoritative and sessions are bounded/cleaned. Furnace/property menus,
+custom buttons, paging, arbitrary slot types/layouts, and automatic slot-count
+inference are not implemented.
+
+An unsupported/error custom menu type is marked server-only at freeze time.
+That quarantine prevents an unknown menu registry entry from reaching a
+vanilla client, but does not make the menu openable or infer a layout.
 
 ## Persistence interaction
 
-A persisted assignment is loaded under strict schema/algorithm validation.
-Item floor carriers are replayed only when the referenced vanilla item still
-exists. Existing textured-block assignments are replayed through Polymer's
-shared pool in stable order and must reproduce the exact stored state; otherwise
-startup records an error instead of remapping. Current resource hashes and last
-validation version are updated without changing a valid carrier. The v1 automatic
-block algorithm uses an empty per-state key. Adding an entry cannot reorder old
-allocations, and pool exhaustion is a backend capacity error rather than reuse
-of an occupied state.
+`mappings-v1.json` is loaded under strict schema/algorithm validation. Item
+carriers replay only when their vanilla targets still exist. Full-block carriers
+replay through Polymer's shared pool in stable order and must reproduce the
+stored state exactly. The v1 store uses canonical per-state keys; a legacy empty
+default-state key can seed the canonical default without reallocating it.
+
+Adding content/state cannot reorder valid old allocations. Capacity exhaustion
+or replay mismatch is an explicit backend error, not permission to reuse or
+silently remap a carrier.
+
+Status/validation/diff/dry-run commands do not alter the frozen plan. Backups
+are checksum-protected and path-bounded. Rollback stages a validated pending
+pair for activation before planning on the next restart; it is never a live
+remap.
 
 ## Client profiles
 
-`VANILLA` is the only profile for which 0.1 makes full mapping decisions.
-`REBORN_COMPANION` and `TRUSTED_MODDED` are API values for future negotiation.
-Unknown clients are `VANILLA`, and Fabric presence never enables raw registry
-passthrough. A future trusted profile must authenticate exact registry and mod
-fingerprints before allowing any passthrough.
+`VANILLA` is the only active 0.2 profile. `REBORN_COMPANION` and
+`TRUSTED_MODDED` are future API values. Unknown clients are vanilla; Fabric
+presence never enables raw registry passthrough. Any future trusted path must
+authenticate exact registry and mod fingerprints.
 
-## Safe failure
+## Safe failure examples
 
-The planner prefers explainable absence over protocol corruption. Examples:
-
-- corrupt mapping JSON: startup/config error, no silent replacement;
-- unknown future schema: migration-required error;
-- native override requested without both gates: native retained plus warning;
-- forged creative marker: the guard rejects reverse conversion; runtime
-  enablement is unavailable in 0.1 and `true` fails startup, while Polymer's
-  ordinary stack metadata is never accepted as authentication;
-- missing model texture: decision/report warning or unsupported resource path,
-  never a traversal outside the pack root;
-- no full-cube carrier capacity: explicit capacity error;
-- packet outside a supported fallback policy: no-op backend does not guess.
+- corrupt/unknown mapping data: startup/migration error, never empty recovery;
+- native override without both gates: native retained plus visible warning;
+- forged creative marker: rejected, while runtime reverse mapping remains
+  disabled and unsigned Polymer restoration data is not authentication;
+- missing/unsafe resource: diagnostic or unsupported decision, never root
+  escape or unresolved custom renderer claim;
+- full-block capacity exhaustion/replay mismatch: explicit error;
+- unmapped menu/entity: unsupported and server-only quarantined rather than
+  guessed;
+- packet outside a reviewed fallback policy: disabled no-op does not guess.

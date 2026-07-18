@@ -15,7 +15,8 @@ contributions are small, reproducible, and honest about fidelity limits.
 
 ## Development workflow
 
-Create a topic branch from `reborn/26.1.2`. Keep commits focused: bootstrap,
+Create a topic branch from the current maintained development branch (for 0.2,
+`reborn/0.2.0-alpha+26.1.2`). Keep commits focused: bootstrap,
 planning/API, backend behavior, persistence/resources, diagnostics/legacy,
 tests, and docs should remain reviewable independently when practical.
 

@@ -1,91 +1,69 @@
 # Roadmap
 
-The roadmap separates implemented 0.1 foundations from future work. Items in a
-future section are not product claims and must not be inferred from an
-interface name alone.
+This roadmap separates implemented alpha scope from future work. An interface,
+fixture, or harness does not by itself prove a release claim.
 
-## 0.1.0-alpha.1+26.1.2 MVP
+## 0.1 foundation
 
-The 0.1 branch is scoped to:
+- Server-only Fabric/JDK 25 build for exactly Minecraft 26.1.2 using official
+  names and pinned dependencies.
+- Immutable, explainable provider planning with native Polymer priority.
+- Conservative item/simple full-cube overlays, deterministic persistence and
+  resource packs, strict profiles, diagnostics/commands, selected legacy source
+  compatibility, JUnit, server GameTest, and dedicated-server smoke.
+- Unsupported classification for unsafe shapes, entities, and menus; disabled
+  packet fallback and creative reverse mapping.
 
-- one server-only Fabric JAR for exactly Minecraft 26.1.2 and Java 25 using
-  official names;
-- immutable, explainable, deterministic provider planning with native Polymer
-  priority;
-- conservative Polymer item overlays and simple stable full-cube block/block-
-  item overlays;
-- safe unsupported classification for complex blocks, entities, and menus;
-- strict main configuration and versioned declarative compatibility profiles;
-- deterministic, atomic persistent mappings and capacity/corruption errors;
-- deterministic resource collection/pack output, manifest, cache, and reports;
-- structured diagnostics, administrator inspection/build commands, counters,
-  and per-mod summaries;
-- selected source-oriented legacy `polymc` bridge and a fixture extension;
-- disabled no-op packet fallback SPI;
-- JUnit, internal test-mod/GameTest, dedicated-server safety checks, CI, and
-  operational/developer documentation.
+## 0.2 Interactive Compatibility Alpha
 
-An alpha is accepted only for behavior actually exercised by its reported
-tests. A checked-in interface or roadmap paragraph is not implementation.
+Implemented engineering scope:
 
-## Near-term after the first alpha
+- isolated two-process production playtest harness and `build/playtest`
+  evidence contract;
+- explicit standard 9xN container projection with server-authoritative
+  inventory transactions;
+- explicit Polymer Virtual Entity adapters with guarded use/attack;
+- deterministic per-state mappings for safely resolvable full-cube blocks;
+- richer semantic item analysis/use coverage;
+- mapping diff, dry run, checksum backup, and restart-only rollback staging.
 
-- Exercise a scripted real vanilla 26.1.2 client login and fixture interaction
-  matrix; until then, keep the explicit no-E2E-test disclaimer.
-- Add more explicit, reviewed content adapters and built-in profiles based on
-  sanitized compatibility reports.
-- Harden mapping/profile migration tooling and add rollback/dry-run operator
-  UX.
-- Expand semantic item component preservation with adversarial serialization
-  tests.
-- Improve stateful full-cube model dependency handling without claiming complex
-  geometry.
-- Publish a stable, separately versioned API artifact after the single-JAR API
-  has real downstream feedback.
-- Add release signing/provenance and a manual release workflow; CI does not
-  auto-publish the initial release.
-- Add a versioned diagnostic suppression/promotion policy after its interaction
-  with immutable decisions and report auditability is specified.
+The exact local Client, Production Client, and aggregate Playtest commands
+passed on 2026-07-18 and their retained evidence was inspected. GitHub Actions
+remains a separate `NOT RUN` release gate until a run ID and downloaded artifact
+are verified.
 
-## Explicit entity work
+## P1 work not completed for 0.2
 
-Future entity support may use Polymer Virtual Entity, but only through explicit
-adapters that define:
+- Authenticated, rate-limited runtime creative reverse mapping and real
+  creative-slot adversarial playtests.
+- A pure zero-mod Minecraft client smoke with no Fabric or driver.
+- A pinned, license-reviewed, hash-verified external-mod compatibility matrix.
+- Versioned diagnostic suppression/promotion policy.
+- Furnace/property GUI projection, paging, server buttons, and dynamic layouts.
+- Entity equipment, passengers, leashes, poses/animations, broader metadata,
+  and dimension specialization. Projection capacity itself is bounded in 0.2.
 
-- visual entity composition and lifecycle;
-- equipment and metadata synchronization;
-- passengers/leashes/relative transforms;
-- hit/interaction proxying and permissions;
-- tracking, dimension change, unload, and reconnect behavior;
-- bandwidth/cache limits and failure diagnostics.
+These remain fail-closed. No incomplete runtime switch should imply support.
 
-There is no planned “choose a vaguely similar entity for everything” provider.
+## Candidate 0.3 direction
 
-## Transaction-safe GUI work
+- Add explicit furnace/property adapters only after full transaction/property
+  synchronization tests.
+- Add reviewed equipment/passenger compositions without generic entity
+  guessing while retaining the bounded projection registry.
+- Design authenticated creative reverse mapping with replay/rate/component
+  protection before enabling its packet path.
+- Run a legal zero-mod client smoke and a small pinned external-mod matrix with
+  sanitized reproducible artifacts.
+- Add diagnostic policy with audit-preserving reason chains.
+- Gather downstream feedback before extracting/versioning a separate API JAR.
+- Add release provenance/signing and manual release automation.
 
-A future generic or profile-driven GUI backend must model standard container
-projection, exact slot remapping, data/progress properties, paging, server-side
-buttons, and reconciliation. It must pass hostile tests for shift-click, drag,
-double-click, hotbar swap, offhand, creative actions, rejected transactions,
-disconnect, and desynchronization recovery before being enabled broadly.
+## Permanent non-goals
 
-## Packet fallback experiments
-
-Packet fallback remains isolated from Polymer and disabled by default. A future
-implementation starts with a narrow allow/transform/reject-with-reason policy
-for named protocol cases. It must never become a blanket cancellation layer or
-a way to conceal unsupported registry data.
-
-## Optional client profiles
-
-`REBORN_COMPANION` may later add optional quality-of-life metadata but will
-never be required for vanilla access. `TRUSTED_MODDED` may later allow narrowly
-scoped passthrough only after an authenticated handshake verifies exact registry
-and mod fingerprints. Fabric presence or an asserted mod list is not enough.
-
-## Out of scope
-
-The project has no 0.1 commitment to Quilt, NeoForge, Geyser/Bedrock, arbitrary
-client renderer simulation, runtime remote profile downloads, profile scripts,
-forced client mods, unknown-mod passthrough, or a wholesale port of original
-PolyMc Mixins.
+There is no plan to promise compatibility with every mod, infer arbitrary GUI
+or entity semantics, emulate arbitrary client renderers, trust Fabric/mod-list
+claims as authentication, download/execute remote compatibility code, add broad
+packet cancellation, or wholesale-port old PolyMc Mixins. Quilt, NeoForge,
+Geyser/Bedrock, and forced companion clients are outside the current release
+line.

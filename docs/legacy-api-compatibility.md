@@ -1,6 +1,6 @@
 # Legacy API compatibility
 
-This matrix describes the 0.1 migration contract for extensions ported and
+This matrix describes the 0.2 migration contract for extensions ported and
 recompiled for Minecraft 26.1.2. It is not a binary-compatibility promise for
 old JARs.
 
@@ -14,8 +14,8 @@ old JARs.
 | `registerItemPoly` | Creates an explicit legacy item candidate for the real registered item. |
 | `registerGlobalItemPoly` | Registers a deterministic global item projection/filter in registration order, subject to server safety validation. |
 | `registerBlockPoly` | Creates an explicit legacy block candidate; shape/resource safety is still reported. |
-| `registerEntityPoly` | Retains an explicit entity mapping/classification; no automatic generic entity conversion is implied. |
-| `registerGuiPoly` | Retains an explicit menu mapping/classification; no automatic generic transaction-safe GUI is implied. |
+| `registerEntityPoly` | Retains a legacy mapping/classification candidate; it does not automatically register the new guarded Virtual Entity adapter. |
+| `registerGuiPoly` | Retains a legacy menu mapping/classification candidate; it does not automatically supply the new authoritative standard-container adapter. |
 | mod-specific resource contribution | Adapted to a normalized, deterministic resource sink. |
 
 Legacy loading is container-aware. Reborn filters its own and Polymer's provider
@@ -54,16 +54,17 @@ should depend on old implementation internals.
 ## Postponed
 
 - General virtual entity/wizard helpers and tick schedulers.
-- Generic entity equipment/passenger/metadata proxy construction.
-- Generic chest projection, paging, slot geometry, progress properties, and
-  complete GUI transaction emulation.
+- Generic entity selection and equipment/passenger/broad-metadata proxying. 0.2
+  supports only separately registered explicit Virtual Entity adapters.
+- Generic GUI inference, paging, progress properties, and custom buttons. 0.2
+  supports only separately registered explicit standard-container adapters.
 - Advanced per-player non-vanilla plans for `REBORN_COMPANION` and
   `TRUSTED_MODDED`.
 - Broad sound, particle, recipe-book, enchantment, and custom dynamic-registry
   compatibility beyond Polymer/native or explicit adapters.
-- A separately published API artifact; 0.1 ships one distributable mod JAR.
+- A separately published API artifact; 0.2 ships one distributable mod JAR.
 - Runtime creative reverse conversion. The signed-marker/component-allowlist
-  guard and forged-input tests exist, but 0.1 fails startup if
+  guard and forged-input tests exist, but 0.2 fails startup if
   `creative_reverse_mapping_enabled=true` instead of trusting Polymer's
   unsigned restoration payload.
 

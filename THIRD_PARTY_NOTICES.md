@@ -14,12 +14,14 @@ tooling. Each project remains under its own copyright and license terms.
 | Polymer Core | `eu.pb4:polymer-core:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
 | Polymer Blocks | `eu.pb4:polymer-blocks:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
 | Polymer Resource Pack | `eu.pb4:polymer-resource-pack:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
+| Polymer Virtual Entity | `eu.pb4:polymer-virtual-entity:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
 
 Polymer modules are resolved from the Nucleoid Maven repository. Polymer
-AutoHost, Networking, Virtual Entity, Resource Pack Extras, and Registry Sync
-Manipulator are discussed as optional or future integration points; they are
-not vendored. Transitive Polymer modules are governed by Polymer's published
-metadata and license.
+AutoHost and Resource Pack Extras remain optional integration points.
+Networking and Registry Sync Manipulator are resolved transitively by the
+pinned Polymer modules. Virtual Entity is a direct 0.2 runtime dependency used
+only by explicit entity projections. No Polymer module is vendored or shaded.
+Transitive modules remain governed by Polymer's published metadata and license.
 
 ## Build and test tooling
 

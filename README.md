@@ -1,17 +1,17 @@
 # PolyMc Reborn
 
 PolyMc Reborn is a community-maintained, server-side Fabric compatibility
-platform for **Minecraft 26.1.2**. It keeps a mod's real registered items,
-blocks, and game logic on the server while using Polymer overlays to present a
-conservative vanilla representation to an unmodified client.
+platform for **Minecraft 26.1.2**. It keeps each mod's real registered objects
+and game logic authoritative on the server while Polymer supplies conservative
+vanilla-facing overlays.
 
-The first release line is `0.1.0-alpha.1+26.1.2`. It requires Java 25 and is
-not an official continuation endorsed by TheEpicBlock or the original PolyMc
-contributors.
+The current development release is `0.2.0-alpha.1+26.1.2`, the **Interactive
+Compatibility Alpha**. It is not an official continuation endorsed by
+TheEpicBlock or the original PolyMc contributors.
 
 > PolyMc Reborn does not make every content mod compatible. Compatibility is a
-> per-entry decision, and unsupported content is reported instead of being
-> guessed into an unsafe representation.
+> per-entry decision. Unsafe or unmodelled content is reported instead of being
+> guessed into a plausible-looking representation.
 
 ## Exact platform
 
@@ -22,112 +22,113 @@ contributors.
 | Fabric Loader | `0.19.3` |
 | Fabric Loom | `1.17.16` |
 | Fabric API | `0.155.2+26.1.2` |
-| Polymer Core, Blocks, Resource Pack | `0.16.5+26.1.2` |
+| Polymer Core, Blocks, Resource Pack, Virtual Entity | `0.16.5+26.1.2` |
 | Gradle Wrapper | `9.5.1` |
 
 The project uses Minecraft's official names. It has no Yarn mappings
 dependency and does not use intermediary-named source.
 
-## What the MVP does
+## What 0.2 implements
 
-The 0.1 architecture discovers registered content in a stable identifier
-order, asks ordered compatibility providers for candidates, and freezes the
-result as an immutable mapping plan. Every decision records its selected
-provider/backend, status, confidence, degradation, reasons, resources,
-warnings, and failure information.
+Reborn discovers registered content in stable identifier order, asks ordered
+compatibility providers for candidates, freezes an immutable mapping plan, and
+applies the selected representation through Polymer. Every decision records
+the chosen provider/backend, confidence, degradation, reason chain, required
+resources, warnings, and failure information.
 
-The implemented safe MVP boundary is:
+The 0.2 implementation adds to the 0.1 foundation:
 
-- preserve any native Polymer item or block implementation by default;
-- attach Polymer overlays to supported existing item and simple full-cube
-  block registrations without replacing the real server object;
-- choose conservative vanilla carriers and report lossy decisions;
-- persist deterministic mapping assignments in
-  `config/polymc-reborn/mappings-v1.json`;
-- load strict, versioned compatibility profiles from bundled resources and
-  `config/polymc-reborn/compat.d/*.json`;
-- build deterministic resource-pack inputs and emit JSON/Markdown reports;
-- expose a source-migration bridge for selected legacy `polymc` entrypoints;
-- classify entities and menus without attempting broad automatic emulation;
-- expose an experimental packet-fallback SPI whose no-op implementation is
-  selected by default.
+- conservative semantic item carriers and safe client-component projection;
+- deterministic per-state mappings for full-cube blocks whose variants and
+  resource dependencies can be resolved safely;
+- an explicit standard-container GUI API backed by the real server
+  `Container`, bounded sessions, policy-gated interactions, and resync support;
+- an explicit Polymer Virtual Entity API with a vanilla surrogate, guarded
+  use/attack callbacks, and lifecycle cleanup;
+- mapping status, strict validation, stable diff, no-write dry run, checksummed
+  backup, and restart-only rollback preparation;
+- a two-process production playtest harness: an independent dedicated server
+  runs the final official-namespace distribution JAR and fixture while a real Minecraft 26.1.2
+  client runs an isolated Fabric Client GameTest driver;
+- deterministic resource-pack generation, strict compatibility profiles,
+  structured diagnostics, and the selected source-migration bridge for legacy
+  `polymc` entrypoints.
 
-See [the compatibility model](docs/compatibility-model.md) for the decision
-order and [the testing guide](docs/testing.md) for the claims actually covered
-by automated tests in this checkout.
+Native Polymer implementations retain priority. The real server item, block,
+entity, menu, and container are never replaced with a vanilla registration.
 
-## What it does not do
+## Explicit limits
 
-The 0.1 release does not provide generic entity conversion, generic GUI
-projection, arbitrary packet rewriting, custom client renderer emulation,
-Quilt/NeoForge support, automatic trust of modded clients, or runtime code
-downloads. A Fabric client is not treated as trusted merely because it runs
-Fabric. Unknown clients use the `VANILLA` profile.
+0.2 does **not** provide arbitrary GUI conversion or automatic entity guessing.
+Only reviewed GUI/entity adapters are projected. Furnace/property menus,
+pagination, custom client screens, broad entity metadata/equipment/passenger
+synchronization, complex block geometry, custom client renderers, and broad
+packet rewriting remain unsupported or roadmap work.
 
-Old PolyMc extensions compiled for Minecraft 1.20 or 1.21 are **not binary
-compatible** with Minecraft 26.1.2. The legacy bridge is for extensions that
-are ported and recompiled against this release; consult
-[migration-from-polymc.md](docs/migration-from-polymc.md).
+Runtime creative reverse mapping remains disabled. The `REBORN_COMPANION` and
+`TRUSTED_MODDED` client profiles remain future API values; Fabric presence does
+not grant registry passthrough. Packet fallback remains an isolated disabled
+no-op/audit boundary.
 
-## Installation
+Old extensions compiled for Minecraft 1.20/1.21 are not binary compatible with
+26.1.2. The bridge is for extensions ported and recompiled against this release.
+See [migration-from-polymc.md](docs/migration-from-polymc.md).
+
+## Server installation
 
 1. Run a dedicated Fabric server for exactly Minecraft `26.1.2` on Java 25.
 2. Install Fabric API `0.155.2+26.1.2`.
-3. Install Polymer Core, Polymer Blocks, and Polymer Resource Pack, all at
-   `0.16.5+26.1.2`.
-4. Put the PolyMc Reborn JAR in the server's `mods` directory and start the
-   server once.
-5. Review generated configuration and compatibility reports before admitting
-   players. Arrange distribution of the generated resource pack if the
-   selected mappings require its assets.
+3. Install the pinned Polymer Core, Blocks, Resource Pack, and Virtual Entity
+   modules at `0.16.5+26.1.2`.
+4. Put the PolyMc Reborn JAR in the server `mods` directory and start once.
+5. Review the generated compatibility, mapping-diff, and resource-pack reports
+   before admitting players.
 
-PolyMc Reborn and Polymer are server dependencies. A vanilla client is not
-required to install either mod. Visual fidelity can depend on accepting the
-server resource pack. Polymer AutoHost may be installed separately to host and
-send a pack, but it is not a core dependency and PolyMc Reborn does not bundle
-it.
+Reborn and Polymer are server dependencies. Ordinary players are not required
+to install them. Visual fidelity can require accepting the server resource
+pack. Polymer AutoHost is optional and is not bundled.
 
-Do not install an independent implementation whose actual mod ID is `polymc`
-beside PolyMc Reborn. Reborn advertises `polymc` through Fabric's `provides`
-metadata for recompiled extensions and fails startup if a distinct real
-`polymc` container is detected. `polymc-extra` is declared incompatible.
+Do not install another real mod whose metadata ID is `polymc` beside Reborn.
+Reborn advertises `polymc` through `provides` for recompiled extensions and
+rejects a distinct implementation. `polymc-extra` is declared incompatible.
 
-## Configuration and generated data
+## Configuration and operational state
 
-The server-side state lives under `config/polymc-reborn/`:
+Server state lives below `config/polymc-reborn/`:
 
 | Path | Purpose |
 | --- | --- |
-| `config.json` | Strict main configuration |
-| `compat.d/*.json` | Administrator compatibility profiles |
-| `mappings-v1.json` | Stable mapping allocations; back up with the world |
-| `reports/` | Compatibility and resource-pack reports |
-| `cache/` | Rebuildable, bounded generated-data cache |
+| `config.json` | strict main configuration |
+| `compat.d/*.json` | versioned administrator compatibility profiles |
+| `mappings-v1.json` | stable mapping allocations; back up with the world |
+| `backups/mappings/` | checksummed mapping backups |
+| `reports/` | compatibility, mapping-diff, and resource-pack reports |
+| `cache/` | bounded, rebuildable generated-data cache |
 
-Unknown fields are rejected consistently rather than silently ignored. A
-profile that changes mapping decisions is read during startup; validating a
-new file online does not apply it to the frozen plan. Restart after changing
-mapping-affecting configuration. Never delete `mappings-v1.json` as a casual
-troubleshooting step: doing so can change client carriers. Corruption is a
-startup error, not a signal to discard existing assignments.
+Unknown fields are rejected. Mapping-affecting changes are read during startup
+and never hot-apply to a frozen plan. Corrupt mappings are a startup error;
+Reborn does not silently replace them with an empty store.
 
-The packet fallback is disabled by default. Enabling an experimental switch
-does not add a broad packet transformer in 0.1.
+Mapping operations are documented in
+[mapping-migration.md](docs/mapping-migration.md). The principal commands are:
 
-Creative reverse mapping is unavailable in the 0.1 runtime. Setting
-`creative_reverse_mapping_enabled` to `true` deliberately fails startup rather
-than accepting Polymer's unsigned restoration metadata. The verification guard
-is retained and tested for future integration, but no 0.1 command or packet path
-enables reversal. A vanilla carrier by itself is never enough to recover a
-server item.
+```text
+/pmcr mappings status
+/pmcr mappings validate
+/pmcr mappings diff
+/pmcr mappings dry-run
+/pmcr mappings backup
+/pmcr mappings rollback <backup-id>
+```
+
+Rollback stages validated pending data and takes effect only during the next
+startup. It never changes the live frozen plan.
 
 ## Administrator commands
 
-The informational `/polymcreborn about` command is available without operator
-permission. All scan, report, explanation, pack-build, configuration, statistics,
-and player-profile subcommands require the server's administrator permission
-level. The primary root is `/polymcreborn`; `/pmcr` is the short alias.
-`/polymc` is registered only if no other command owns that literal.
+`/polymcreborn about` is informational. Inspection/build commands require
+administrator permission. `/pmcr` is the short alias; `/polymc` is registered
+only when that literal is free.
 
 - `/polymcreborn about`
 - `/polymcreborn scan`
@@ -137,66 +138,71 @@ level. The primary root is `/polymcreborn`; `/pmcr` is the short alias.
 - `/polymcreborn config validate`
 - `/polymcreborn stats`
 - `/polymcreborn client-profile <player>`
+- `/polymcreborn mappings <status|validate|diff|dry-run|backup|rollback>`
 
-`scan` reports the frozen plan; it does not mutate registries or remap a live
-server. `why` shows candidates, the winner, and the reason chain. Reports omit
-absolute local paths by default.
+`scan` and mapping commands inspect the frozen plan; they do not remap a live
+server. Reports omit absolute local paths by default.
 
 ## Resource packs
 
-Polymer is the active rendering and resource-pack integration layer. Reborn
-collects only normalized resource paths, rejects traversal, walks declared
-model dependencies, and validates texture references. Missing dependencies are
-recorded in compatibility diagnostics; conflicting bytes for one destination
-fail the build instead of producing a successful resource-pack report.
-Equivalent normalized inputs are written in a stable ZIP order with normalized
-timestamps so they produce the same content hash.
+Reborn normalizes resource paths, rejects traversal, walks bounded model
+dependencies, validates texture references, diagnoses duplicate/conflicting
+bytes, sorts ZIP entries, normalizes timestamps, and records content hashes.
+Equivalent resources and mappings must produce byte-identical pack output.
 
-For an automatic item, Reborn sets the vanilla-facing `ITEM_MODEL` component
-only when the owning mod supplies the corresponding 26.1
-`assets/<namespace>/items/<path>.json` definition. A missing definition is
-reported and the safe vanilla carrier keeps its own model instead of displaying
-an unresolvable custom reference.
+The two-process playtest additionally downloads the real served pack through
+the Minecraft client and records the application/reconnect observations. A
+resource-pack or playtest claim is valid only when its command actually exits
+successfully and the evidence validates. See
+[resource-pack-pipeline.md](docs/resource-pack-pipeline.md).
 
-Generated packs can contain assets copyrighted by installed mods. Server
-operators are responsible for having permission to redistribute those assets.
-See [resource-pack-pipeline.md](docs/resource-pack-pipeline.md).
+## Testing and client terminology
 
-## Build from source
-
-Run `java -version` first; do not substitute Java 21. The Gradle Foojay
-toolchain resolver can provision a JDK 25 toolchain when the local Gradle JVM
-can start and network policy permits it.
+Run Java first; do not substitute Java 21:
 
 ```text
+java -version
+./gradlew javaToolchains
 ./gradlew clean build
 ./gradlew test
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
+./gradlew verifyPlaytestClientIsolation
+./gradlew runClientPlaytest
+./gradlew runProductionClientPlaytest
+./gradlew runPlaytest
 ```
 
-On Windows use `gradlew.bat`. GameTest and the dedicated-server smoke run are
-separate integration tasks; consult [docs/testing.md](docs/testing.md) before
-interpreting their results. The distributable JAR is written to
-`build/libs/` together with sources and Javadoc JARs.
+On Windows use `gradlew.bat`. The canonical full interactive entrypoint is
+`runPlaytest`. It writes ignored evidence below `build/playtest/`, including
+summary JSON/Markdown, JUnit XML, loaded-client mods, independent client/server
+state, logs, and screenshots.
 
-## Compatibility and support
+The Client Driver Playtest launches a **real Minecraft client**, but that client
+contains Fabric Loader, the minimal Fabric Client GameTest/resource modules,
+and the automation driver. It is therefore not a pure zero-mod vanilla client.
+The driver contains no Reborn, Polymer, server fixture, server content
+definitions, or private mapping-plan access and rejects those mods at startup.
 
-Before reporting an incompatibility, retain the compatibility report, relevant
-server log excerpt, exact mod versions, mapping-store schema/algorithm
-versions, and whether the resource pack was accepted. Do not publish world
-data, authentication material, full local paths, or other secrets.
+A pure zero-mod vanilla-client smoke and a completed third-party content-mod
+matrix are separate P1 layers and are not implemented or claimed by this
+release. On 2026-07-18 the local `runClientPlaytest`,
+`runProductionClientPlaytest`, and `runPlaytest` commands each completed
+successfully; the retained final evidence reports 53/53 checks, 34/34 client
+steps, and 17/17 screenshots. A GitHub Actions result is a separate gate and
+must be cited by run ID after it completes. See
+[testing.md](docs/testing.md) and [client-playtest.md](docs/client-playtest.md).
 
-Security issues should follow [SECURITY.md](SECURITY.md). Development rules are
-in [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
+The distributable JAR and sources/Javadoc JARs are written to `build/libs/`.
+The release JAR must not contain the client driver, fixtures, screenshots, or
+playtest reports.
 
 ## License and attribution
 
 PolyMc Reborn is derived from
 [TheEpicBlock/PolyMc](https://github.com/TheEpicBlock/PolyMc) and is licensed
-under `LGPL-3.0-or-later`. Reused or adapted upstream files retain their
-copyright and license notices. New Java sources carry an SPDX identifier.
-
-See [NOTICE.md](NOTICE.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-No original logo is reused because its separate artwork license has not been
-confirmed. No PolyMc-Extra source was used.
+under `LGPL-3.0-or-later`. Reused/adapted files retain upstream notices; new
+Java sources carry an SPDX identifier. No original logo is reused because its
+separate artwork license has not been confirmed, and no PolyMc-Extra source was
+used. See [NOTICE.md](NOTICE.md) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

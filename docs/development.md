@@ -29,7 +29,7 @@ loom_version=1.17.16
 fabric_api_version=0.155.2+26.1.2
 polymer_version=0.16.5+26.1.2
 junit_version=5.13.4
-mod_version=0.1.0-alpha.1+26.1.2
+mod_version=0.2.0-alpha.1+26.1.2
 ```
 
 The Gradle wrapper is 9.5.1. Dependencies must remain exact; do not introduce
@@ -46,16 +46,21 @@ Use `./gradlew` on Unix-like hosts and `gradlew.bat` on Windows.
 ./gradlew test
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
+./gradlew verifyPlaytestClientIsolation
+./gradlew runClientPlaytest
+./gradlew runProductionClientPlaytest
+./gradlew runPlaytest
 ./gradlew dependencies
 ./gradlew dependencyInsight --dependency polymer-core
 ./gradlew javadoc sourcesJar
 ```
 
 `clean build` runs compilation, unit tests, and archive tasks wired to the
-build lifecycle. `runGameTest` and `runDedicatedServerSmoke` are process
-integration runs and must be invoked separately unless CI explicitly wires
-them into another task. Check `docs/testing.md` for termination/acceptance
-details.
+build lifecycle. Server GameTest, dedicated-server smoke, and two-process
+client playtests are distinct integration layers. Invoke and report them
+separately unless a named aggregate wires them together. `runPlaytest` is the
+canonical interactive aggregate; its evidence root is `build/playtest/`.
+Check `docs/testing.md` for exact acceptance details.
 
 ## Source sets
 
@@ -64,6 +69,12 @@ details.
   live game where possible.
 - `src/gametest/java` and `src/gametest/resources`: internal content fixtures and
   Fabric GameTest entrypoints, not included as a public API or release mod.
+- `playtest/client-driver`: separate client-only Loom project containing the
+  minimal Fabric Client GameTest driver. It has no root-project, Polymer, or
+  fixture dependency and must never be packaged into the release JAR.
+- production playtest server fixtures are built as a separate non-release JAR;
+  generated worlds, logs, reports, and screenshots live under
+  `build/playtest/` and are ignored.
 
 Test fixtures include ordinary/semantic items, safe and unsafe block shapes,
 block entity/entity/menu registrations, native Polymer content, and a legacy
@@ -126,7 +137,7 @@ and temporary research clones are not tracked.
 
 ## Git workflow
 
-Work on `reborn/26.1.2`, not the upstream default branch. Keep `upstream`
+Work on `reborn/0.2.0-alpha+26.1.2`, not the upstream default branch. Keep `upstream`
 read-only and never open a Reborn pull request against TheEpicBlock/PolyMc.
 Use focused commits whose messages explain the purpose. Push the development
 branch only after the build is in a reasonably reliable state and report any

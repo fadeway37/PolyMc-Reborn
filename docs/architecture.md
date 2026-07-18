@@ -1,237 +1,207 @@
 # Architecture
 
-PolyMc Reborn is a planning layer around a maintained presentation backend. It
-does not replace a mod's server registrations. A server `Item`, `Block`, entity
-type, or menu type remains the authoritative object; only the value serialized
-to a particular client is overlaid or transformed.
+PolyMc Reborn plans and applies vanilla-facing presentations without replacing
+authoritative server registrations. A mod's `Item`, `Block`, entity, menu type,
+container, and gameplay logic remain real server objects.
 
-## Data flow
+## Compatibility flow
 
 ```text
-Fabric registries and loaded-mod metadata
-                 |
-        stable ContentDescriptor discovery
-                 |
-      CompatibilityRegistry providers
-                 |
-      candidates + complete reason chains
-                 |
-             MappingPlanner
-        / validation / persistence
-                 |
+Fabric registries + loaded-mod metadata
+                |
+      stable ContentDescriptor discovery
+                |
+     ordered CompatibilityProvider candidates
+                |
+            MappingPlanner
+      validation + persisted replay
+                |
        immutable final MappingPlan
-                 |
+                |
        CompatibilityBackend dispatch
-        |          |           |
-   item overlay block overlay resource pack
-        |          |           |
-        +---- diagnostics/reports ----+
+       /        |         |         \
+    items   state blocks  pack   explicit GUI/entity
+                |
+       diagnostics and reports
 ```
 
-The key separation is between deciding and applying. Providers inspect a
-normalized descriptor and propose a mapping candidate. The planner resolves
-all candidates and emits an immutable proposed plan. The backend validates
-persisted allocations/capacity, installs selected overlays, and publishes the
-immutable final plan.
+Providers decide and explain; backends apply. A provider proposes a candidate
+with strategy, confidence, degradation, reason chain, resources, warnings, and
+failure information. It does not mutate registries or write files. The planner
+resolves candidates in deterministic priority order and publishes an immutable
+plan with O(1) lookup.
 
-## Core model
-
-### ContentDescriptor
-
-A descriptor identifies one server registration using its registry type,
-canonical registry ID, owner mod, content kind, state/property information,
-shape/block-entity facts where applicable, and normalized behavior/component
-hints. It contains no client-only classes. Discovery sorts descriptors by
-registry ID and then content kind, never by registry/`HashMap` iteration order.
-
-### CompatibilityRegistry and providers
-
-The registry holds providers in explicit priority tiers. A
-`CompatibilityProvider` is a pure candidate producer: it explains whether it
-can handle a descriptor and what backend strategy/carrier/resources it needs.
-Providers do not write files or mutate registries. Their deterministic order is
-defined in [compatibility-model.md](compatibility-model.md).
-
-### MappingPlanner and MappingPlan
-
-The planner combines provider candidates and administrator policy in stable
-order, while preserving every accepted/rejected candidate explanation. The
-Polymer backend then loads the mapping store, replays valid item carriers and
-the shared full-block pool, checks carrier existence/capacity, and refuses a
-persisted replay that would silently change a block carrier.
-
-The output is an immutable `MappingPlan` keyed for O(1) lookup. A
-`MappingDecision` includes status, selected provider/backend/strategy,
-confidence, degradation, the complete reason chain, resources, warnings, and a
-failure reason. Diagnostics derive counters and per-mod summaries from the plan.
-
-### Backends
-
-`CompatibilityBackend` applies already-selected decisions. The default
-implementation lives in `backend.polymer` and is the only package that should
-expose Polymer types. It installs overlays on existing item/block objects and
-connects resource contributions to Polymer's pack API.
-
-`PacketFallbackBackend` is a separate experimental SPI. The 0.1 implementation
-is a disabled no-op that reports its state. It does not cancel or rewrite
-arbitrary packets. Future implementations must classify a packet as allow,
-transform, or reject-with-reason and remain bounded to explicitly supported
-protocol cases.
+Discovery sorts canonical registry IDs and content kind. Provider ties use
+stable IDs, never registration order or map iteration. Native Polymer overlays
+remain first priority unless both an explicit administrator rule and the
+dangerous `override_native_polymer` switch authorize replacement.
 
 ## Lifecycle
 
-### Phase 1: static planning
+During initialization Reborn validates configuration/container conflicts,
+registers built-in providers, loads `polymc-reborn` extensions, adapts selected
+recompiled `polymc` entrypoints, and registers lifecycle/command hooks.
 
-During Fabric mod initialization, Reborn:
+A narrow registry-freeze hook performs stable discovery while Polymer can still
+mark server-only registrations. It installs provisional overlays and publishes
+an immutable plan. At `SERVER_STARTING`, after Minecraft has bound default item
+components, a registry-read-only pass finalizes semantic carriers, persistent
+records, resource inputs, and reports before players join. Commands can inspect
+that plan but cannot remap the live server.
 
-1. validates its own mod/container conflicts and main configuration;
-2. registers built-in and Java providers;
-3. loads `polymc-reborn` extensions;
-4. loads recompiled legacy `polymc` extensions through the bridge;
-5. registers commands and lifecycle callbacks.
-
-After all Fabric entrypoints have run, a narrow Mixin observes the head of the
-first relevant `MappedRegistry.freeze()` call for items, blocks, entity types,
-or menus. While registry writes are still legal, its idempotent guard:
-
-1. discovers static registries in stable order;
-2. resolves the plan, validates/persists allocations, and installs overlays;
-3. collects the normalized resource snapshot and writes compatibility reports;
-4. publishes the final immutable plan.
-
-The injection does not inspect, cancel, or transform packets. It installs
-server-only overlays immediately before the first relevant registry freezes.
-Minecraft binds item default components later, so `SERVER_STARTING` performs a
-second, registry-read-only pass that replaces the provisional immutable plan
-with the final immutable plan, persists exact semantic carriers, and refreshes
-reports before players can join.
-
-The exact ordering is enforced by implementation tests. Extensions must not
-expect a command to alter the plan later.
-
-### Phase 2: server validation
-
-Polymer's resource-pack initialized event records a diagnostic; its creation
-event consumes the already frozen resource snapshot. When the server is fully
-started, Reborn enumerates the available server registry views and records a
-server-dependent diagnostic. Compatibility reports were already written at
-static freeze, while a resource-pack report is written after an actual pack
-build. This phase does not silently remap the frozen plan.
+Pending rollback activation is even earlier: a complete pending data/metadata
+pair is validated and atomically activated before static planning. A partial or
+invalid pair blocks startup rather than being ignored.
 
 ## Polymer backend
 
-Polymer 0.16.5+26.1.2 supports overlays on already-registered objects through
-`PolymerItemUtils.registerOverlay` and `PolymerBlockUtils.registerOverlay`.
-Native support is detected with
-`PolymerSyncedObject.getSyncedObject(BuiltInRegistries.ITEM/BLOCK, object)` and
-an `instanceof PolymerItem`/`PolymerBlock` check, not only by checking the real
-object class. Consequently the mod object remains real in inventories, worlds,
-recipes, tags, and calls from other server mods, while Polymer supplies the
-vanilla-facing representation at its supported serialization boundaries.
+Direct Polymer types stay in `io.github.polymcreborn.backend.polymer`. The
+backend attaches overlays to already registered objects, uses Polymer Blocks'
+shared full-block carrier pool, contributes normalized assets to Polymer's pack
+pipeline, marks server-only registrations, and drives explicit Virtual Entity
+projections. The public API remains backend-neutral.
 
-The backend focuses on:
+Unsupported/error block registrations that would otherwise leak an unknown
+state are quarantined with a conservative barrier presentation for protocol
+safety. Their compatibility status stays `UNSUPPORTED`/`ERROR`, with the
+quarantine backend and degradation visible; quarantine is not a claim that the
+block behavior or visuals are supported.
 
-- conservative item carriers and safe component projection;
-- simple full-cube block states with matching collision/outline assumptions;
-- corresponding block-item decisions;
-- resource contribution and registry-server-only integration supplied by
-  Polymer;
-- diagnostics for unsafe shapes, block entities, entities, and menus.
+The same freeze-time safety pass marks unsupported/error custom entity types
+as Polymer server-only types with an invisible marker quarantine, and marks
+unsupported/error custom menu types as server-only. These decisions retain
+their unsupported status and carry an explicit `polymer-quarantine` backend
+reason. The pass does not invent an entity surrogate or menu layout; it only
+prevents unknown registry entries from leaking to a vanilla client.
 
-Native Polymer is not silently replaced. An administrator must both write an
-explicit override rule and enable `override_native_polymer`; the resulting
-dangerous decision remains visible in reports.
+The separate `PacketFallbackBackend` remains experimental and disabled. Its
+no-op/audit boundary does not cancel arbitrary packets or disable registry
+validation.
 
-## Items and creative reverse mapping
+## Items
 
-The item planner chooses a semantic carrier only when observable server data
-supports that category: food/drink, tool, armor, bow/crossbow-like, shield-like,
-throwable, block item, or material. Minecraft 26.1 binds some item default
-components after Polymer requires server-only entries to be marked. The
-pre-freeze overlay therefore starts with a conservative material floor. At
-`SERVER_STARTING`, Reborn reads the now-bound component map, locks one carrier
-into the overlay, final immutable plan, report, and `mappings-v1.json`, and then
-never changes that carrier in a packet hot path. Client serialization retains
-safe display information, count, damage, and supported effects while dropping
-unregistered/custom components that a vanilla client cannot decode.
+Item analysis selects a semantic carrier only when server-visible behavior and
+bound data components justify a category such as food/drink, tool, armor,
+bow/crossbow, shield, throwable, block item, or generic material. The selected
+carrier is fixed before players join. Safe display information, count, damage,
+and supported visual effects are projected; unregistered/custom client
+components are filtered. Client-only renderers are never inferred.
 
-Reverse mapping is a separate trust boundary. Polymer's default `$polymer:stack`
-custom data contains restoration information but is not a Reborn authenticity
-signature. Reborn therefore defaults creative reversal to disabled. An enabled
-implementation may restore only when a Reborn-generated marker verifies
-against the current mapping, names a valid target ID, and contains only allowed
-components. A missing, malformed, stale, or forged marker is rejected; Reborn
-does not infer a server item from its visual carrier.
+Creative reverse mapping is a separate trust boundary and remains disabled.
+Polymer's ordinary restoration data is not a Reborn authenticity signature.
+Malformed, stale, forged, wrong-ID, or disallowed-component markers are rejected
+by the guard, but 0.2 does not connect that guard to the live creative packet
+path.
 
-## Blocks
+## Stateful full-cube blocks
 
-Block discovery inspects every possible state, then records aggregate full-cube,
-stable-shape, block-entity, and state-count facts. Automatic 0.1 support is
-limited to safe complete cubes. The automatic backend allocates and persists
-one visual full-block carrier per registry ID; the v1 store's optional state key
-is reserved for a future per-state algorithm. Distinct state visuals require a
-native or explicit adapter. The associated `BlockItem` receives an item mapping.
+For a candidate block, discovery examines all states, collision/outline shape,
+block-entity association, and properties. Automatic state projection is limited
+to stable complete cubes with an unambiguous bounded `variants` model graph.
 
-Doors, beds, fences, stairs, multi-block structures, special redstone behavior,
-height-dynamic blocks, non-full cubes, and unhandled block-entity presentations
-are fallback/unsupported unless an explicit native or Java adapter safely
-handles them. Reborn does not manually claim a legacy note-block state pool when
-Polymer Blocks offers the maintained abstraction. Textured full blocks request
-a carrier from Polymer Blocks' process-wide `PolymerBlockResourceUtils` pool.
-Reborn does not create a private allocator that could collide with other mods;
-a `null` allocation is capacity exhaustion and persisted assignments must be
-replayed and validated in stable order.
+`BlockStateKey` serializes property names/values canonically. Every safe state
+gets an immutable O(1) mapping. Persisted carriers replay first in stable order;
+new registry-ID/state keys append without reordering valid existing assignments.
+A legacy empty default-state record can seed the canonical default state.
 
-## Entities and menus
+Missing/ambiguous variants, multipart or unsafe paths, capacity exhaustion,
+carrier replay mismatch, complex shapes, doors, beds, fences, stairs, dynamic
+geometry, and unmodelled block-entity presentation fail closed. Associated
+block items use the selected block mapping where safe.
 
-Entity types and screen-handler/menu types are discovered and included in
-reports. Native or explicit adapters can contribute a decision, but 0.1 has no
-generic entity or GUI generator.
+## Safe standard-container GUI projection
 
-The entity SPI is designed for future Polymer Virtual Entity implementations,
-equipment, passengers, metadata, interaction proxying, and explicit vanilla
-replacement types. The GUI SPI reserves standard container projection, slot
-mapping, progress/properties, paging, server buttons, and transaction
-validation. Shift-click, drag, offhand/hotbar actions, and desynchronization
-recovery are required before a generic implementation can be called safe.
+GUI support is explicit, not inferred. `GuiProjectionRegistry` freezes adapters
+in stable menu-ID order. An adapter supplies the real authoritative server
+`Container`, a one-to-six-row vanilla generic-container shape, a complete
+bijective slot mapping, and an explicit interaction policy.
 
-## Persistent and generated state
+The projected vanilla menu points every content `Slot` directly at the real
+container and adds Minecraft's standard player inventory/hotbar. There is no
+shadow inventory. Normal pickup, quick move, bounded drag, hotbar/offhand swap,
+throw, and pickup-all are policy-gated; creative clone is denied. Illegal slot
+or button values request full resynchronization.
 
-`mapping.PersistentMappingStore` owns `mappings-v1.json`. It uses schema and
-algorithm versions, strict validation, canonical sorting, an adjacent temporary
-file, and atomic replacement where the filesystem supports it. An incompatible
-migration creates a backup before changing the primary file. Corruption is fatal
-and capacity exhaustion is an explicit diagnostic.
+Generation-safe sessions have a configured capacity and clean up on normal
+close/disconnect. The optional strict transaction validator checks container/
+state IDs, monotonic sequence, changed slots, carried stack, and exact
+authoritative post-click deltas. It never trusts a client prediction as
+inventory state.
 
-The resource pipeline reads files only during startup or an administrator pack
-build. It normalizes logical paths, bounds extraction/caches, traverses model
-dependencies, detects duplicates/conflicts/missing textures, and writes stable
-archives and manifests. Packet conversion never performs filesystem I/O.
+Furnace/property menus, custom buttons, paging, dynamic layouts, arbitrary slot
+subclasses, and custom client screens are not implemented. See
+[gui-projection.md](gui-projection.md) and
+[ADR 0005](adr/0005-safe-gui-projection.md).
 
-## Client profiles
+## Explicit virtual-entity projection
 
-- `VANILLA`: the only fully acted-on MVP profile; unknown clients use it.
-- `REBORN_COMPANION`: reserved for an optional future quality-of-life client,
-  never required for login.
-- `TRUSTED_MODDED`: reserved for authenticated exact registry and mod
-  fingerprints. Fabric presence alone is not trust.
+Entity support is likewise explicit. An adapter names one custom target type,
+a registered vanilla surrogate, a finite visual offset and interaction radius,
+and approved use/attack callbacks. Native Polymer behavior and vanilla targets
+are not replaced.
 
-The client profile is part of mapping context. The only active 0.1 profile is
-`VANILLA`; its per-overlay semantic item cache is bounded to one carrier and
-reports hits/misses. Generated resource-pack cache reuse is byte-for-byte.
+The Polymer backend anchors a virtual vanilla element to the real entity and
+synchronizes position/tracking, rotation, custom name/name visibility, and
+glowing state. The real entity retains health, AI, persistence, damage, and all
+game mechanics. Interactions require a current generation, live same-level
+source/player, active tracking, finite hit data, and bounded distance. Holders
+are removed on unload/replacement/stop.
 
-## Dedicated-server safety
+Equipment, passengers, leashes, arbitrary tracked data, animations, and generic
+surrogate inference are not implemented. See
+[entity-projection.md](entity-projection.md) and
+[ADR 0006](adr/0006-explicit-entity-projection.md).
 
-`fabric.mod.json` declares `environment: server`; shared initialization imports
-no client classes. The build uses Loom's server-only Minecraft JAR and provides
-a dedicated-server run. Optional client concepts are values/protocol policy,
-not references to client implementation classes.
+## Mapping persistence and operations
 
-## Observability
+`mappings-v1.json` retains schema `1` and algorithm `reborn-2`. It validates
+strictly, sorts records canonically, writes through an adjacent temporary file,
+and replaces atomically where supported. Corruption never causes silent empty
+regeneration.
 
-Startup logs one concise status summary. Structured diagnostics drive JSON and
-Markdown reports and the `why` command, so log wording is not the only evidence
-for a decision. Report serialization uses logical mod/registry/resource IDs and
-does not emit absolute local paths by default. A narrow `SystemReport` Mixin adds
-a path-free PolyMc Reborn version/plan/error summary to Minecraft crash reports;
-it does not alter crash handling.
+Startup produces a stable mapping diff. Operator commands expose status,
+validation, diff, dry run, checksummed backup, and rollback preparation. Dry
+run hashes an in-memory proposal and does not write. Rollback validates path,
+metadata, checksum, size, schema, algorithm, and Minecraft version, creates a
+safety backup, and stages pending files for restart. See
+[mapping-migration.md](mapping-migration.md) and
+[ADR 0007](adr/0007-mapping-migration-and-rollback.md).
+
+## Resource pack and diagnostics
+
+Filesystem work occurs only during startup or explicit pack build, never in a
+packet hot path. Resource paths are normalized and bounded; model dependencies
+are traversed with cycle/depth/size guards; conflicts, missing assets, and
+traversal attempts are diagnostics. Stable ZIP order/timestamps and canonical
+manifests make equivalent input byte-identical.
+
+JSON and Markdown reports use logical IDs, not sensitive absolute paths.
+Counters include compatibility statuses plus GUI/entity operational metrics and
+mapping/resource state where available. `/why` renders accepted and rejected
+provider candidates.
+
+## Client profiles and dedicated-server safety
+
+`VANILLA` is the only active profile. `REBORN_COMPANION` and `TRUSTED_MODDED`
+are future values; Fabric presence is not authenticated trust.
+
+`fabric.mod.json` declares `environment: server`; production initialization
+does not reference client-only Minecraft classes. The Client GameTest driver is
+a separate non-release project with no dependency on Reborn, Polymer, or server
+fixtures.
+
+## Two-process production playtest
+
+The server process runs the final official-namespace production JAR plus pinned runtime
+dependencies and a separate fixture JAR. The client process is a real Minecraft
+26.1.2 client with only the minimal Fabric Client GameTest/resource modules and
+automation driver. It rejects Reborn, Polymer, fixtures, and content definitions
+on its classpath.
+
+Both communicate only through loopback multiplayer/resource-pack protocols and
+filesystem evidence. The driver uses real keyboard/mouse input APIs; the server
+records independent observations. Passing requires both processes, assertions,
+clean shutdown, and the complete `build/playtest/` evidence contract. This is
+not a pure zero-mod vanilla-client test. See
+[client-playtest.md](client-playtest.md) and
+[ADR 0004](adr/0004-client-playtest-architecture.md).

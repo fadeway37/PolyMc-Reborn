@@ -1,115 +1,166 @@
 # Testing
 
-PolyMc Reborn uses layered tests. No single unit test proves that an arbitrary
-mod is compatible, and a dedicated-server start is not a substitute for a real
-vanilla-client login.
+PolyMc Reborn uses independent test layers. Never report one layer as evidence
+that another passed, and never infer a result from checked-in harness source.
 
 ## Commands
 
-Run Java first and record its output:
-
 ```text
 java -version
+./gradlew javaToolchains
 ./gradlew clean build
 ./gradlew test
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
+./gradlew verifyPlaytestClientIsolation
+./gradlew runClientPlaytest
+./gradlew runProductionClientPlaytest
+./gradlew runPlaytest
 git diff --check
 ```
 
-Use `gradlew.bat` on Windows. `clean build` already executes the JUnit test task;
-running `test` separately is useful for a focused rerun. GameTest and the server
-smoke run are separate Loom processes and are not considered passed merely
-because compilation succeeded.
+Use `gradlew.bat` on Windows. `clean build` includes JUnit but not every external
+process task. Each separate command must really finish before it is marked
+passed.
 
-## Unit tests
+## Test-layer matrix
 
-The JUnit 5 suite is organized around deterministic, game-independent logic
-where possible:
+| Layer | Process/artifact boundary | Claim allowed after success |
+| --- | --- | --- |
+| JUnit | JVM tests, mostly temporary data | deterministic/hostile logic cases |
+| Server GameTest | development server plus internal fixture | registry, Fabric, and Polymer lifecycle behavior |
+| Dedicated-server smoke | server-only production source set | startup and absence of client-class linkage |
+| Isolated Client Driver Playtest | real client + independent server | multiplayer, pack, input, presentation, reconnect observations |
+| Production Client Playtest | same two processes using the final official-namespace distribution JAR | artifact/classpath isolation plus the interactive scenario |
+| Pure zero-mod vanilla smoke | no Fabric/client driver | P1, not implemented/run for 0.2 |
+| External-mod matrix | pinned third-party server mod, absent from client | P1 framework only; no completed compatibility result claimed |
 
-| Area | Required assertions |
-| --- | --- |
-| main config | defaults are safe; required fields/types/ranges parse; unknown and misspelled fields fail with a JSON path |
-| compatibility profiles | schema/version/target/rules parse; safe globs are bounded; code/script/class/unknown actions fail |
-| provider resolution | all tiers follow stable order; provider ID breaks ties; traces include accepted and rejected candidates |
-| native Polymer | native item/block decisions win unless both explicit override gates are true |
-| discovery | shuffled equivalent descriptor inputs produce the same ordered plan |
-| mapping store | strict round trip, corrupt/unknown schema rejection, temporary-file replacement, backup-before-migration, and capacity errors |
-| deterministic mappings | identical input produces byte-identical `mappings-v1.json`; adding content preserves valid assignments |
-| resource pack | traversal/conflict/missing-resource diagnostics and byte-identical ZIP/manifest output |
-| item conversion | ordinary and semantic carriers, safe component preservation, unsupported component filtering, namespaced `ITEM_MODEL`, deterministic output |
-| reverse-conversion guard | unit-level signed-marker round trip; malformed, stale, forged, wrong-ID, and disallowed-component markers rejected; runtime enablement remains unavailable in 0.1 |
-| block conversion | full cube, multi-state full cube, corresponding block item, deterministic assignment, and unsupported shape/block entity |
-| legacy bridge | a `polymc` entrypoint registration appears as `LEGACY` and contributes normalized resources |
-| dedicated-server linkage | common entrypoints and APIs load without client-only Minecraft classes |
+The Client Driver Playtest is a real Minecraft 26.1.2 client, but includes a
+minimal Fabric automation mod. It must not be called an unmodified or pure
+vanilla client.
 
-Tests should use temporary directories supplied by JUnit and validate resolved
-targets before deleting them. They must not write developer-global
-`config/polymc-reborn` state.
+## JUnit coverage
 
-## Internal test mod and GameTest
+The JUnit 5 suite covers strict main/profile config, bounded safe globs,
+provider priority/native preservation, stable discovery, mapping-store
+roundtrip/corruption/atomic writes/determinism, deterministic resource packs,
+semantic item conversion/filtering, full-cube and stateful-block allocation,
+legacy entrypoint registration, dedicated-server class loading, GUI slot/
+transaction/session safety, explicit entity registry/session/interaction
+safety, and mapping diff/backup/rollback validation.
 
-The `gametest` source set is not shipped in the release JAR. It registers:
+Deterministic tests compare canonical bytes/hashes. Filesystem tests use JUnit
+temporary directories and never modify developer-global server configuration.
 
-- a basic item, food-like item, and tool-like item;
-- a simple full cube and a stateful full cube;
-- a non-full-cube unsupported block and a block entity case;
-- a custom entity type and menu/screen-handler type for classification;
-- item/block content with an existing native Polymer implementation;
-- a recompiled legacy adapter under the `polymc` entrypoint.
+## Server GameTest
 
-GameTest verifies registry discovery and real Fabric/Polymer lifecycle wiring
-that a plain JUnit process cannot cover. A successful run requires the server
-to reach the GameTest phase, execute all registered tests, write the configured
-report, and exit with success. A process that only accepts the EULA, creates a
-world, or reaches an idle prompt is not sufficient.
+The non-release GameTest fixture registers real custom items, semantic food/
+tools, simple and stateful full cubes, unsupported shape/block-entity cases,
+native Polymer examples, custom entity/menu types, and a recompiled legacy
+entrypoint. GameTest checks real registry and Polymer lifecycle wiring.
 
-## Dedicated-server smoke test
+Success requires execution of the registered tests and a successful process
+exit. Accepting the EULA, generating a world, or reaching an idle prompt is not
+a passing GameTest.
 
-The smoke run uses Loom's server-only Minecraft JAR and the release mod source
-set. It is intended to detect:
+## Dedicated-server smoke
 
-- client-only class linkage during mod discovery/initialization;
-- incorrect `fabric.mod.json` dependencies/environment;
-- startup guard/config/report failures;
-- Polymer API linkage errors for the exact pinned version.
+The smoke task uses the server-only Minecraft JAR and production mod source to
+detect client linkage, metadata/dependency mistakes, startup guard/config/report
+failures, and Polymer API linkage. It passes only after the ready marker and a
+controlled shutdown. A forced kill is incomplete/failure.
 
-The test is successful only when logs show Reborn initialization and the server
-reaches its ready state without a client-class error, followed by a controlled
-shutdown. If automation cannot stop the process cleanly, report the run as
-manual/incomplete rather than silently killing it and calling it passed.
+## Client and production playtests
 
-## Vanilla-client scope
+`verifyPlaytestClientIsolation` checks the client dependency/mod allow-list and
+that release archives exclude the driver/fixture/evidence. `runClientPlaytest`
+and `runProductionClientPlaytest` exercise the isolated two-process harness;
+`runPlaytest` is the canonical aggregate entrypoint.
 
-This repository does not currently claim an automated, real vanilla-client
-end-to-end login test. Unless a test run actually launches an unmodified 26.1.2
-client, connects, accepts/declines the pack, interacts with fixtures, and
-validates observations, the final test report must say it was **not run**.
+The scenario contract includes:
 
-The MVP substitutes focused server-side evidence:
+- real multiplayer connection and resource-pack handling/application;
+- movement, camera rotation, and hotbar input;
+- semantic item use;
+- placement, state change, and break of a mapped full cube;
+- projected-container click, shift-click, drag/hotbar/offhand paths and
+  inventory-conservation checks;
+- explicit virtual-entity spawn/movement/use/attack observations;
+- normal disconnect and reconnect;
+- independent client assertions and server observations;
+- bounded scenario/global timeouts and clean process shutdown.
 
-- direct Polymer item-stack projection and hostile reverse-mapping tests;
-- Polymer overlay/non-override integration tests;
-- GameTest fixture behavior;
-- dedicated-server class-loading/startup smoke.
+The evidence root is:
 
-These reduce risk but do not prove every client rendering or interaction path.
+```text
+build/playtest/
+  summary.json
+  summary.md
+  junit.xml
+  loaded-client-mods.json
+  server-state.json
+  client-state.json
+  screenshots/
+  logs/client.log
+  logs/server.log
+  logs/orchestrator.log
+```
 
-## Reproducibility checks
+The required screenshot contract is:
 
-For mappings and packs, run equivalent builds in two new temporary directories
-with the same normalized input and compare bytes/SHA-256. Avoid testing only in
-one warmed cache. Archive reproducibility checks also inspect timestamps and
-entry order.
+```text
+01-connected.png
+02-resource-pack-prompt.png
+03-resource-pack-applied.png
+04-item-held.png
+05-item-after-use.png
+06-block-placed.png
+07-block-state-off.png
+08-block-state-on.png
+09-block-broken.png
+10-gui-open.png
+11-gui-after-shift-click.png
+12-gui-after-hotbar-swap.png
+13-gui-reopened.png
+14-entity-spawned.png
+15-entity-moved.png
+16-entity-interacted.png
+17-reconnected.png
+```
 
-The distributable JAR must contain `fabric.mod.json`, the license/notice, and a
-manifest with PolyMc Reborn version, Minecraft version, Git commit, and dirty
-state. It must not contain GameTest classes, cache/reports, secrets, local JARs,
-or absolute developer paths.
+A missing/empty report, forbidden client mod, missing input assertion,
+screenshot mismatch, timeout, non-zero process exit, or forced cleanup fails the
+run. The summary/JUnit report must be derived from actual client/server results,
+not hard-coded success. The final handoff records the exact command, exit code,
+scenario counts, and evidence paths.
 
-## Reporting results
+## 0.2 release-candidate verification (2026-07-18)
 
-A release or handoff report lists exact commands, exit codes, number of tests,
-failures/skips, integration-task status, JAR path/hash, Git commit, and dirty
-state. Include the reason for every skipped task. Do not turn “not automated”
-into “passed by inspection.”
+The local Windows host completed `runClientPlaytest`,
+`runProductionClientPlaytest`, and the canonical `runPlaytest` entrypoint in
+fresh directories. The retained final run reports 53/53 aggregate checks,
+34/34 client steps, 17/17 screenshot artifacts, client/server exit code zero,
+no timeout, no forced termination, and a clean server stop. It observed exactly
+two joins/disconnects, two resource-pack pushes/GETs, and two byte-identical
+client pack-cache files. GitHub Actions is not covered by this local statement
+and requires its own run ID and artifact review.
+
+## Resource-pack stability
+
+Equivalent normalized inputs and mappings must generate byte-identical ZIP and
+manifest bytes. The production playtest additionally records the served pack
+hash, client application state, and reconnect state. A warm-cache result alone
+does not prove determinism; compare independent builds when releasing.
+
+## Release archive verification
+
+The distributable JAR must contain `fabric.mod.json`, license/notices, and a
+manifest with project version, Minecraft version, Git commit, and dirty state.
+It must not contain Client GameTest/driver classes, fixtures, screenshots,
+reports, worlds, caches, secrets, local JARs, or absolute developer paths.
+
+## P1 test status
+
+The pure zero-mod vanilla-client smoke, runtime creative reverse-mapping client
+scenario, and completed external third-party mod matrix are not implemented/run
+for 0.2. Internal fixture success must not be generalized to unrelated mods.

@@ -19,7 +19,7 @@ distinct mod container has the actual ID `polymc`, and it declares
 1. Create a branch of the extension and change the toolchain to Java 25,
    Minecraft 26.1.2, Loader 0.19.3, Loom 1.17.16, and official names. Remove
    Yarn mappings.
-2. Depend on PolyMc Reborn `0.1.0-alpha.1+26.1.2` and the exact Polymer modules
+2. Depend on PolyMc Reborn `0.2.0-alpha.1+26.1.2` and the exact Polymer modules
    needed by the server pack; do not copy dependency JARs into the source tree.
 3. First keep the Fabric entrypoint key `polymc` and port the implementation to
    the bridged `io.github.theepicblock.polymc.api.PolyMcEntrypoint`. This gives a
@@ -64,7 +64,7 @@ by a particular alpha. For a new extension, use:
     ]
   },
   "depends": {
-    "polymc-reborn": ">=0.1.0-alpha.1+26.1.2"
+    "polymc-reborn": ">=0.2.0-alpha.1+26.1.2"
   }
 }
 ```
@@ -89,9 +89,11 @@ installed as the original packet-Mixin implementation.
 
 Global item transforms must be deterministic, safe for all items, and must not
 restore arbitrary client data. Resource callbacks write normalized logical
-paths through the controlled resource sink. Entity and GUI registrations are
-accepted only as explicit adapter/classification input; there is no broad
-automatic emulation in 0.1.
+paths through the controlled resource sink. Legacy entity/GUI registrations
+remain classification/candidate inputs; they do not automatically become the
+new 0.2 guarded Virtual Entity or authoritative standard-container adapters.
+Port those behaviors explicitly through the new APIs and test their real
+interactions. There is no broad automatic emulation.
 
 ## Operational migration
 
@@ -110,9 +112,18 @@ error by design.
 - Native Polymer items/blocks remain `NATIVE` in the report.
 - Explicit legacy registrations appear as `LEGACY` with their reason chain.
 - Unsupported entity, GUI, shape, renderer, and block-entity cases are visible.
-- Item components and creative reverse mapping pass hostile-input tests.
+- Item components and the disabled reverse-mapping guard pass hostile-input
+  tests; runtime creative reversal remains off.
+- Explicit GUI adapters preserve inventory across click/shift-click/drag/swap,
+  close, and disconnect tests.
+- Explicit entity adapters validate tracking/generation/distance and invoke the
+  real server entity.
+- Stateful full-cube additions preserve existing per-state assignments.
 - Two equivalent clean pack builds have the same hash.
 - Restart reuses the same mapping bytes/assignments.
+- `runPlaytest` uses the isolated client allow-list and produces complete
+  `build/playtest` evidence. The 2026-07-18 local release-candidate run passed
+  53/53 checks and 34/34 client steps; CI remains a separately cited result.
 
 The detailed compatibility matrix is in
 [legacy-api-compatibility.md](legacy-api-compatibility.md).

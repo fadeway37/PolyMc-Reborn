@@ -1,24 +1,23 @@
 # Contributor and agent guide
 
 This file defines repository-wide implementation rules for PolyMc Reborn.
-Apply it together with the user-visible behavior described in `README.md` and
-the accepted decisions in `docs/adr/`.
+Apply it together with `README.md` and accepted decisions in `docs/adr/`.
 
 ## Product invariant
 
 The server keeps the real modded registry object and server behavior. A client
-representation is an overlay, mapping, or serialization transform only. Never
-replace a real server registration with a vanilla stand-in. Never describe the
-project as compatible with every mod.
+representation is an overlay, mapping, virtual presentation, or serialization
+transform only. Never replace a real server registration with a vanilla
+stand-in. Never describe the project as compatible with every mod.
 
 Target exactly Minecraft 26.1.2, Fabric Loader 0.19.3, Java 25, official
 Minecraft names, and the exact dependency pins in `gradle.properties`. Do not
 add Yarn, intermediary-named source, dynamic versions, `flatDir`, vendored
-dependency JARs, or unrelated Maven mirrors.
+dependency JARs, unrelated Maven mirrors, Lombok, or runtime code downloads.
 
 ## Architecture and package boundaries
 
-The normal flow is:
+The normal compatibility flow is:
 
 ```text
 stable registry discovery
@@ -32,117 +31,150 @@ stable registry discovery
 Package responsibilities:
 
 - `io.github.polymcreborn.api`: backend-neutral extension API and stable data
-  contracts. Do not expose Polymer implementation types here.
-- `io.github.polymcreborn.core`: lifecycle orchestration, registry discovery,
-  plan freezing, and startup guards.
+  contracts; do not expose Polymer types.
+- `io.github.polymcreborn.core`: lifecycle, discovery, plan freezing, startup
+  guards, and server orchestration.
 - `io.github.polymcreborn.backend`: generic backend SPI.
-- `io.github.polymcreborn.backend.polymer`: all direct Polymer integration.
-- `io.github.polymcreborn.compat`: provider registry, built-in providers,
-  candidate ordering, and compatibility profiles after parsing.
-- `io.github.polymcreborn.config`: strict configuration/profile decoding and
-  validation. It must never load arbitrary classes or execute scripts.
-- `io.github.polymcreborn.mapping`: immutable decisions, deterministic
-  allocation, validation, atomic persistence, and capacity errors.
+- `io.github.polymcreborn.backend.polymer`: direct Polymer integration only.
+- `io.github.polymcreborn.compat`: providers, deterministic candidate ordering,
+  and validated compatibility-profile decisions.
+- `io.github.polymcreborn.config`: strict decoding/validation; never load
+  arbitrary classes or run scripts.
+- `io.github.polymcreborn.mapping`: immutable decisions, deterministic state
+  allocation, strict persistence, diff, backup, and restart-only rollback.
 - `io.github.polymcreborn.pack`: normalized resource discovery, dependency
-  traversal, deterministic pack output, hashing, and manifests.
-- `io.github.polymcreborn.diagnostics`: structured diagnostics, counters, and
-  path-sanitized JSON/Markdown reports.
-- `io.github.polymcreborn.command`: Brigadier registration and read-only
-  inspection/build commands.
-- `io.github.polymcreborn.legacy`: adapters between legacy registrations and
-  the new planning API.
-- `io.github.theepicblock.polymc.api`: only the deliberately ported legacy
-  source-compatibility surface. Preserve upstream license headers here.
+  traversal, deterministic output, hashing, and manifests.
+- `io.github.polymcreborn.diagnostics`: structured diagnostics, statistics,
+  and path-sanitized reports.
+- `io.github.polymcreborn.command`: Brigadier inspection, pack, validation, and
+  mapping-operations commands.
+- `io.github.polymcreborn.legacy`: adapters into the new planning API.
+- `io.github.theepicblock.polymc.api`: only deliberately ported legacy source-
+  compatibility types; preserve upstream copyright/license headers.
 
-No common or server initializer may reference client-only Minecraft classes.
-Hot-path lookups use precomputed immutable maps; do not scan registries per
+No common/server initializer may reference client-only Minecraft classes.
+Hot-path lookups use precomputed immutable maps. Do not scan registries per
 tick, read files during packet conversion, or use reflection in packet paths.
+
+## Interactive compatibility boundary
+
+The 0.2 APIs are deliberately narrow:
+
+- GUI projection means an explicit adapter to a standard vanilla 9xN container
+  backed directly by the real server `Container`. Never infer an arbitrary menu
+  from slot count or copy its inventory into a second authority.
+- Entity projection means an explicit Polymer Virtual Entity adapter with a
+  registered vanilla surrogate and guarded callbacks. Never choose a vaguely
+  similar entity automatically or spawn a real replacement entity.
+- Stateful automatic blocks remain complete cubes whose per-state variants and
+  resource dependencies resolve deterministically. Unsafe shapes, ambiguous or
+  multipart resources, and unmodelled block-entity rendering fail closed.
+- Semantic item carriers are selected before players join and remain fixed;
+  unsupported custom client components are filtered.
+
+Native Polymer behavior wins unless an administrator profile explicitly
+requests override and `override_native_polymer` is enabled. Provider ordering
+changes require an ADR, deterministic tests, and migration notes.
 
 ## Lifecycle and mutability
 
-Registration and provider contribution happen during mod initialization.
-Discovery is sorted by canonical registry identifier before planning. A narrow
-registry-freeze hook finalizes the plan after startup registrations are
-collected but while Polymer can still mark server-only entries. Server-start checks
-may inspect dynamic registry state, but commands must not change a frozen plan.
-Mapping-affecting config changes require restart.
+Provider/adapter registration happens during initialization. Discovery sorts
+canonical IDs before planning. A narrow registry-freeze hook finalizes the
+static plan while Polymer can still mark server-only entries; server startup
+may finish component-aware validation without writing registries. Commands do
+not mutate the frozen plan, and mapping-affecting configuration requires a
+restart.
 
-Native Polymer overlays win unless both an administrator rule requests an
-override and `override_native_polymer` is explicitly enabled. The full provider
-order is documented in `docs/compatibility-model.md`; changes to it require an
-ADR, deterministic-order tests, and migration notes.
+Mapping diff, dry-run, and validation are read-only. Backup writes only below
+the validated backup root. Rollback validates the selected backup and writes a
+pending data/metadata pair; it becomes active before planning on the next
+startup. Never hot-swap mappings beneath live Polymer overlays.
 
 ## Adding a CompatibilityProvider
 
-1. Implement the backend-neutral provider contract in `compat` or a downstream
-   mod. Give it a stable ID and an explicit priority tier; never depend on
-   insertion order or `HashMap` iteration.
-2. Return an explainable candidate, not an applied mutation. Include strategy,
-   confidence, degradation, reason chain, required resources, warnings, and
-   failure information.
-3. Refuse types the provider cannot model safely. Prefer `UNSUPPORTED` to a
-   plausible-looking but behaviorally unsafe mapping.
-4. Register during the `polymc-reborn` entrypoint. Do not mutate registries
-   after plan freeze.
-5. Add tests for priority, native-Polymer preservation, stable ordering,
-   capacity behavior, reports, and the new content case.
-6. Update compatibility documentation and release notes if observable behavior
-   changes.
+1. Implement the backend-neutral contract and give the provider a stable ID and
+   explicit priority tier; never depend on insertion or `HashMap` order.
+2. Return an explainable candidate, not a mutation. Include strategy,
+   confidence, degradation, reasons, resources, warnings, and failures.
+3. Refuse content that cannot be modelled safely. Prefer `UNSUPPORTED` over an
+   attractive but behaviorally unsafe projection.
+4. Register through the `polymc-reborn` entrypoint before freeze.
+5. Test priority, native preservation, stable ordering, capacity, persistence,
+   reports, and positive/negative content cases.
+6. Update focused documentation and `CHANGELOG.md` for observable behavior.
 
 ## Adding a declarative compatibility profile
 
-1. Start from the example and JSON Schema referenced in
-   `docs/compat-profile-schema.md`.
-2. Use a unique stable profile ID, schema version, target mod/version
-   condition, explicit priority, and narrow rules.
-3. Match exact IDs where possible. Safe globs are permitted; regular
-   expressions, scripts, class names to instantiate, shell commands, and remote
-   code are forbidden.
-4. An override of native Polymer behavior must be visible in the profile and is
-   inert unless the dangerous global switch is enabled.
-5. Run the schema/config tests and validate through the administrator command.
-   Validation does not hot-apply the file.
+1. Start from the example/JSON Schema in `docs/compat-profile-schema.md`.
+2. Use a stable unique ID, schema version, target mod/version condition,
+   explicit priority, and narrow rules.
+3. Prefer exact IDs. Safe globs are allowed; regular expressions, scripts,
+   class names to instantiate, shell commands, and remote code are forbidden.
+4. A native override is inert unless both the rule and dangerous global switch
+   authorize it, and must remain visible in decision traces.
+5. Run schema/config tests and validate through the administrator command.
+   Validation never hot-applies a profile.
 
 ## Build and test commands
 
-Run `java -version` before building.
+Run Java first:
 
 ```text
+java -version
+./gradlew javaToolchains
 ./gradlew clean build
 ./gradlew test
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
+./gradlew verifyPlaytestClientIsolation
+./gradlew runClientPlaytest
+./gradlew runProductionClientPlaytest
+./gradlew runPlaytest
 ./gradlew dependencies
 git diff --check
 ```
 
-On Windows use `gradlew.bat`. Do not claim a GameTest or server smoke test
-passed unless that exact task completed successfully. There is no claim of a
-real vanilla-client end-to-end login unless a real client automation was
-actually run.
+Use `gradlew.bat` on Windows. Name the exact layer in reports: JUnit, server
+GameTest, dedicated-server smoke, isolated Client Driver Playtest, production
+Client Playtest, pure zero-mod vanilla smoke, or external-mod matrix. A layer
+passes only when its exact command succeeds and required evidence validates.
+
+The Client Driver Playtest runs a real Minecraft 26.1.2 client with minimal
+Fabric Client GameTest/resource modules and an automation driver. It is not a
+pure zero-mod vanilla client. The client must reject Reborn, Polymer, the
+server fixture, tested content mods, and unexpected modules. Client and server
+must be separate processes and cannot share statics or private plan state.
+
+The canonical evidence root is `build/playtest/`. Reports, logs, screenshots,
+runtime mods, and worlds are ignored build output and never enter the release
+JAR. A missing assertion, timeout, non-zero process result, or forced cleanup
+is failed/incomplete, never success. Test-harness source is not proof a run
+passed.
 
 Before committing, inspect `git status --short`, dependency locks/verification,
-the distributable JAR manifest and `fabric.mod.json`, and confirm no build output,
-cache, secrets, local JARs, absolute paths, or temporary research clones are
-tracked.
+the release JAR manifest and `fabric.mod.json`, and confirm no build output,
+cache, screenshots, secrets, local JARs, absolute paths, research clones,
+client-driver classes, or fixture classes are tracked/shipped.
 
 ## Style and compatibility discipline
 
-- Use ordinary Java 25, four-space indentation for Java, UTF-8, final fields,
-  immutable snapshots, and explicit validation messages containing the logical
-  config path.
-- Prefer records and small value objects for immutable data. Normalize IDs and
-  paths at boundaries.
-- Avoid Lombok and avoid dependencies that duplicate JDK/Fabric facilities.
-- Use stable sorting for persisted/reportable collections. Deterministic tests
-  compare bytes, not merely parsed objects.
-- Mapping files use temporary-file plus replacement semantics and are backed up
-  before incompatible migration. Never recover corruption by silently creating
-  an empty store.
-- Packet fallback is isolated, experimental, and off by default. Never add a
-  broad “cancel unknown packets” Mixin to make login appear to work.
-- Entity and GUI automation requires explicit safe semantics; do not guess
-  generic projections in 0.1.
+- Use Java 25, four-space Java indentation, UTF-8, final fields, immutable
+  snapshots, and path-specific validation messages.
+- Prefer records/small immutable values. Normalize registry IDs and paths at
+  boundaries.
+- Use stable sorting for persisted/reportable data; deterministic tests compare
+  bytes, not only parsed values.
+- Mapping writes use adjacent temporary files and replacement semantics.
+  Corruption never causes silent regeneration.
+- GUI sessions are bounded and generation-safe. Rejected transaction claims
+  request resync; client predictions never become inventory authority.
+- Entity interaction checks current generation, liveness, level, tracking,
+  finite hit data, and bounded distance before invoking real server logic.
+- Packet fallback is isolated, experimental, and disabled by default. Never add
+  a broad "cancel unknown packets" Mixin to make login appear to work.
+- Playtest changes must keep the client allow-list, independent server
+  observations, timeouts, screenshot contract, structured reports, and clean
+  shutdown assertions synchronized.
 
 ## License policy
 
@@ -152,11 +184,10 @@ New Java source files begin with:
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 ```
 
-Files reused or adapted from upstream PolyMc keep the original copyright and
-license header. Do not copy from PolyMc-Extra or any source with unclear or
-incompatible licensing. Do not reuse the original logo without a documented
-artwork license. Markdown does not require an SPDX header, but must not change
-the repository's `LGPL-3.0-or-later` policy.
+Files reused/adapted from upstream PolyMc retain original copyright and license
+headers. Do not copy PolyMc-Extra or another unclear/incompatible source. Do not
+reuse the original logo without a documented artwork license. Markdown does not
+need an SPDX header but must preserve the `LGPL-3.0-or-later` policy.
 
 Any behavior change must update the relevant report shape, tests, README or
 focused documentation, and `CHANGELOG.md` in the same logical change.

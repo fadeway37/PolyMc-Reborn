@@ -137,8 +137,10 @@ mechanisms are:
   dependency because the current MVP does not call that API;
 - Polymer Networking can negotiate optional Polymer-aware connections, but
   detecting it is not sufficient for Reborn's future `TRUSTED_MODDED` profile;
-- Polymer Virtual Entity supplies a future implementation option for explicit
-  entity adapters; it is not a license to auto-map arbitrary entities;
+- In the 0.1 baseline, Polymer Virtual Entity was only a future implementation
+  option. The 0.2 work adds it as an exact direct dependency for explicit entity
+  adapters; it is still not a license to auto-map arbitrary entities. See
+  [research-0.2.md](research-0.2.md) and ADR 0006;
 - AutoHost is an optional pack hosting/sending module and is not required by
   Reborn core.
 

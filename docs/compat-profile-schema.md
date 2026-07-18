@@ -57,8 +57,9 @@ have negative tests proving their scope.
 
 For `block_properties`, discovery stores each property's allowed values in
 sorted order. A rule value matches one allowed value; `"*"` matches property
-presence. The 0.1 planner still creates one decision per block registry ID, not
-one carrier per state.
+presence. The 0.2 decision remains attached to the block registry entry, while
+the backend expands an approved full cube into canonical per-state carrier
+records. A profile does not bypass state/resource validation.
 
 ## Action object
 
@@ -76,8 +77,8 @@ The v1 action types are:
 | `item_carrier_category` | `food`, `drink`, `tool`, `armor`, `bow`, `crossbow`, `shield`, `throwable`, `block_item`, or `material`. |
 | `block_strategy` | `textured-full-cube`; rejected unless the source is a stable full cube without a block entity. |
 | `vanilla_fallback_state` | Exact vanilla, block-entity-free full-cube state; the backend parses and validates it. |
-| `entity_replacement` | Records a vanilla replacement request as unsupported/future; it does not install an entity backend in 0.1. |
-| `gui_classification` | Records an explicit menu classification as unsupported/future; it does not install a generic GUI. |
+| `entity_replacement` | Records a requested classification/carrier in the reason chain; it does not register the 0.2 Java Virtual Entity adapter or callbacks. |
+| `gui_classification` | Records an explicit menu classification; it does not create the 0.2 authoritative container/slot adapter. |
 
 Diagnostic suppression/promotion is postponed: `diagnostic_level` is rejected by
 the v1 Java parser and is not listed by the JSON Schema. This avoids accepting a
@@ -169,9 +170,9 @@ when false it does not disable the hard no-scripts/no-client-trust/no-complex-
 shape boundaries. `log_decision_chains` emits the frozen chains at debug level.
 
 `packet_fallback_enabled` is a Boolean that defaults to false. Setting it true
-records a warning, but the 0.1 backend remains a disabled no-op; it does not
+records a warning, but the 0.2 backend remains a disabled no-op; it does not
 activate packet conversion. Native override also defaults false. Creative
-reversal is not wired to a runtime conversion path in 0.1: setting
+reversal is not wired to a runtime conversion path in 0.2: setting
 `creative_reverse_mapping_enabled` to true is a fail-fast startup error rather
 than permission to trust unsigned Polymer restoration data.
 Writers use a sibling temporary file, force its bytes to disk, and replace the
