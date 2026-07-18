@@ -50,17 +50,19 @@ flow exercises:
 2. pack application verified through a known client resource;
 3. camera rotation, movement, and number-key/hotbar input;
 4. holding and using a semantic custom item;
-5. placement, inactive/active state change, and breaking of a mapped full cube;
-6. opening a projected container and exercising click, shift-click, drag,
+5. dropping a mapped custom item into the world and picking it back up with
+   the same count, name, and component fingerprint;
+6. placement, inactive/active state change, and breaking of a mapped full cube;
+7. opening a projected container and exercising click, shift-click, drag,
    hotbar/offhand operations, close, and reopen while preserving inventory;
-7. seeing an explicit vanilla entity surrogate, observing movement/metadata,
+8. seeing an explicit vanilla entity surrogate, observing movement/metadata,
    then sending real use and attack input;
-8. normal disconnect, reconnect, and pack/state validation in the new session.
+9. normal disconnect, reconnect, and pack/state validation in the new session.
 
-The server fixture records independent joins/disconnects, item use, block
-placement/state/break, GUI open/close and inventory conservation, and entity
-use/attack. A client screenshot or client-side state alone cannot satisfy a
-server assertion.
+The server fixture records independent joins/disconnects, item use, the basic
+item inventory transition `1 -> 0 -> 1`, block placement/state/break, GUI
+open/close and inventory conservation, and entity use/attack. A client
+screenshot or client-side state alone cannot satisfy a server assertion.
 
 ## Resource-pack contract
 
@@ -135,15 +137,15 @@ a green compilation step is insufficient.
 
 Local verification on 2026-07-18 completed `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` successfully. The retained
-bundle contains 53/53 passing aggregate checks, 34/34 passing client steps, and
+bundle contains 53/53 passing aggregate checks, 35/35 passing client steps, and
 all 17 required screenshots. Its authoritative server observations include two
 joins, two disconnects, three GUI opens/closes, two entity callbacks, and two
 resource-pack pushes/GETs. GitHub Actions run
-[`29641300974`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300974)
-also passed 53/53 checks and 34/34 client steps under Ubuntu 24.04/Xvfb. Its
-5,353,727-byte evidence artifact was downloaded, parsed, and visually sampled;
+[`29642433900`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433900)
+also passed 53/53 checks and 35/35 client steps under Ubuntu 24.04/Xvfb. Its
+5,218,411-byte evidence Artifact archive was downloaded, parsed, and all 17 screenshots were inspected;
 standard CI run
-[`29641300985`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300985)
+[`29642433896`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433896)
 also passed and its distribution JAR was inspected.
 
 ## Separate P1 layers

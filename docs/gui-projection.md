@@ -49,7 +49,7 @@ The internal 27-slot fixture and client scenario exercise the projection and
 independent inventory-conservation observations. The retained 2026-07-18 local
 Playtest passed the GUI open, normal/Shift click, hotbar swap, drag safety,
 close/reopen, and inventory-integrity checks. GitHub Actions Client Playtest
-`29641300974` repeated the complete scenario successfully; see
+`29642433900` repeated the complete scenario successfully; see
 [testing.md](testing.md).
 
 | Capability | 0.2 implementation |

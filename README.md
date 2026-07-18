@@ -188,11 +188,11 @@ A pure zero-mod vanilla-client smoke and a completed third-party content-mod
 matrix are separate P1 layers and are not implemented or claimed by this
 release. On 2026-07-18 the local `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` commands each completed
-successfully; the retained final evidence reports 53/53 checks, 34/34 client
+successfully; the retained final evidence reports 53/53 checks, 35/35 client
 steps, and 17/17 screenshots. GitHub Actions Client Playtest run
-[`29641300974`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300974)
+[`29642433900`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433900)
 and standard CI run
-[`29641300985`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300985)
+[`29642433896`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433896)
 both completed successfully; both downloaded artifacts were inspected. See
 [testing.md](docs/testing.md) and [client-playtest.md](docs/client-playtest.md).
 

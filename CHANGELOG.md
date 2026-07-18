@@ -32,8 +32,8 @@ principles; alpha versions are tied to an exact Minecraft version.
 
 - Advanced the development version to `0.2.0-alpha.1+26.1.2` while retaining
   Minecraft 26.1.2, Java 25, official names, and exact dependency pins.
-- Expanded semantic item inspection and real-use fixture coverage while keeping
-  unsafe custom components filtered.
+- Expanded semantic item inspection and real-use fixture coverage, including a
+  real world drop/pickup round trip, while keeping unsafe custom components filtered.
 - Extended compatibility and operational reports for interactive projections,
   per-state mappings, rollback state, and playtest observations.
 
@@ -56,8 +56,8 @@ principles; alpha versions are tied to an exact Minecraft version.
 
 Local verification on 2026-07-18 completed `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` successfully. The retained
-final bundle reports 53/53 checks, 34/34 client steps, and 17/17 screenshots.
-GitHub Actions Client Playtest `29641300974` and standard CI `29641300985`
+final bundle reports 53/53 checks, 35/35 client steps, and 17/17 screenshots.
+GitHub Actions Client Playtest `29642433900` and standard CI `29642433896`
 completed successfully, and their evidence/JAR artifacts were downloaded and
 inspected.
 

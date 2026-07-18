@@ -30,7 +30,8 @@ Use two independent Loom project/process boundaries:
    multiplayer networking, handles the real pack, sends keyboard/mouse input,
    makes client assertions, disconnects/reconnects, and writes evidence.
 5. The fixture records independent server observations for joins, item use,
-   block state/break, GUI integrity, entity interactions, and disconnect.
+   the basic-item inventory transition `1 -> 0 -> 1`, block state/break, GUI
+   integrity, entity interactions, and disconnect.
 6. A stop-request asks the server to halt normally. Forced process termination
    is a failed/incomplete cleanup fallback and cannot turn the task green.
 

@@ -82,6 +82,8 @@ The scenario contract includes:
 - real multiplayer connection and resource-pack handling/application;
 - movement, camera rotation, and hotbar input;
 - semantic item use;
+- a real bound-key world drop and pickup with client fingerprint and independent
+  server inventory-transition assertions;
 - placement, state change, and break of a mapped full cube;
 - projected-container click, shift-click, drag/hotbar/offhand paths and
   inventory-conservation checks;
@@ -139,14 +141,14 @@ scenario counts, and evidence paths.
 The local Windows host completed `runClientPlaytest`,
 `runProductionClientPlaytest`, and the canonical `runPlaytest` entrypoint in
 fresh directories. The retained final run reports 53/53 aggregate checks,
-34/34 client steps, 17/17 screenshot artifacts, client/server exit code zero,
+35/35 client steps, 17/17 screenshot artifacts, client/server exit code zero,
 no timeout, no forced termination, and a clean server stop. It observed exactly
 two joins/disconnects, two resource-pack pushes/GETs, and two byte-identical
 client pack-cache files. GitHub Actions Client Playtest run
-[`29641300974`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300974)
-passed the same 53/53 checks and 34/34 client steps under Ubuntu 24.04/Xvfb;
+[`29642433900`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433900)
+passed the same 53/53 checks and 35/35 client steps under Ubuntu 24.04/Xvfb;
 standard CI run
-[`29641300985`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29641300985)
+[`29642433896`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433896)
 also passed. Their evidence and release-JAR artifacts were downloaded to the
 ignored `build/github-artifacts/` directory and inspected.
 
