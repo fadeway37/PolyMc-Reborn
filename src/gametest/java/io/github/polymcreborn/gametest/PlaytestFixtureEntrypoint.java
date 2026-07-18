@@ -293,6 +293,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         try {
             Files.createDirectories(reportDirectory);
             int foodRemaining = PlaytestProbe.FOOD_REMAINING.get();
+            int basicItemRemaining = PlaytestProbe.BASIC_ITEM_REMAINING.get();
             int toolDamage = PlaytestProbe.MAX_TOOL_DAMAGE.get();
             String finalMappingSha256 = mappingStoreSha256();
             boolean mappingStable = !"missing".equals(initialMappingSha256)
@@ -323,6 +324,9 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     && PlaytestProbe.ENTITY_ATTACK_COUNT.get() == 1
                     && projectedInteractions == 2
                     && PlaytestProbe.semanticUseObserved
+                    && PlaytestProbe.itemDropObserved
+                    && PlaytestProbe.itemPickupObserved
+                    && basicItemRemaining == 1
                     && foodRemaining == 3
                     && toolDamage == 2
                     && PlaytestProbe.COMMAND_COUNT.get() == COMMANDS.size()
@@ -352,6 +356,9 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + "  \"entity_attack_count\": " + PlaytestProbe.ENTITY_ATTACK_COUNT.get() + ",\n"
                     + "  \"entity_interaction_callbacks\": " + projectedInteractions + ",\n"
                     + "  \"semantic_use_observed\": " + PlaytestProbe.semanticUseObserved + ",\n"
+                    + "  \"item_drop_observed\": " + PlaytestProbe.itemDropObserved + ",\n"
+                    + "  \"item_pickup_observed\": " + PlaytestProbe.itemPickupObserved + ",\n"
+                    + "  \"basic_item_remaining\": " + basicItemRemaining + ",\n"
                     + "  \"tool_damage\": " + toolDamage + ",\n"
                     + "  \"food_remaining\": " + foodRemaining + ",\n"
                     + "  \"client_profile\": \"VANILLA\",\n"
@@ -395,11 +402,21 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             PlaytestProbe.MAX_TOOL_DAMAGE.accumulateAndGet(damage, Math::max);
         }
         int food = 0;
+        int basicItems = 0;
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
             var stack = player.getInventory().getItem(slot);
+            if (stack.is(FixtureContent.BASIC_ITEM)) {
+                basicItems += stack.getCount();
+            }
             if (stack.is(FixtureContent.FOOD_ITEM)) {
                 food += stack.getCount();
             }
+        }
+        int previousBasicItems = PlaytestProbe.BASIC_ITEM_REMAINING.getAndSet(basicItems);
+        if (previousBasicItems > 0 && basicItems == 0) {
+            PlaytestProbe.itemDropObserved = true;
+        } else if (PlaytestProbe.itemDropObserved && previousBasicItems == 0 && basicItems > 0) {
+            PlaytestProbe.itemPickupObserved = true;
         }
         PlaytestProbe.FOOD_REMAINING.set(food);
         if (food < 4) {

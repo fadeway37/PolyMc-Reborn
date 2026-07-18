@@ -46,6 +46,7 @@ REQUIRED_STEP_COUNTS = {
     "movement-look": 1,
     "hotbar": 1,
     "semantic-item-use": 1,
+    "item-drop-pickup": 1,
     "simple-block": 1,
     "place": 1,
     "state-toggle": 1,
@@ -301,6 +302,8 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         "broken_block_observed",
         "gui_inventory_integrity",
         "semantic_use_observed",
+        "item_drop_observed",
+        "item_pickup_observed",
         "mapping_store_stable",
         "resource_pack_stable",
     )
@@ -318,6 +321,7 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         "resource_pack_request_count": 2,
         "tool_damage": 2,
         "food_remaining": 3,
+        "basic_item_remaining": 1,
     }
     for field, expected in expected_counts.items():
         observed = value.get(field)

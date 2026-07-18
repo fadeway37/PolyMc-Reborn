@@ -24,6 +24,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Items;
 
 import java.io.IOException;
@@ -85,6 +86,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             acceptAndWaitForPack(context, "initial connection", true);
             exerciseMovementAndHotbar(context);
             exerciseSemanticUse(context);
+            exerciseDropAndPickup(context);
             exercisePlaceAndBreak(context);
             exerciseGui(context);
             exerciseEntity(context);
@@ -413,6 +415,55 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         pass("semantic-item-use", "Food use consumed exactly one real custom item through vanilla input");
     }
 
+    private void exerciseDropAndPickup(ClientGameTestContext context) {
+        context.getInput().pressKey(options -> options.keyHotbarSlots[0]);
+        context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 0, 100);
+        String before = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
+        context.computeOnClient(client -> {
+            var stack = client.player.getInventory().getSelectedItem();
+            if (stack.isEmpty() || !stack.getHoverName().getString().contains("PolyMc Reborn Fixture Item")) {
+                throw new AssertionError("Mapped fixture item is unavailable before the drop scenario");
+            }
+            return true;
+        });
+
+        // Q is sent through the live key binding. Waiting before walking guarantees that the
+        // server observes at least one authoritative inventory-absent interval, including the
+        // vanilla owner pickup delay, instead of accepting a client-only slot animation.
+        context.getInput().lookAt(0.0F, 80.0F);
+        context.getInput().pressKey(options -> options.keyDrop);
+        context.waitFor(client -> client.player.getInventory().getSelectedItem().isEmpty(), 200);
+        context.waitFor(client -> droppedMappedItem(client) != null, 200);
+        context.waitTicks(45);
+        float pickupYaw = context.computeOnClient(client -> {
+            ItemEntity dropped = droppedMappedItem(client);
+            if (dropped == null) {
+                throw new AssertionError("Dropped mapped item disappeared before pickup movement");
+            }
+            double dx = dropped.getX() - client.player.getX();
+            double dz = dropped.getZ() - client.player.getZ();
+            return (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+        });
+        context.getInput().lookAt(pickupYaw, 20.0F);
+        context.getInput().holdKey(options -> options.keyUp);
+        try {
+            context.waitFor(client -> {
+                var stack = client.player.getInventory().getItem(0);
+                return stack.getCount() == 1
+                        && stack.getHoverName().getString().contains("PolyMc Reborn Fixture Item");
+            }, 300);
+        } finally {
+            context.getInput().releaseKey(options -> options.keyUp);
+        }
+
+        String after = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
+        if (!before.equals(after)) {
+            throw new AssertionError("Dropped custom item did not return with the same inventory/component fingerprint");
+        }
+        pass("item-drop-pickup",
+                "Pressed the bound drop key, observed the mapped item leave inventory and picked it up intact");
+    }
+
     private void exerciseGui(ClientGameTestContext context) {
         openProjectedGui(context);
         assertMenuStack(context, 0, Items.DIAMOND, 16);
@@ -681,6 +732,19 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         return result;
     }
 
+    private static ItemEntity droppedMappedItem(net.minecraft.client.Minecraft client) {
+        if (client.level == null) {
+            return null;
+        }
+        for (Entity entity : client.level.entitiesForRendering()) {
+            if (entity instanceof ItemEntity itemEntity
+                    && itemEntity.getItem().getHoverName().getString().contains("PolyMc Reborn Fixture Item")) {
+                return itemEntity;
+            }
+        }
+        return null;
+    }
+
     private static String inventoryFingerprint(net.minecraft.client.Minecraft client) {
         var value = new StringBuilder();
         var inventory = client.player.getInventory();
@@ -911,6 +975,14 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     "food_remaining=3 and semantic_use_observed=true",
                     400, "Use key is released", List.of("polymc-reborn-gametest:food_item"),
                     "HEURISTIC semantic-item-food via Polymer");
+            case "item-drop-pickup" -> new ScenarioSpec(
+                    "The mapped basic custom item is selected and the player is in the deterministic arena",
+                    "Look down, press the bound drop key, wait through the owner delay and walk to the live ItemEntity",
+                    "The selected slot becomes empty and the complete inventory/component fingerprint is restored",
+                    "item_drop_observed/item_pickup_observed are true and basic_item_remaining=1",
+                    600, "Drop is a one-shot key input; forward input is released after pickup",
+                    List.of("polymc-reborn-gametest:basic_item"),
+                    "HEURISTIC generic-item via Polymer with server-authoritative world ItemEntity");
             case "simple-block" -> new ScenarioSpec("Stone support and full-cube block item are present",
                     "Right-click place, select the real tool, then hold attack until removal",
                     "Vanilla carrier appears with a non-missing model and is removed after break",

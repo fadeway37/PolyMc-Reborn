@@ -93,6 +93,8 @@ class EvidenceAggregatorTest(unittest.TestCase):
                 "entity_attack_count": 1,
                 "entity_interaction_callbacks": 2,
                 "semantic_use_observed": True,
+                "item_drop_observed": True,
+                "item_pickup_observed": True,
                 "mapping_store_stable": True,
                 "resource_pack_stable": True,
                 "admin_command_count": 9,
@@ -100,6 +102,7 @@ class EvidenceAggregatorTest(unittest.TestCase):
                 "resource_pack_push_count": 2,
                 "tool_damage": 2,
                 "food_remaining": 3,
+                "basic_item_remaining": 1,
                 "client_profile": "VANILLA",
                 "gui_active_sessions": 0,
                 "entity_projection_sessions": 1,
@@ -363,6 +366,34 @@ class EvidenceAggregatorTest(unittest.TestCase):
         self.assertIn("finished_at precedes", scenario["detail"])
         self.assertIn("actual_input is empty", scenario["detail"])
         self.assertIn("timeout_ticks", scenario["detail"])
+
+    def test_item_drop_pickup_scenario_is_required(self) -> None:
+        client = json.loads((self.input_directory / "client-state.json").read_text(encoding="utf-8"))
+        client["steps"] = [
+            step for step in client["steps"] if step["id"] != "item-drop-pickup"
+        ]
+        self._write_json("client-state.json", client)
+
+        self.assertFalse(self._aggregate())
+        summary = json.loads((self.output_directory / "summary.json").read_text(encoding="utf-8"))
+        scenario = next(check for check in summary["checks"] if check["id"] == "client-scenarios")
+        self.assertFalse(scenario["passed"])
+        self.assertIn("item-drop-pickup>=1", scenario["detail"])
+
+    def test_server_must_observe_item_leave_and_return(self) -> None:
+        server = json.loads((self.input_directory / "server-state.json").read_text(encoding="utf-8"))
+        server["item_pickup_observed"] = False
+        server["basic_item_remaining"] = 0
+        self._write_json("server-state.json", server)
+
+        self.assertFalse(self._aggregate())
+        summary = json.loads((self.output_directory / "summary.json").read_text(encoding="utf-8"))
+        observations = next(
+            check for check in summary["checks"] if check["id"] == "server-observations"
+        )
+        self.assertFalse(observations["passed"])
+        self.assertIn("item_pickup_observed", observations["detail"])
+        self.assertIn("basic_item_remaining=1", observations["detail"])
 
     def test_production_jar_and_mapping_decisions_are_required(self) -> None:
         server = json.loads((self.input_directory / "server-state.json").read_text(encoding="utf-8"))

@@ -16,6 +16,7 @@ public final class PlaytestProbe {
     public static final AtomicInteger RESOURCE_PACK_REQUEST_COUNT = new AtomicInteger();
     public static final AtomicInteger MAX_TOOL_DAMAGE = new AtomicInteger();
     public static final AtomicInteger FOOD_REMAINING = new AtomicInteger(-1);
+    public static final AtomicInteger BASIC_ITEM_REMAINING = new AtomicInteger(-1);
     public static volatile boolean placedBlockObserved;
     public static volatile boolean brokenBlockObserved;
     public static volatile boolean simpleBlockPlacedObserved;
@@ -23,6 +24,8 @@ public final class PlaytestProbe {
     public static volatile boolean guiInventoryIntegrity;
     public static volatile boolean semanticUseObserved;
     public static volatile boolean stateToggleObserved;
+    public static volatile boolean itemDropObserved;
+    public static volatile boolean itemPickupObserved;
 
     private PlaytestProbe() {
     }
