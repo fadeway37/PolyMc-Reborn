@@ -7,10 +7,15 @@ import io.github.polymcreborn.api.MappingContext;
 import io.github.polymcreborn.api.MappingStatus;
 import io.github.polymcreborn.backend.NoOpPacketFallbackBackend;
 import io.github.polymcreborn.backend.PacketFallbackBackend;
+import io.github.polymcreborn.backend.gui.GuiProjectionService;
 import io.github.polymcreborn.backend.polymer.MinecraftContentScanner;
 import io.github.polymcreborn.backend.polymer.PolymerCompatibilityBackend;
+import io.github.polymcreborn.backend.polymer.PolymerRegistrySanitizer;
+import io.github.polymcreborn.backend.polymer.entity.PolymerEntityProjectionBackend;
 import io.github.polymcreborn.compat.CompatibilityRegistry;
 import io.github.polymcreborn.compat.DeclarativeProfileProvider;
+import io.github.polymcreborn.compat.ExplicitEntityProjectionProvider;
+import io.github.polymcreborn.compat.ExplicitGuiProjectionProvider;
 import io.github.polymcreborn.compat.HeuristicProvider;
 import io.github.polymcreborn.compat.MappingPlanner;
 import io.github.polymcreborn.compat.NativePolymerProvider;
@@ -31,6 +36,8 @@ import io.github.polymcreborn.mapping.MappingBackupService;
 import io.github.polymcreborn.mapping.MappingPlanDiff;
 import io.github.polymcreborn.mapping.MappingStoreDocument;
 import io.github.polymcreborn.mapping.PersistentMappingStore;
+import io.github.polymcreborn.api.entity.EntityProjectionRegistry;
+import io.github.polymcreborn.api.gui.GuiProjectionRegistry;
 import io.github.polymcreborn.pack.DeterministicResourcePack;
 import io.github.polymcreborn.pack.PolymerPackService;
 import io.github.polymcreborn.pack.ResourcePackReportWriter;
@@ -49,11 +56,15 @@ public final class RebornRuntime {
     private final RebornConfig config;
     private final BoundedDiagnosticCollector diagnostics;
     private final CompatibilityRegistry providers;
+    private final EntityProjectionRegistry entityProjections;
+    private final GuiProjectionRegistry guiProjections;
     private final LegacyEntrypointBridge legacy;
     private final ExtensionEntrypointLoader extensions;
     private final PacketFallbackBackend packetFallback = new NoOpPacketFallbackBackend();
     private final PolymerPackService polymerPackService;
     private final MappingBackupService mappingBackups;
+    private final PolymerEntityProjectionBackend entityProjectionBackend;
+    private final GuiProjectionService guiProjectionService;
 
     private volatile MappingPlan plan;
     private volatile PolymerCompatibilityBackend polymerBackend;
@@ -71,21 +82,27 @@ public final class RebornRuntime {
                     DiagnosticCollector.Severity.WARNING);
         }
         this.providers = new CompatibilityRegistry();
+        this.entityProjections = new EntityProjectionRegistry();
+        this.guiProjections = new GuiProjectionRegistry();
         this.legacy = new LegacyEntrypointBridge(diagnostics);
-        this.extensions = new ExtensionEntrypointLoader(providers);
+        this.extensions = new ExtensionEntrypointLoader(providers, entityProjections, guiProjections);
         this.polymerPackService = new PolymerPackService(
                 configManager.cacheDirectory(), config.cacheLimits().maxBytes());
 
         if (config.creativeReverseMappingEnabled()) {
-            throw new IllegalStateException("creative_reverse_mapping_enabled=true is not available in 0.1: "
+            throw new IllegalStateException("creative_reverse_mapping_enabled=true is not available in 0.2: "
                     + "unsigned Polymer reverse payloads are intentionally rejected");
         }
         if (config.packetFallbackEnabled()) {
             diagnostics.record("packet_fallback.unavailable", "polymc-reborn",
-                    "packet_fallback_enabled was requested, but the 0.1 backend is a disabled no-op",
+                    "packet_fallback_enabled was requested, but the 0.2 backend is a disabled no-op",
                     DiagnosticCollector.Severity.WARNING);
         }
         registerProviders();
+        this.entityProjectionBackend = new PolymerEntityProjectionBackend(entityProjections.snapshot(),
+                Math.min(65_536, config.cacheLimits().maxEntries()));
+        this.guiProjectionService = new GuiProjectionService(guiProjections.freeze(),
+                Math.min(65_536, config.cacheLimits().maxEntries()));
         registerLifecycle();
         RebornCommands.register(this);
     }
@@ -97,6 +114,8 @@ public final class RebornRuntime {
         providers.register(new NativePolymerProvider());
         providers.register(new DeclarativeProfileProvider(profiles, true));
         extensions.load();
+        providers.register(new ExplicitEntityProjectionProvider(entityProjections.freeze()));
+        providers.register(new ExplicitGuiProjectionProvider(guiProjections.freeze()));
         providers.register(new LegacyCompatibilityProvider(legacy.registry()));
         providers.register(new DeclarativeProfileProvider(profiles, false));
         providers.register(new HeuristicProvider());
@@ -144,19 +163,30 @@ public final class RebornRuntime {
         MappingPlan finalPlan = proposed;
 
         if (config.enabled()) {
+            var sanitizedBlockEntities = PolymerRegistrySanitizer.registerServerOnlyBlockEntityTypes();
+            if (!sanitizedBlockEntities.isEmpty()) {
+                diagnostics.record("registry.block-entity.sanitized", "minecraft:block_entity_type",
+                        "Registered " + sanitizedBlockEntities.size()
+                                + " custom block-entity type(s) as server-only; custom client NBT remains filtered",
+                        DiagnosticCollector.Severity.INFO);
+            }
+            entityProjectionBackend.install();
+            guiProjectionService.install();
             new LegacyPolymerBackend(legacy.registry()).apply(proposed);
             var backend = new PolymerCompatibilityBackend(
                     new PersistentMappingStore(configManager.root()), diagnostics, config.persistentMappings(),
                     config.generateResourcePack());
             this.polymerBackend = backend;
             finalPlan = backend.apply(proposed, PolyMcReborn.VERSION);
+            finalPlan = PolymerRegistrySanitizer.quarantineUnsupportedBlocks(finalPlan);
+            finalPlan = PolymerRegistrySanitizer.quarantineUnsupportedEntityAndMenuTypes(finalPlan);
             new MappingDiffReportWriter().write(configManager.reportsDirectory(), backend.startupDiff());
         } else {
             finalPlan = proposed.replaceDecisions(proposed.orderedDecisions().stream()
                     .map(RebornRuntime::disabledDecision).toList());
         }
         this.plan = finalPlan;
-        this.resourceSnapshot = collectResources(finalPlan);
+        this.resourceSnapshot = config.enabled() ? collectResources(finalPlan) : Map.of();
         new CompatibilityReportWriter().write(configManager.reportsDirectory(), finalPlan, diagnostics,
                 config.reportFormats());
 
@@ -305,6 +335,14 @@ public final class RebornRuntime {
 
     public MappingBackupService mappingBackups() {
         return mappingBackups;
+    }
+
+    public PolymerEntityProjectionBackend entityProjectionBackend() {
+        return entityProjectionBackend;
+    }
+
+    public GuiProjectionService guiProjectionService() {
+        return guiProjectionService;
     }
 
     public MappingStoreDocument mappingSnapshot() {

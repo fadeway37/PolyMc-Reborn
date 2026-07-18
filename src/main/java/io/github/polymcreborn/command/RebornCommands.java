@@ -231,7 +231,16 @@ public final class RebornCommands {
                 + ", unsupported=" + stats.totals().get(io.github.polymcreborn.api.MappingStatus.UNSUPPORTED)
                 + ", errors=" + stats.totals().get(io.github.polymcreborn.api.MappingStatus.ERROR)
                 + ", item_cache="
-                + io.github.polymcreborn.backend.polymer.ItemProjectionCacheStats.snapshot());
+                + io.github.polymcreborn.backend.polymer.ItemProjectionCacheStats.snapshot()
+                + ", gui_sessions=" + runtime.guiProjectionService().activeSessionCount()
+                + ", gui_rejected=" + runtime.guiProjectionService().rejectedOpenCount()
+                + ", gui_failures=" + runtime.guiProjectionService().failedOpenCount()
+                + ", entity_sessions=" + runtime.entityProjectionBackend().activeSessionCount()
+                + ", entity_interactions=" + runtime.entityProjectionBackend().acceptedInteractionCount()
+                + ", entity_auth_rejected=" + runtime.entityProjectionBackend().authorizationRejectionCount()
+                + ", entity_replays_rejected=" + runtime.entityProjectionBackend().replayRejectionCount()
+                + ", entity_adapter_failures=" + runtime.entityProjectionBackend().adapterFailureCount()
+                + ", entity_session_failures=" + runtime.entityProjectionBackend().sessionFailureCount());
         return runtime.plan().size();
     }
 
