@@ -2,7 +2,10 @@
 package io.github.polymcreborn.gametest;
 
 import eu.pb4.polymer.core.api.block.PolymerBlock;
+import eu.pb4.polymer.core.api.block.PolymerBlockUtils;
+import eu.pb4.polymer.core.api.entity.PolymerEntityUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
+import eu.pb4.polymer.core.api.other.PolymerMenuUtils;
 import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
 import io.github.polymcreborn.api.ContentType;
 import io.github.polymcreborn.api.MappingStatus;
@@ -39,6 +42,25 @@ public final class RebornGameTests {
         helper.assertTrue(PolymerSyncedObject.getSyncedObject(
                         BuiltInRegistries.BLOCK, FixtureContent.FULL_BLOCK) instanceof PolymerBlock,
                 "automatic block overlay should be registered");
+        var statefulOverlay = (PolymerBlock) PolymerSyncedObject.getSyncedObject(
+                BuiltInRegistries.BLOCK, FixtureContent.STATEFUL_BLOCK);
+        var inactive = FixtureContent.STATEFUL_BLOCK.defaultBlockState()
+                .setValue(FixtureContent.StatefulFullBlock.ACTIVE, false);
+        var active = inactive.setValue(FixtureContent.StatefulFullBlock.ACTIVE, true);
+        var inactiveCarrier = statefulOverlay.getPolymerBlockState(inactive, null);
+        var activeCarrier = statefulOverlay.getPolymerBlockState(active, null);
+        helper.assertFalse(inactiveCarrier.equals(activeCarrier),
+                "active=false and active=true must have distinct persisted Polymer carriers");
+        var stateMappings = PolyMcReborn.runtime().mappingSnapshot().mappings().stream()
+                .filter(mapping -> mapping.contentType() == ContentType.BLOCK
+                        && mapping.registryId().equals(FixtureContent.MOD_ID + ":stateful_block"))
+                .toList();
+        helper.assertTrue(stateMappings.size() == 2
+                        && stateMappings.stream().map(mapping -> mapping.state()).collect(
+                        java.util.stream.Collectors.toSet()).equals(
+                        java.util.Set.of("active=false", "active=true"))
+                        && stateMappings.stream().map(mapping -> mapping.clientCarrier()).distinct().count() == 2,
+                "both canonical server states must be persisted with independent carriers");
         helper.assertTrue(status(plan, ContentType.ITEM, "full_block") == MappingStatus.HEURISTIC,
                 "the corresponding block item should have a mapping decision");
         helper.assertTrue(PolymerSyncedObject.getSyncedObject(
@@ -58,6 +80,15 @@ public final class RebornGameTests {
                 "non-full shape must not be guessed");
         helper.assertTrue(status(plan, ContentType.BLOCK, "block_entity_block") == MappingStatus.UNSUPPORTED,
                 "block entity must not be projected as a simple cube");
+        var quarantine = (PolymerBlock) PolymerSyncedObject.getSyncedObject(
+                BuiltInRegistries.BLOCK, FixtureContent.NON_FULL_BLOCK);
+        helper.assertTrue(quarantine != null
+                        && quarantine.getPolymerBlockState(
+                        FixtureContent.NON_FULL_BLOCK.defaultBlockState(), null).is(
+                        net.minecraft.world.level.block.Blocks.BARRIER),
+                "unsupported blocks must remain classified unsupported but use a safe wire quarantine");
+        helper.assertTrue(PolymerBlockUtils.isPolymerBlockEntityType(FixtureContent.BLOCK_ENTITY_TYPE),
+                "custom block-entity ids must be server-only and their client NBT filtered");
         var throwingShape = plan.decision(ContentType.BLOCK,
                 FixtureContent.MOD_ID + ":throwing_shape_block");
         helper.assertTrue(throwingShape != null && throwingShape.status() == MappingStatus.UNSUPPORTED,
@@ -78,10 +109,25 @@ public final class RebornGameTests {
                 "legacy polymc item adapter should be collected");
         helper.assertTrue(status(plan, ContentType.BLOCK, "legacy_block") == MappingStatus.LEGACY,
                 "legacy polymc block adapter should be collected");
-        helper.assertTrue(status(plan, ContentType.ENTITY, "fixture_entity") == MappingStatus.UNSUPPORTED,
-                "generic entity projection is intentionally unsupported in 0.1");
-        helper.assertTrue(status(plan, ContentType.GUI, "fixture_menu") == MappingStatus.UNSUPPORTED,
-                "generic GUI projection is intentionally unsupported in 0.1");
+        helper.assertTrue(status(plan, ContentType.ENTITY, "fixture_entity") == MappingStatus.EXPLICIT,
+                "the 0.2 fixture entity should use only its registered explicit projection");
+        helper.assertTrue(status(plan, ContentType.GUI, "fixture_menu") == MappingStatus.EXPLICIT,
+                "the 0.2 fixture menu should use only its registered explicit projection");
+        helper.assertTrue(status(plan, ContentType.ENTITY, "unsupported_entity") == MappingStatus.UNSUPPORTED,
+                "an entity without an explicit/native projection must remain unsupported");
+        helper.assertTrue(status(plan, ContentType.GUI, "unsupported_menu") == MappingStatus.UNSUPPORTED,
+                "a menu without an explicit/native projection must remain unsupported");
+        helper.assertTrue(PolymerEntityUtils.isPolymerEntityType(FixtureContent.UNSUPPORTED_ENTITY_TYPE),
+                "unsupported custom entity ids must be quarantined from vanilla registry sync");
+        helper.assertTrue(PolymerMenuUtils.isPolymerType(FixtureContent.UNSUPPORTED_MENU_TYPE),
+                "unsupported custom menu ids must be marked server-only");
+        helper.assertTrue("polymer-quarantine".equals(plan.decision(ContentType.ENTITY,
+                        FixtureContent.MOD_ID + ":unsupported_entity").backend())
+                        && "polymer-quarantine".equals(plan.decision(ContentType.GUI,
+                        FixtureContent.MOD_ID + ":unsupported_menu").backend()),
+                "unsupported entity/menu decisions must explain their wire quarantine");
+        helper.assertTrue(PolyMcReborn.runtime().entityProjectionBackend().activeAdapterCount() == 1,
+                "exactly one explicit fixture entity adapter should be active");
         helper.assertFalse(PolyMcReborn.runtime().packetFallback().enabled(),
                 "packet fallback must remain disabled by default");
         helper.succeed();

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "active=false": {
+      "model": "polymc-reborn-gametest:block/stateful_block_inactive"
+    },
+    "active=true": {
+      "model": "polymc-reborn-gametest:block/stateful_block_active"
+    }
+  }
+}

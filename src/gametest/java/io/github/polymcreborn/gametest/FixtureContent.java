@@ -11,6 +11,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.food.FoodProperties;
@@ -21,6 +22,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ToolMaterial;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
@@ -31,6 +36,14 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+
 
 /** Registry fixtures spanning every MVP discovery category. */
 public final class FixtureContent {
@@ -49,10 +62,14 @@ public final class FixtureContent {
     public static Block LEGACY_BLOCK;
     public static Block NATIVE_BLOCK;
     public static BlockEntityType<FixtureBlockEntity> BLOCK_ENTITY_TYPE;
-    public static EntityType<?> ENTITY_TYPE;
+    public static EntityType<FixtureEntity> ENTITY_TYPE;
+    public static EntityType<FixtureEntity> UNSUPPORTED_ENTITY_TYPE;
     public static MenuType<FixtureMenu> MENU_TYPE;
+    public static MenuType<UnsupportedFixtureMenu> UNSUPPORTED_MENU_TYPE;
 
     private static boolean bootstrapped;
+    private static final java.util.Map<java.util.UUID, FixtureContainer> GUI_CONTAINERS =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     private FixtureContent() {
     }
@@ -63,8 +80,8 @@ public final class FixtureContent {
         }
         bootstrapped = true;
 
-        BASIC_ITEM = registerItem("basic_item", new Item(itemProperties("basic_item")));
-        FOOD_ITEM = registerItem("food_item", new Item(itemProperties("food_item").food(
+        BASIC_ITEM = registerItem("basic_item", new GuiOpenerItem(itemProperties("basic_item")));
+        FOOD_ITEM = registerItem("food_item", new SemanticFoodItem(itemProperties("food_item").food(
                 new FoodProperties.Builder().nutrition(4).saturationModifier(0.4F).build())));
         TOOL_ITEM = registerItem("tool_item", new Item(itemProperties("tool_item")
                 .pickaxe(ToolMaterial.IRON, 1.0F, -2.8F)));
@@ -97,9 +114,17 @@ public final class FixtureContent {
         var entityId = id("fixture_entity");
         var entityKey = ResourceKey.create(Registries.ENTITY_TYPE, entityId);
         ENTITY_TYPE = Registry.register(BuiltInRegistries.ENTITY_TYPE, entityId,
-                EntityType.Builder.createNothing(MobCategory.MISC).sized(0.5F, 0.5F).build(entityKey));
+                EntityType.Builder.of(FixtureEntity::new, MobCategory.MISC)
+                        .sized(0.8F, 1.8F).build(entityKey));
+        var unsupportedEntityId = id("unsupported_entity");
+        var unsupportedEntityKey = ResourceKey.create(Registries.ENTITY_TYPE, unsupportedEntityId);
+        UNSUPPORTED_ENTITY_TYPE = Registry.register(BuiltInRegistries.ENTITY_TYPE, unsupportedEntityId,
+                EntityType.Builder.of(FixtureEntity::new, MobCategory.MISC)
+                        .sized(0.8F, 1.8F).build(unsupportedEntityKey));
         MENU_TYPE = Registry.register(BuiltInRegistries.MENU, id("fixture_menu"),
                 new MenuType<>(FixtureMenu::new, FeatureFlags.DEFAULT_FLAGS));
+        UNSUPPORTED_MENU_TYPE = Registry.register(BuiltInRegistries.MENU, id("unsupported_menu"),
+                new MenuType<>(UnsupportedFixtureMenu::new, FeatureFlags.DEFAULT_FLAGS));
 
         PolymerItemUtils.registerOverlay(NATIVE_ITEM, (stack, context) -> Items.STICK);
         PolymerBlockUtils.registerOverlay(NATIVE_BLOCK,
@@ -111,7 +136,11 @@ public final class FixtureContent {
     }
 
     private static BlockBehaviour.Properties blockProperties(String path) {
-        return BlockBehaviour.Properties.ofFullCopy(Blocks.STONE)
+        // The Polymer full-block pool exposes note-block states. Matching the
+        // authoritative fixture hardness/tool requirements to that carrier is
+        // part of the safety contract: otherwise the vanilla client can finish
+        // its break animation before the real server block is breakable.
+        return BlockBehaviour.Properties.ofFullCopy(Blocks.NOTE_BLOCK)
                 .setId(ResourceKey.create(Registries.BLOCK, id(path)));
     }
 
@@ -142,6 +171,17 @@ public final class FixtureContent {
         @Override
         protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
             builder.add(ACTIVE);
+        }
+
+        @Override
+        protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos position,
+                                                    Player player,
+                                                    net.minecraft.world.phys.BlockHitResult hit) {
+            if (!level.isClientSide()) {
+                level.setBlockAndUpdate(position, state.cycle(ACTIVE));
+                PlaytestProbe.stateToggleObserved = true;
+            }
+            return InteractionResult.SUCCESS;
         }
     }
 
@@ -185,9 +225,97 @@ public final class FixtureContent {
         }
     }
 
+    /** Opens the explicit standard-container projection; the item remains a real server item. */
+    public static final class GuiOpenerItem extends Item {
+        public GuiOpenerItem(Properties properties) {
+            super(properties);
+        }
+
+        @Override
+        public InteractionResult use(Level level, Player player, InteractionHand hand) {
+            if (level instanceof ServerLevel && player instanceof ServerPlayer serverPlayer) {
+                var opened = io.github.polymcreborn.core.PolyMcReborn.runtime().guiProjectionService().open(
+                        serverPlayer, new FixtureMenu(0, serverPlayer.getInventory()),
+                        net.minecraft.network.chat.Component.literal("PolyMc Reborn Safe Container"));
+                if (opened.isPresent()) {
+                    PlaytestProbe.GUI_OPEN_COUNT.incrementAndGet();
+                    return InteractionResult.SUCCESS;
+                }
+            }
+            return InteractionResult.PASS;
+        }
+    }
+
+    /** Deterministic food-like fixture whose real server action is observable without timing ambiguity. */
+    public static final class SemanticFoodItem extends Item {
+        public SemanticFoodItem(Properties properties) {
+            super(properties);
+        }
+
+        @Override
+        public ItemStack finishUsingItem(ItemStack stack, Level level,
+                                         net.minecraft.world.entity.LivingEntity user) {
+            int countBefore = stack.getCount();
+            var remaining = super.finishUsingItem(stack, level, user);
+            if (!level.isClientSide() && remaining.getCount() == countBefore - 1) {
+                PlaytestProbe.semanticUseObserved = true;
+            }
+            return remaining;
+        }
+    }
+
+    /** Real custom server entity used by both GameTest and the isolated client playtest. */
+    public static final class FixtureEntity extends Entity {
+        public FixtureEntity(EntityType<? extends FixtureEntity> type, Level level) {
+            super(type, level);
+        }
+
+        @Override
+        public void tick() {
+            super.tick();
+            double phase = tickCount * 0.05D;
+            setPos(1.5D + Math.sin(phase) * 0.2D, 100.0D, -2.5D + Math.cos(phase) * 0.2D);
+            setYRot((tickCount * 3.0F) % 360.0F);
+        }
+
+        @Override
+        protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        }
+
+        @Override
+        protected void readAdditionalSaveData(ValueInput input) {
+        }
+
+        @Override
+        protected void addAdditionalSaveData(ValueOutput output) {
+        }
+
+        @Override
+        public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+            PlaytestProbe.ENTITY_ATTACK_COUNT.incrementAndGet();
+            return true;
+        }
+
+        public void projectedUse() {
+            PlaytestProbe.ENTITY_USE_COUNT.incrementAndGet();
+        }
+    }
+
     public static final class FixtureMenu extends AbstractContainerMenu {
+        private final FixtureContainer container;
+
         public FixtureMenu(int containerId, net.minecraft.world.entity.player.Inventory inventory) {
             super(MENU_TYPE, containerId);
+            this.container = GUI_CONTAINERS.computeIfAbsent(inventory.player.getUUID(), ignored -> {
+                var created = new FixtureContainer(inventory.player);
+                created.setItem(0, new ItemStack(Items.DIAMOND, 16));
+                created.setItem(1, new ItemStack(Items.EMERALD, 8));
+                return created;
+            });
+        }
+
+        public FixtureContainer container() {
+            return container;
         }
 
         @Override
@@ -198,6 +326,54 @@ public final class FixtureContent {
         @Override
         public boolean stillValid(net.minecraft.world.entity.player.Player player) {
             return true;
+        }
+    }
+
+    /** A discovered custom menu with no projection adapter; it must stay server-only. */
+    public static final class UnsupportedFixtureMenu extends AbstractContainerMenu {
+        public UnsupportedFixtureMenu(int containerId, net.minecraft.world.entity.player.Inventory inventory) {
+            super(UNSUPPORTED_MENU_TYPE, containerId);
+        }
+
+        @Override
+        public ItemStack quickMoveStack(Player player, int slot) {
+            return ItemStack.EMPTY;
+        }
+
+        @Override
+        public boolean stillValid(Player player) {
+            return true;
+        }
+    }
+
+    public static final class FixtureContainer extends SimpleContainer {
+        private final java.util.UUID owner;
+
+        public FixtureContainer(Player owner) {
+            super(27);
+            this.owner = owner.getUUID();
+        }
+
+        @Override
+        public void stopOpen(net.minecraft.world.entity.ContainerUser user) {
+            super.stopOpen(user);
+            if (user instanceof Player player && player.getUUID().equals(owner)) {
+                PlaytestProbe.GUI_CLOSE_COUNT.incrementAndGet();
+                int diamonds = countItem(this, Items.DIAMOND) + countItem(player.getInventory(), Items.DIAMOND);
+                int emeralds = countItem(this, Items.EMERALD) + countItem(player.getInventory(), Items.EMERALD);
+                PlaytestProbe.guiInventoryIntegrity = diamonds == 16 && emeralds == 8;
+            }
+        }
+
+        private static int countItem(net.minecraft.world.Container container, Item item) {
+            int count = 0;
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                var stack = container.getItem(slot);
+                if (stack.is(item)) {
+                    count += stack.getCount();
+                }
+            }
+            return count;
         }
     }
 }

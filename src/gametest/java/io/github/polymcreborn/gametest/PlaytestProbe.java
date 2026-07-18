@@ -1,0 +1,29 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
+package io.github.polymcreborn.gametest;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/** Cross-component observations written by the server-only production playtest fixture. */
+public final class PlaytestProbe {
+    public static final AtomicInteger JOIN_COUNT = new AtomicInteger();
+    public static final AtomicInteger DISCONNECT_COUNT = new AtomicInteger();
+    public static final AtomicInteger GUI_OPEN_COUNT = new AtomicInteger();
+    public static final AtomicInteger GUI_CLOSE_COUNT = new AtomicInteger();
+    public static final AtomicInteger ENTITY_USE_COUNT = new AtomicInteger();
+    public static final AtomicInteger ENTITY_ATTACK_COUNT = new AtomicInteger();
+    public static final AtomicInteger COMMAND_COUNT = new AtomicInteger();
+    public static final AtomicInteger RESOURCE_PACK_PUSH_COUNT = new AtomicInteger();
+    public static final AtomicInteger RESOURCE_PACK_REQUEST_COUNT = new AtomicInteger();
+    public static final AtomicInteger MAX_TOOL_DAMAGE = new AtomicInteger();
+    public static final AtomicInteger FOOD_REMAINING = new AtomicInteger(-1);
+    public static volatile boolean placedBlockObserved;
+    public static volatile boolean brokenBlockObserved;
+    public static volatile boolean simpleBlockPlacedObserved;
+    public static volatile boolean simpleBlockBrokenObserved;
+    public static volatile boolean guiInventoryIntegrity;
+    public static volatile boolean semanticUseObserved;
+    public static volatile boolean stateToggleObserved;
+
+    private PlaytestProbe() {
+    }
+}
