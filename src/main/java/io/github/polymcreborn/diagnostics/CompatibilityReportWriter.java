@@ -3,6 +3,7 @@ package io.github.polymcreborn.diagnostics;
 
 import com.google.gson.GsonBuilder;
 import io.github.polymcreborn.config.AtomicFiles;
+import io.github.polymcreborn.core.PolyMcReborn;
 import io.github.polymcreborn.mapping.MappingPlan;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ public final class CompatibilityReportWriter {
         var stats = CompatibilityStats.from(plan);
         var root = new LinkedHashMap<String, Object>();
         root.put("schema_version", 1);
-        root.put("project_version", "0.1.0-alpha.1+26.1.2");
+        root.put("project_version", PolyMcReborn.VERSION);
         root.put("minecraft_version", "26.1.2");
         root.put("totals", stats.totals());
         root.put("by_mod", stats.byMod());
@@ -55,7 +56,7 @@ public final class CompatibilityReportWriter {
         var json = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(root) + "\n";
 
         var markdown = new StringBuilder("# PolyMc Reborn compatibility report\n\n")
-                .append("Minecraft 26.1.2; PolyMc Reborn 0.1.0-alpha.1+26.1.2.\n\n")
+                .append("Minecraft 26.1.2; PolyMc Reborn ").append(PolyMcReborn.VERSION).append(".\n\n")
                 .append("## Summary\n\n")
                 .append("| Status | Count |\n|---|---:|\n");
         stats.totals().forEach((status, count) -> markdown.append("| ").append(status)

@@ -6,6 +6,13 @@ an alpha mod tied to an exact Minecraft version.
 
 ## [Unreleased]
 
+### 0.2.0-alpha.1+26.1.2 development
+
+- Began the Interactive Compatibility Alpha on the preserved 0.1 history.
+- The target remains Minecraft 26.1.2, Java 25, Fabric, and official Minecraft
+  names; client playtest, explicit GUI/entity projections, stateful blocks, and
+  mapping migration tooling are under active implementation.
+
 ### Added
 
 - Minecraft 26.1.2 / Java 25 Fabric Loom bootstrap using official Minecraft
