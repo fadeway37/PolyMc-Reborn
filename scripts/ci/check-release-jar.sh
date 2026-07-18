@@ -123,8 +123,20 @@ with archive:
     }
     for required in sorted(required_entries - entry_set):
         fail(f"distributable JAR is missing {required}")
-    if not any(re.fullmatch(r"LICENSE(?:_polymc-reborn)?", name) for name in entries):
+    license_entries = sorted(
+        name for name in entries
+        if re.fullmatch(r"LICENSE(?:_polymc-reborn)?", name)
+    )
+    if not license_entries:
         fail("distributable JAR is missing its LGPL license file")
+    for license_entry in license_entries:
+        license_bytes = archive.read(license_entry)
+        if b"\r" in license_bytes:
+            fail(f"{license_entry} must use normalized LF line endings")
+        try:
+            license_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            fail(f"{license_entry} is not valid UTF-8")
 
     forbidden_prefixes = (
         "build/",

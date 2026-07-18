@@ -370,10 +370,24 @@ tasks.withType(AbstractArchiveTask).configureEach {
 	reproducibleFileOrder = true
 }
 
-tasks.withType(Jar).configureEach {
-	from('LICENSE') {
-		rename { "${it}_${project.archives_base_name}" }
+def normalizedLicenseFile = layout.buildDirectory.file(
+	"generated/legal/LICENSE_${project.archives_base_name}")
+def normalizeReleaseLicense = tasks.register('normalizeReleaseLicense') {
+	inputs.file(layout.projectDirectory.file('LICENSE'))
+	outputs.file(normalizedLicenseFile)
+	doLast {
+		def source = layout.projectDirectory.file('LICENSE').asFile.getText('UTF-8')
+		def normalized = source.replace('\r\n', '\n').replace('\r', '\n')
+		def destination = normalizedLicenseFile.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(destination.parent)
+		java.nio.file.Files.writeString(destination, normalized,
+			java.nio.charset.StandardCharsets.UTF_8)
 	}
+}
+
+tasks.withType(Jar).configureEach {
+	dependsOn normalizeReleaseLicense
+	from(normalizedLicenseFile)
 	from('NOTICE.md')
 	from('THIRD_PARTY_NOTICES.md')
 	manifest {
