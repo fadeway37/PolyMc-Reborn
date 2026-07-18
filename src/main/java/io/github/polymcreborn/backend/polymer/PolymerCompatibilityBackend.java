@@ -15,6 +15,7 @@ import io.github.polymcreborn.api.MappingStatus;
 import io.github.polymcreborn.diagnostics.BoundedDiagnosticCollector;
 import io.github.polymcreborn.mapping.MappingCapacityException;
 import io.github.polymcreborn.mapping.MappingPlan;
+import io.github.polymcreborn.mapping.MappingPlanDiff;
 import io.github.polymcreborn.mapping.MappingStoreDocument;
 import io.github.polymcreborn.mapping.PersistentMappingStore;
 import io.github.polymcreborn.mapping.StoredMapping;
@@ -50,6 +51,10 @@ public final class PolymerCompatibilityBackend {
     private final boolean persistentMappings;
     private final boolean customModelsEnabled;
     private final Map<String, SafeItemOverlay> pendingSemanticItems = new TreeMap<>();
+    private volatile MappingStoreDocument startupBase = MappingStoreDocument.empty();
+    private volatile MappingStoreDocument mappingSnapshot = MappingStoreDocument.empty();
+    private volatile MappingPlanDiff startupDiff = MappingPlanDiff.compare(
+            MappingStoreDocument.empty(), MappingStoreDocument.empty());
 
     public PolymerCompatibilityBackend(PersistentMappingStore store, BoundedDiagnosticCollector diagnostics) {
         this(store, diagnostics, true, true);
@@ -71,6 +76,7 @@ public final class PolymerCompatibilityBackend {
     public MappingPlan apply(MappingPlan proposedPlan, String projectVersion) {
         pendingSemanticItems.clear();
         MappingStoreDocument existing = persistentMappings ? store.load() : MappingStoreDocument.empty();
+        startupBase = existing;
         var updated = new LinkedHashMap<String, MappingDecision>();
         proposedPlan.orderedDecisions().forEach(decision -> updated.put(decision.descriptor().key(), decision));
         var newMappings = new ArrayList<StoredMapping>();
@@ -78,8 +84,10 @@ public final class PolymerCompatibilityBackend {
         applyItems(proposedPlan, existing, updated, newMappings, projectVersion);
         applyBlocks(proposedPlan, existing, updated, newMappings, projectVersion);
 
+        var merged = store.mergePreservingAssignments(existing, newMappings);
+        mappingSnapshot = merged;
+        startupDiff = MappingPlanDiff.compare(startupBase, merged);
         if (persistentMappings) {
-            var merged = store.mergePreservingAssignments(existing, newMappings);
             store.save(merged.mappings());
         }
         return proposedPlan.replaceDecisions(List.copyOf(updated.values()));
@@ -191,9 +199,24 @@ public final class PolymerCompatibilityBackend {
         }
         if (persistentMappings && !resolvedMappings.isEmpty()) {
             var existing = store.load();
-            store.save(store.mergePreservingAssignments(existing, resolvedMappings).mappings());
+            var merged = store.mergePreservingAssignments(existing, resolvedMappings);
+            store.save(merged.mappings());
+            mappingSnapshot = merged;
+            startupDiff = MappingPlanDiff.compare(startupBase, merged);
+        } else if (!resolvedMappings.isEmpty()) {
+            var merged = store.mergePreservingAssignments(mappingSnapshot, resolvedMappings);
+            mappingSnapshot = merged;
+            startupDiff = MappingPlanDiff.compare(startupBase, merged);
         }
         return current.replaceDecisions(List.copyOf(updated.values()));
+    }
+
+    public MappingStoreDocument mappingSnapshot() {
+        return mappingSnapshot;
+    }
+
+    public MappingPlanDiff startupDiff() {
+        return startupDiff;
     }
 
     public synchronized boolean hasPendingSemanticItems() {

@@ -138,6 +138,10 @@ public final class RebornGameTests {
         var dispatcher = server.getCommands().getDispatcher();
         var source = server.createCommandSourceStack();
         try {
+            var runtime = PolyMcReborn.runtime();
+            var frozenPlan = runtime.plan();
+            var mappingPath = runtime.configManager().root().resolve("mappings-v1.json");
+            byte[] mappingsBefore = java.nio.file.Files.readAllBytes(mappingPath);
             helper.assertTrue(dispatcher.execute("polymcreborn scan", source) > 0,
                     "scan should inspect the frozen plan");
             helper.assertTrue(dispatcher.execute(
@@ -152,6 +156,19 @@ public final class RebornGameTests {
                     "the JSON report should contain the decision and full candidate trace");
             helper.assertTrue(dispatcher.execute("polymcreborn config validate", source) > 0,
                     "the strict configuration validation command should complete");
+            helper.assertTrue(dispatcher.execute("pmcr mappings status", source) > 0,
+                    "mapping status should validate the current persistent store");
+            helper.assertTrue(dispatcher.execute("pmcr mappings validate", source) > 0,
+                    "mapping validation should complete without changing the store");
+            helper.assertTrue(dispatcher.execute("pmcr mappings diff", source) > 0,
+                    "startup mapping diff should be compatible");
+            helper.assertTrue(dispatcher.execute("pmcr mappings dry-run", source) > 0,
+                    "mapping dry-run should complete without committing changes");
+            helper.assertTrue(runtime.plan() == frozenPlan,
+                    "mapping inspection commands must preserve the frozen plan identity");
+            helper.assertTrue(java.util.Arrays.equals(mappingsBefore,
+                            java.nio.file.Files.readAllBytes(mappingPath)),
+                    "mapping inspection commands must preserve the store byte-for-byte");
             helper.assertTrue(dispatcher.getRoot().getChild("pmcr") != null,
                     "the short command alias should be registered");
             helper.assertTrue(dispatcher.getRoot().getChild("polymc") != null,

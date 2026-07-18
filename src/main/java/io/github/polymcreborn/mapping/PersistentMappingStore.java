@@ -9,6 +9,8 @@ import io.github.polymcreborn.config.AtomicFiles;
 import io.github.polymcreborn.config.ConfigManager;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,39 +41,61 @@ public final class PersistentMappingStore {
         if (Files.notExists(path)) {
             return MappingStoreDocument.empty();
         }
-        try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+        try {
+            return parse(Files.readAllBytes(path), path);
+        } catch (MappingStoreException exception) {
+            throw exception;
+        } catch (IOException | RuntimeException exception) {
+            throw new MappingStoreException(path, "Corrupt mapping file; data was not replaced: "
+                    + exception.getMessage(), exception);
+        }
+    }
+
+    /** Strictly validates mapping bytes without writing or changing the production store. */
+    public MappingStoreDocument parse(byte[] bytes) {
+        return parse(bytes, path);
+    }
+
+    MappingStoreDocument parse(byte[] bytes, Path logicalPath) {
+        try (var reader = new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8)) {
             var root = JsonParser.parseReader(reader).getAsJsonObject();
-            ConfigManager.rejectUnknown(path, "$", root, ROOT_FIELDS);
-            ConfigManager.requireFields(path, "$", root, ROOT_FIELDS);
+            ConfigManager.rejectUnknown(logicalPath, "$", root, ROOT_FIELDS);
+            ConfigManager.requireFields(logicalPath, "$", root, ROOT_FIELDS);
             int schema = root.get("schema_version").getAsInt();
             String algorithm = root.get("mapping_algorithm_version").getAsString();
             if (schema != MappingStoreDocument.SCHEMA_VERSION
                     || !MappingStoreDocument.ALGORITHM_VERSION.equals(algorithm)) {
-                backupIncompatible(schema, algorithm);
-                throw new MappingStoreException(path, "Incompatible schema/algorithm; backup created and automatic migration refused");
+                if (logicalPath.equals(path)) {
+                    backupIncompatible(schema, algorithm);
+                }
+                throw new MappingStoreException(logicalPath, "Incompatible schema/algorithm"
+                        + (logicalPath.equals(path) ? "; backup created and automatic migration refused" : ""));
             }
             if (!root.get("mappings").isJsonArray()) {
-                throw new MappingStoreException(path, "$.mappings must be an array");
+                throw new MappingStoreException(logicalPath, "$.mappings must be an array");
             }
             int index = 0;
             for (var element : root.getAsJsonArray("mappings")) {
                 if (!element.isJsonObject()) {
-                    throw new MappingStoreException(path, "$.mappings[" + index + "] must be an object");
+                    throw new MappingStoreException(logicalPath,
+                            "$.mappings[" + index + "] must be an object");
                 }
                 var entry = element.getAsJsonObject();
-                ConfigManager.rejectUnknown(path, "$.mappings[" + index + "]", entry, ENTRY_FIELDS);
-                ConfigManager.requireFields(path, "$.mappings[" + index + "]", entry, ENTRY_FIELDS);
+                ConfigManager.rejectUnknown(logicalPath, "$.mappings[" + index + "]", entry, ENTRY_FIELDS);
+                ConfigManager.requireFields(logicalPath, "$.mappings[" + index + "]", entry, ENTRY_FIELDS);
                 index++;
             }
             try {
                 return GSON.fromJson(root, MappingStoreDocument.class);
             } catch (RuntimeException exception) {
-                throw new MappingStoreException(path, "Mapping validation failed: " + exception.getMessage(), exception);
+                throw new MappingStoreException(logicalPath,
+                        "Mapping validation failed: " + exception.getMessage(), exception);
             }
         } catch (MappingStoreException exception) {
             throw exception;
         } catch (IOException | RuntimeException exception) {
-            throw new MappingStoreException(path, "Corrupt mapping file; data was not replaced: " + exception.getMessage(), exception);
+            throw new MappingStoreException(logicalPath, "Corrupt mapping file; data was not replaced: "
+                    + exception.getMessage(), exception);
         }
     }
 

@@ -22,10 +22,14 @@ import io.github.polymcreborn.config.ConfigManager;
 import io.github.polymcreborn.config.RebornConfig;
 import io.github.polymcreborn.diagnostics.BoundedDiagnosticCollector;
 import io.github.polymcreborn.diagnostics.CompatibilityReportWriter;
+import io.github.polymcreborn.diagnostics.MappingDiffReportWriter;
 import io.github.polymcreborn.legacy.LegacyCompatibilityProvider;
 import io.github.polymcreborn.legacy.LegacyEntrypointBridge;
 import io.github.polymcreborn.legacy.LegacyPolymerBackend;
 import io.github.polymcreborn.mapping.MappingPlan;
+import io.github.polymcreborn.mapping.MappingBackupService;
+import io.github.polymcreborn.mapping.MappingPlanDiff;
+import io.github.polymcreborn.mapping.MappingStoreDocument;
 import io.github.polymcreborn.mapping.PersistentMappingStore;
 import io.github.polymcreborn.pack.DeterministicResourcePack;
 import io.github.polymcreborn.pack.PolymerPackService;
@@ -49,6 +53,7 @@ public final class RebornRuntime {
     private final ExtensionEntrypointLoader extensions;
     private final PacketFallbackBackend packetFallback = new NoOpPacketFallbackBackend();
     private final PolymerPackService polymerPackService;
+    private final MappingBackupService mappingBackups;
 
     private volatile MappingPlan plan;
     private volatile PolymerCompatibilityBackend polymerBackend;
@@ -59,6 +64,12 @@ public final class RebornRuntime {
         this.configManager = new ConfigManager(FabricLoader.getInstance().getConfigDir());
         this.config = configManager.loadOrCreate();
         this.diagnostics = new BoundedDiagnosticCollector(config.cacheLimits().maxEntries());
+        this.mappingBackups = new MappingBackupService(configManager.root());
+        if (mappingBackups.activatePendingRollback("26.1.2", PolyMcReborn.VERSION)) {
+            diagnostics.record("mapping.rollback.activated", "mappings-v1.json",
+                    "A validated pending rollback was activated before static planning",
+                    DiagnosticCollector.Severity.WARNING);
+        }
         this.providers = new CompatibilityRegistry();
         this.legacy = new LegacyEntrypointBridge(diagnostics);
         this.extensions = new ExtensionEntrypointLoader(providers);
@@ -139,6 +150,7 @@ public final class RebornRuntime {
                     config.generateResourcePack());
             this.polymerBackend = backend;
             finalPlan = backend.apply(proposed, PolyMcReborn.VERSION);
+            new MappingDiffReportWriter().write(configManager.reportsDirectory(), backend.startupDiff());
         } else {
             finalPlan = proposed.replaceDecisions(proposed.orderedDecisions().stream()
                     .map(RebornRuntime::disabledDecision).toList());
@@ -182,6 +194,7 @@ public final class RebornRuntime {
                     DiagnosticCollector.Severity.INFO);
             new CompatibilityReportWriter().write(configManager.reportsDirectory(), finalized, diagnostics,
                     config.reportFormats());
+            new MappingDiffReportWriter().write(configManager.reportsDirectory(), backend.startupDiff());
         }
         if (finalPlanAnnounced) {
             return;
@@ -288,6 +301,26 @@ public final class RebornRuntime {
 
     public PolymerPackService packService() {
         return polymerPackService;
+    }
+
+    public MappingBackupService mappingBackups() {
+        return mappingBackups;
+    }
+
+    public MappingStoreDocument mappingSnapshot() {
+        var backend = polymerBackend;
+        return backend == null ? new PersistentMappingStore(configManager.root()).load()
+                : backend.mappingSnapshot();
+    }
+
+    public MappingPlanDiff mappingDiff() {
+        var backend = polymerBackend;
+        return backend == null ? MappingPlanDiff.compare(MappingStoreDocument.empty(), mappingSnapshot())
+                : backend.startupDiff();
+    }
+
+    public MappingBackupService.DryRunResult mappingDryRun() {
+        return mappingBackups.dryRun(mappingSnapshot());
     }
 
     public void writeReports() {

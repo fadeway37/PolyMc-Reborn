@@ -97,6 +97,17 @@ class PersistentMappingStoreTest {
     }
 
     @Test
+    void interruptedTemporaryFileNeverReplacesTheLastGoodStore() throws IOException {
+        var store = new PersistentMappingStore(temporaryDirectory);
+        store.save(List.of(mapping("demo:good", ContentType.ITEM, "minecraft:paper")));
+        Files.writeString(temporaryDirectory.resolve("mappings-v1.json.interrupted.tmp"),
+                "partial", StandardCharsets.UTF_8);
+
+        assertEquals("demo:good", store.load().mappings().getFirst().registryId());
+        assertTrue(Files.exists(temporaryDirectory.resolve("mappings-v1.json.interrupted.tmp")));
+    }
+
+    @Test
     void mergePreservesExistingAssignmentsAndOnlyUpdatesValidationVersion() {
         var store = new PersistentMappingStore(temporaryDirectory);
         var existing = mapping("demo:fixed", ContentType.BLOCK, "polymer:block/1");

@@ -8,6 +8,7 @@ import io.github.polymcreborn.api.ClientProfile;
 import io.github.polymcreborn.core.PolyMcReborn;
 import io.github.polymcreborn.core.RebornRuntime;
 import io.github.polymcreborn.diagnostics.CompatibilityStats;
+import io.github.polymcreborn.mapping.MappingPlanDiff;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -48,11 +49,26 @@ public final class RebornCommands {
                         .then(Commands.literal("build").executes(context -> packBuild(context, runtime))))
                 .then(Commands.literal("config").requires(RebornCommands::isAdmin)
                         .then(Commands.literal("validate").executes(context -> configValidate(context, runtime))))
+                .then(mappingCommands("mappings", runtime))
+                .then(mappingCommands("mapping", runtime))
                 .then(Commands.literal("stats").requires(RebornCommands::isAdmin)
                         .executes(context -> stats(context, runtime)))
                 .then(Commands.literal("client-profile").requires(RebornCommands::isAdmin)
                         .then(Commands.argument("player", EntityArgument.player())
                                 .executes(context -> clientProfile(context))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> mappingCommands(String name, RebornRuntime runtime) {
+        return Commands.literal(name).requires(RebornCommands::isAdmin)
+                .then(Commands.literal("status").executes(context -> mappingStatus(context, runtime)))
+                .then(Commands.literal("validate").executes(context -> mappingValidate(context, runtime)))
+                .then(Commands.literal("diff").executes(context -> mappingDiff(context, runtime)))
+                .then(Commands.literal("dry-run").executes(context -> mappingDryRun(context, runtime)))
+                .then(Commands.literal("backup").executes(context -> mappingBackup(context, runtime)))
+                .then(Commands.literal("rollback")
+                        .then(Commands.argument("backup-id", StringArgumentType.word())
+                                .executes(context -> mappingRollback(context, runtime,
+                                        StringArgumentType.getString(context, "backup-id")))));
     }
 
     private static boolean isAdmin(CommandSourceStack source) {
@@ -114,6 +130,94 @@ public final class RebornCommands {
         new io.github.polymcreborn.config.CompatProfileLoader().load(runtime.configManager().compatDirectory());
         success(context, "config.json and compat.d are valid. Mapping changes require a server restart.");
         return 1;
+    }
+
+    private static int mappingStatus(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        try {
+            var status = runtime.mappingBackups().validateCurrent();
+            int backups = runtime.mappingBackups().listBackups().size();
+            success(context, status.present()
+                    ? "Mapping store is valid: entries=" + status.entryCount() + ", sha256=" + status.sha256()
+                            + ", schema=" + status.schemaVersion() + ", algorithm=" + status.algorithmVersion()
+                            + ", backups=" + backups
+                    : "Mapping store is not present; the frozen in-memory plan remains active. backups=" + backups);
+            return 1;
+        } catch (RuntimeException exception) {
+            return mappingFailure(context, exception);
+        }
+    }
+
+    private static int mappingValidate(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        try {
+            var status = runtime.mappingBackups().validateCurrent();
+            if (!status.present()) {
+                context.getSource().sendFailure(Component.literal("No mappings-v1.json exists to validate"));
+                return 0;
+            }
+            success(context, "Strict mapping validation passed: entries=" + status.entryCount()
+                    + ", sha256=" + status.sha256());
+            return 1;
+        } catch (RuntimeException exception) {
+            return mappingFailure(context, exception);
+        }
+    }
+
+    private static int mappingDiff(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        var diff = runtime.mappingDiff();
+        success(context, "Startup mapping diff: " + formatDiffCounts(diff)
+                + "; incompatible=" + diff.hasIncompatibleChanges());
+        return diff.hasIncompatibleChanges() ? 0 : 1;
+    }
+
+    private static int mappingDryRun(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        try {
+            var result = runtime.mappingDryRun();
+            success(context, "Mapping dry-run completed without writing files or changing the frozen plan: "
+                    + formatDiffCounts(result.diff()) + "; proposed_bytes=" + result.proposedSizeBytes()
+                    + ", proposed_sha256=" + result.proposedSha256());
+            return result.diff().hasIncompatibleChanges() ? 0 : 1;
+        } catch (RuntimeException exception) {
+            return mappingFailure(context, exception);
+        }
+    }
+
+    private static int mappingBackup(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        try {
+            var backup = runtime.mappingBackups().backupCurrent("26.1.2", PolyMcReborn.VERSION);
+            success(context, "Created validated mapping backup " + backup.id() + ": sha256=" + backup.sha256()
+                    + ", bytes=" + backup.sizeBytes());
+            return 1;
+        } catch (RuntimeException exception) {
+            return mappingFailure(context, exception);
+        }
+    }
+
+    private static int mappingRollback(CommandContext<CommandSourceStack> context, RebornRuntime runtime,
+                                       String backupId) {
+        try {
+            var result = runtime.mappingBackups().prepareRollback(backupId, "26.1.2", PolyMcReborn.VERSION);
+            success(context, "Validated rollback " + result.sourceBackupId()
+                    + " is staged in " + result.pendingFileName()
+                    + "; it will activate before planning on the next server restart. The current frozen plan was not changed"
+                    + (result.safetyBackupId() == null ? "." : "; safety backup=" + result.safetyBackupId()));
+            return 1;
+        } catch (RuntimeException exception) {
+            return mappingFailure(context, exception);
+        }
+    }
+
+    private static String formatDiffCounts(MappingPlanDiff diff) {
+        var values = new java.util.ArrayList<String>();
+        for (var kind : MappingPlanDiff.ChangeKind.values()) {
+            values.add(kind.name().toLowerCase(java.util.Locale.ROOT) + "=" + diff.counts().get(kind));
+        }
+        return String.join(", ", values);
+    }
+
+    private static int mappingFailure(CommandContext<CommandSourceStack> context, RuntimeException exception) {
+        context.getSource().sendFailure(Component.literal("Mapping operation failed safely: "
+                + exception.getMessage()));
+        return 0;
     }
 
     private static int stats(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
