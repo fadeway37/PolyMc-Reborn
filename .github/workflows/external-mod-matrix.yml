@@ -1,6 +1,9 @@
 name: External Mod Matrix
 
 on:
+  push:
+    branches:
+      - 'reborn/0.3.0-beta+26.1.2'
   workflow_dispatch:
   schedule:
     - cron: '23 4 * * 3'

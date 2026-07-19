@@ -5,6 +5,9 @@ principles; alpha versions are tied to an exact Minecraft version.
 
 ## [Unreleased]
 
+- Run the beta external-mod matrix and cross-platform archive reproducibility
+  gates automatically on pushes to the 0.3 beta release branch.
+
 ### 0.3.0-beta.1+26.1.2 development
 
 #### Changed

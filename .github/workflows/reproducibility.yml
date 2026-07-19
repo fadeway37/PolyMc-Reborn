@@ -1,6 +1,9 @@
 name: Cross-platform archive reproducibility
 
 on:
+  push:
+    branches:
+      - 'reborn/0.3.0-beta+26.1.2'
   workflow_dispatch:
 
 permissions:
