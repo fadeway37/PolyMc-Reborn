@@ -5,6 +5,14 @@ principles; alpha versions are tied to an exact Minecraft version.
 
 ## [Unreleased]
 
+### 0.3.0-beta.1+26.1.2 development
+
+#### Changed
+
+- Began the Real-World Compatibility Beta from the verified final 0.2 commit.
+- Corrected the 0.2 release-evidence references after auditing both successive
+  GitHub Actions run pairs and their downloaded artifacts.
+
 ### 0.2.0-alpha.1+26.1.2 development
 
 #### Added

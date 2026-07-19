@@ -227,7 +227,7 @@ tasks.register('prepareProductionServerPlaytest') {
 		java.nio.file.Files.writeString(directory.resolve('eula.txt'), 'eula=true\n')
 		java.nio.file.Files.writeString(directory.resolve('server.properties'),
 			'online-mode=false\nserver-ip=127.0.0.1\nserver-port=' + playtestServerPort.get()
-				+ '\nlevel-seed=PolyMc-Reborn-0.2-playtest\ngenerate-structures=false\n'
+				+ '\nlevel-seed=PolyMc-Reborn-0.3-playtest\ngenerate-structures=false\n'
 				+ 'max-players=1\nspawn-animals=false\nspawn-monsters=false\nspawn-npcs=false\n'
 				+ 'difficulty=normal\n'
 				+ 'spawn-protection=0\nview-distance=5\nsimulation-distance=5\n'
