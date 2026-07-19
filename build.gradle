@@ -682,11 +682,18 @@ publishing {
 }
 
 def releaseDirectory = layout.buildDirectory.dir('release')
-def sbomFile = releaseDirectory.map { it.file("polymc-reborn-${project.version}-cyclonedx.json") }
-def provenanceFile = releaseDirectory.map { it.file("polymc-reborn-${project.version}-provenance.json") }
-def buildManifestFile = releaseDirectory.map { it.file("polymc-reborn-${project.version}-build-manifest.json") }
-def checksumsFile = releaseDirectory.map { it.file('SHA256SUMS') }
-def checksums512File = releaseDirectory.map { it.file('SHA512SUMS') }
+def releaseMetadataDirectory = layout.buildDirectory.dir('reports/release-artifacts')
+def sbomFile = releaseMetadataDirectory.map {
+	it.file("polymc-reborn-${project.version}-cyclonedx.json")
+}
+def provenanceFile = releaseMetadataDirectory.map {
+	it.file("polymc-reborn-${project.version}-provenance.json")
+}
+def buildManifestFile = releaseMetadataDirectory.map {
+	it.file("polymc-reborn-${project.version}-build-manifest.json")
+}
+def checksumsFile = releaseMetadataDirectory.map { it.file('SHA256SUMS') }
+def checksums512File = releaseMetadataDirectory.map { it.file('SHA512SUMS') }
 def apiJarFile = project(':api').tasks.named('jar', Jar).flatMap { it.archiveFile }
 def apiSourcesJarFile = project(':api').tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
 def apiJavadocJarFile = project(':api').tasks.named('javadocJar', Jar).flatMap { it.archiveFile }
@@ -854,6 +861,33 @@ tasks.register('assembleBetaArtifacts', Copy) {
 	from file('THIRD_PARTY_NOTICES.md')
 	from file('docs/0.3-release-notes.md')
 	into releaseDirectory
+	outputs.upToDateWhen { false }
+	doFirst {
+		delete releaseDirectory
+	}
+	doLast {
+		def expected = [
+			productionReleaseJar.get().asFile.name,
+			tasks.named('sourcesJar', Jar).get().archiveFile.get().asFile.name,
+			tasks.named('javadocJar', Jar).get().archiveFile.get().asFile.name,
+			apiJarFile.get().asFile.name, apiSourcesJarFile.get().asFile.name,
+			apiJavadocJarFile.get().asFile.name, sbomFile.get().asFile.name,
+			provenanceFile.get().asFile.name, buildManifestFile.get().asFile.name,
+			checksumsFile.get().asFile.name, checksums512File.get().asFile.name,
+			'0.3.0-beta.1.txt', 'LICENSE', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md',
+			'0.3-release-notes.md'
+		].toSorted()
+		def actual = releaseDirectory.get().asFile.listFiles().findAll { it.isFile() }
+			.collect { it.name }.toSorted()
+		if (actual != expected) {
+			throw new GradleException('Beta artifact set differs from the exact allow-list: ' + actual)
+		}
+		def empty = releaseDirectory.get().asFile.listFiles().findAll { it.isFile() && it.length() == 0 }
+			.collect { it.name }
+		if (!empty.isEmpty()) {
+			throw new GradleException('Beta artifact set contains empty files: ' + empty)
+		}
+	}
 }
 
 tasks.register('verifyReproducibleArchives', Exec) {

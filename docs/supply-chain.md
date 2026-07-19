@@ -3,6 +3,9 @@
 `assembleBetaArtifacts` creates a bounded release directory containing the
 main and standalone API artifacts, CycloneDX 1.5 JSON SBOM, SHA-256/SHA-512
 checksums, build provenance, API signature, license, and notices.
+Metadata is generated in a separate intermediate directory before assembly.
+The final copy starts from an empty bounded release directory and fails unless
+the exact 16-file allow-list is present with every file non-empty.
 
 The SBOM records exact resolved direct/transitive coordinates and available
 hashes without local absolute paths, secrets, playtest content Mod artifacts,

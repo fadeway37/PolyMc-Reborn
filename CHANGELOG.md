@@ -12,6 +12,9 @@ principles; alpha versions are tied to an exact Minecraft version.
 - Began the Real-World Compatibility Beta from the verified final 0.2 commit.
 - Corrected the 0.2 release-evidence references after auditing both successive
   GitHub Actions run pairs and their downloaded artifacts.
+- Release metadata is generated outside the final copy destination; Beta
+  assembly now deletes stale output and rejects missing, unexpected, or empty
+  files against an exact artifact allow-list.
 
 #### Added
 
