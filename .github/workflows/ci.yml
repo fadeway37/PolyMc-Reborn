@@ -103,3 +103,13 @@ jobs:
             build/reports/**
             build/run/gameTest/logs/**
             build/server-smoke/logs/**
+
+  external-mod-matrix:
+    name: P0 real external-mod matrix
+    if: github.ref == 'refs/heads/reborn/0.3.0-beta+26.1.2'
+    uses: ./.github/workflows/external-mod-matrix.yml
+
+  cross-platform-reproducibility:
+    name: P0 cross-platform archive reproducibility
+    if: github.ref == 'refs/heads/reborn/0.3.0-beta+26.1.2'
+    uses: ./.github/workflows/reproducibility.yml
