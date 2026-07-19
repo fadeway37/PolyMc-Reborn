@@ -149,4 +149,5 @@ Harness source or a server-only pack build is not evidence that those steps ran.
 lookups are O(1) against a bounded per-player map. REQUIRED may expose planned
 resources because vanilla disconnects a decline; OPTIONAL exposes them only
 after `SUCCESSFULLY_LOADED`; DISABLED never does. Duplicate terminal responses
-are idempotent, and disconnect removes the live entry.
+are idempotent, responses are correlated to the current protocol pack UUID,
+stale UUIDs are ignored, and disconnect removes the live entry.

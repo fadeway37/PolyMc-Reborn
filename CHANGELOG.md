@@ -9,6 +9,9 @@ principles; alpha versions are tied to an exact Minecraft version.
   gates automatically on pushes to the 0.3 beta release branch.
 - Normalize generated Javadoc text to LF so main and standalone API Javadoc
   archives reproduce byte-for-byte across Linux and Windows.
+- Track resource-pack responses against the current protocol pack UUID and
+  make terminal responses idempotent, preventing stale acknowledgements from
+  corrupting per-session policy diagnostics.
 
 ### 0.3.0-beta.1+26.1.2 development
 

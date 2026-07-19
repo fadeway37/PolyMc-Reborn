@@ -10,9 +10,10 @@ do not cancel or replace protocol handling. Only APPLIED optional clients see
 custom-resource models. REQUIRED relies on vanilla's required-pack disconnect.
 DISABLED always uses safe vanilla carriers.
 
-Terminal counters are transition-based and idempotent. Disconnect removes the
-live state. The mapping plan and global deterministic pack do not change per
-player.
+Terminal counters are transition-based and idempotent. Each live state is tied
+to the exact protocol pack UUID; late responses for an older push cannot alter
+the current state or counters. Disconnect removes the live state. The mapping
+plan and global deterministic pack do not change per player.
 
 ## Consequences
 

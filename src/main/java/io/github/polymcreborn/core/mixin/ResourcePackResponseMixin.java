@@ -21,7 +21,8 @@ abstract class ResourcePackResponseMixin {
         Object listener = this;
         if (listener instanceof ServerGamePacketListenerImpl game) {
             var runtime = PolyMcReborn.runtime();
-            var state = runtime.playerPackStates().response(game.player.getUUID(), packet.action());
+            var state = runtime.playerPackStates().response(
+                    game.player.getUUID(), packet.id(), packet.action());
             runtime.diagnostics().record("resource-pack.state", new DiagnosticContext(
                             "client-session", "", "", "", "", "", "VANILLA",
                             state.name(), "", "network-session"),

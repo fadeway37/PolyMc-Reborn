@@ -294,17 +294,17 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             throw new IllegalStateException("Playtest client joined before resource pack host was ready");
         }
         var policy = PolyMcReborn.runtime().config().resourcePackPolicy();
-        PolyMcReborn.runtime().playerPackStates().offered(player.getUUID());
-        if (policy == ResourcePackPolicy.DISABLED) {
-            player.sendSystemMessage(Component.literal(
-                    "PolyMc Reborn resource pack disabled; safe vanilla carriers are active"));
-            return;
-        }
         // Resource-pack IDs identify individual protocol pushes, not the immutable ZIP content.
         // Use a distinct deterministic ID per connection so a reconnect cannot deduplicate the
         // second push after Minecraft has removed the first connection's active server packs.
         var pushId = UUID.nameUUIDFromBytes(("polymc-reborn-playtest:" + resourcePackSha256
                 + ":connection:" + joins).getBytes(StandardCharsets.UTF_8));
+        PolyMcReborn.runtime().playerPackStates().offered(player.getUUID(), pushId);
+        if (policy == ResourcePackPolicy.DISABLED) {
+            player.sendSystemMessage(Component.literal(
+                    "PolyMc Reborn resource pack disabled; safe vanilla carriers are active"));
+            return;
+        }
         var packPacket = new ClientboundResourcePackPushPacket(pushId, resourcePackUrl,
                 resourcePackSha1, policy == ResourcePackPolicy.REQUIRED,
                 Optional.of(Component.literal("PolyMc Reborn isolated compatibility playtest")));

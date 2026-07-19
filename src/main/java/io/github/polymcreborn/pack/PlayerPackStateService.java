@@ -25,7 +25,7 @@ public final class PlayerPackStateService {
 
     private final ResourcePackPolicy policy;
     private final int capacity;
-    private final Map<UUID, State> states = new ConcurrentHashMap<>();
+    private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private final AtomicLong rejectedCapacity = new AtomicLong();
     private final AtomicLong offeredCount = new AtomicLong();
     private final AtomicLong appliedCount = new AtomicLong();
@@ -45,12 +45,25 @@ public final class PlayerPackStateService {
         return policy;
     }
 
-    public void offered(UUID playerId) {
+    public void offered(UUID playerId, UUID packId) {
         offeredCount.incrementAndGet();
-        update(playerId, policy == ResourcePackPolicy.DISABLED ? State.DISABLED : State.OFFERED);
+        update(playerId, packId, policy == ResourcePackPolicy.DISABLED ? State.DISABLED : State.OFFERED);
     }
 
-    public State response(UUID playerId, ServerboundResourcePackPacket.Action action) {
+    public State response(UUID playerId, UUID packId, ServerboundResourcePackPacket.Action action) {
+        java.util.Objects.requireNonNull(playerId, "playerId");
+        java.util.Objects.requireNonNull(packId, "packId");
+        java.util.Objects.requireNonNull(action, "action");
+        if (policy == ResourcePackPolicy.DISABLED) {
+            return State.DISABLED;
+        }
+        Session session = sessions.get(playerId);
+        if (session == null) {
+            return State.UNKNOWN;
+        }
+        if (!session.packId().equals(packId) || terminal(session.state())) {
+            return session.state();
+        }
         State state = switch (action) {
             case ACCEPTED -> State.ACCEPTED;
             case DOWNLOADED -> State.DOWNLOADED;
@@ -59,7 +72,7 @@ public final class PlayerPackStateService {
                     ? State.REQUIRED_REJECTED : State.DECLINED;
             case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> State.FAILED;
         };
-        State previous = state(playerId);
+        State previous = session.state();
         if (previous == state) {
             return state;
         }
@@ -73,12 +86,13 @@ public final class PlayerPackStateService {
         } else if (state == State.FAILED) {
             failedCount.incrementAndGet();
         }
-        update(playerId, state);
+        update(playerId, packId, state);
         return state;
     }
 
     public State disconnected(UUID playerId) {
-        State previous = states.remove(playerId);
+        Session session = sessions.remove(playerId);
+        State previous = session == null ? null : session.state();
         if (policy == ResourcePackPolicy.REQUIRED && previous == State.OFFERED) {
             declinedCount.incrementAndGet();
             requiredRejectedCount.incrementAndGet();
@@ -88,8 +102,11 @@ public final class PlayerPackStateService {
     }
 
     public State state(UUID playerId) {
-        return policy == ResourcePackPolicy.DISABLED
-                ? State.DISABLED : states.getOrDefault(playerId, State.UNKNOWN);
+        if (policy == ResourcePackPolicy.DISABLED) {
+            return State.DISABLED;
+        }
+        Session session = sessions.get(playerId);
+        return session == null ? State.UNKNOWN : session.state();
     }
 
     public boolean customResourcesAllowed(PacketContext context) {
@@ -113,7 +130,9 @@ public final class PlayerPackStateService {
     }
 
     public Map<UUID, State> snapshot() {
-        return Map.copyOf(states);
+        var snapshot = new java.util.HashMap<UUID, State>();
+        sessions.forEach((playerId, session) -> snapshot.put(playerId, session.state()));
+        return Map.copyOf(snapshot);
     }
 
     public long rejectedCapacityCount() {
@@ -121,7 +140,7 @@ public final class PlayerPackStateService {
     }
 
     public Stats stats() {
-        return new Stats(states.size(), offeredCount.get(), appliedCount.get(), declinedCount.get(),
+        return new Stats(sessions.size(), offeredCount.get(), appliedCount.get(), declinedCount.get(),
                 requiredRejectedCount.get(), failedCount.get(), rejectedCapacity.get());
     }
 
@@ -129,12 +148,22 @@ public final class PlayerPackStateService {
                         long requiredRejected, long failed, long capacityRejected) {
     }
 
-    private void update(UUID playerId, State state) {
+    private void update(UUID playerId, UUID packId, State state) {
         java.util.Objects.requireNonNull(playerId, "playerId");
-        if (!states.containsKey(playerId) && states.size() >= capacity) {
+        java.util.Objects.requireNonNull(packId, "packId");
+        if (!sessions.containsKey(playerId) && sessions.size() >= capacity) {
             rejectedCapacity.incrementAndGet();
             return;
         }
-        states.put(playerId, state);
+        sessions.put(playerId, new Session(packId, state));
+    }
+
+    private static boolean terminal(State state) {
+        return state == State.APPLIED || state == State.DECLINED
+                || state == State.REQUIRED_REJECTED || state == State.FAILED
+                || state == State.DISABLED;
+    }
+
+    private record Session(UUID packId, State state) {
     }
 }

@@ -16,12 +16,16 @@ class PlayerPackStateServiceTest {
         var service = new PlayerPackStateService(ResourcePackPolicy.OPTIONAL, 2);
         UUID accepted = UUID.randomUUID();
         UUID declined = UUID.randomUUID();
-        service.offered(accepted);
-        service.offered(declined);
-        service.response(accepted, ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED);
-        service.response(accepted, ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED);
-        service.response(declined, ServerboundResourcePackPacket.Action.DECLINED);
-        service.response(declined, ServerboundResourcePackPacket.Action.DECLINED);
+        UUID acceptedPack = UUID.randomUUID();
+        UUID declinedPack = UUID.randomUUID();
+        service.offered(accepted, acceptedPack);
+        service.offered(declined, declinedPack);
+        service.response(accepted, acceptedPack,
+                ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED);
+        service.response(accepted, acceptedPack,
+                ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED);
+        service.response(declined, declinedPack, ServerboundResourcePackPacket.Action.DECLINED);
+        service.response(declined, declinedPack, ServerboundResourcePackPacket.Action.DECLINED);
 
         assertEquals(PlayerPackStateService.State.APPLIED, service.state(accepted));
         assertEquals(PlayerPackStateService.State.DECLINED, service.state(declined));
@@ -37,8 +41,9 @@ class PlayerPackStateServiceTest {
     void disabledPolicyNeverRetainsAnEnabledState() {
         var service = new PlayerPackStateService(ResourcePackPolicy.DISABLED, 1);
         UUID player = UUID.randomUUID();
-        service.offered(player);
-        service.response(player, ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED);
+        UUID pack = UUID.randomUUID();
+        service.offered(player, pack);
+        service.response(player, pack, ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED);
         assertEquals(PlayerPackStateService.State.DISABLED, service.state(player));
     }
 
@@ -46,10 +51,11 @@ class PlayerPackStateServiceTest {
     void requiredDeclineHasAnExplicitFailClosedState() {
         var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 1);
         UUID player = UUID.randomUUID();
-        service.offered(player);
+        UUID pack = UUID.randomUUID();
+        service.offered(player, pack);
 
         assertEquals(PlayerPackStateService.State.REQUIRED_REJECTED,
-                service.response(player, ServerboundResourcePackPacket.Action.DECLINED));
+                service.response(player, pack, ServerboundResourcePackPacket.Action.DECLINED));
         assertEquals(PlayerPackStateService.State.REQUIRED_REJECTED, service.state(player));
         assertEquals(1, service.stats().declined());
         assertEquals(1, service.stats().requiredRejected());
@@ -59,7 +65,7 @@ class PlayerPackStateServiceTest {
     void requiredOfferClosedBeforeAResponseIsRecordedAsRejected() {
         var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 1);
         UUID player = UUID.randomUUID();
-        service.offered(player);
+        service.offered(player, UUID.randomUUID());
 
         assertEquals(PlayerPackStateService.State.REQUIRED_REJECTED,
                 service.disconnected(player));
@@ -70,8 +76,8 @@ class PlayerPackStateServiceTest {
     @Test
     void capacityIsBoundedAndReported() {
         var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 1);
-        service.offered(UUID.randomUUID());
-        service.offered(UUID.randomUUID());
+        service.offered(UUID.randomUUID(), UUID.randomUUID());
+        service.offered(UUID.randomUUID(), UUID.randomUUID());
         assertEquals(1, service.snapshot().size());
         assertEquals(1, service.rejectedCapacityCount());
     }
@@ -84,5 +90,26 @@ class PlayerPackStateServiceTest {
                 .customResourcesAllowed(null));
         assertFalse(new PlayerPackStateService(ResourcePackPolicy.DISABLED, 1)
                 .customResourcesAllowed(null));
+    }
+
+    @Test
+    void ignoresStalePackIdsAndKeepsTerminalResponsesIdempotent() {
+        var service = new PlayerPackStateService(ResourcePackPolicy.OPTIONAL, 1);
+        UUID player = UUID.randomUUID();
+        UUID currentPack = UUID.randomUUID();
+        service.offered(player, currentPack);
+
+        assertEquals(PlayerPackStateService.State.OFFERED,
+                service.response(player, UUID.randomUUID(),
+                        ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED));
+        assertEquals(0, service.stats().applied());
+        assertEquals(PlayerPackStateService.State.APPLIED,
+                service.response(player, currentPack,
+                        ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED));
+        assertEquals(PlayerPackStateService.State.APPLIED,
+                service.response(player, currentPack, ServerboundResourcePackPacket.Action.DECLINED));
+        assertEquals(1, service.stats().applied());
+        assertEquals(0, service.stats().declined());
+        assertEquals(0, service.stats().failed());
     }
 }
