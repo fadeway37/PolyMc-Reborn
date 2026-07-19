@@ -615,6 +615,19 @@ tasks.withType(Javadoc).configureEach {
 	options.encoding = 'UTF-8'
 	options.addStringOption('Xdoclint:none', '-quiet')
 	options.addBooleanOption('notimestamp', true)
+	doLast {
+		def textNames = ['element-list'] as Set
+		def textExtensions = ['html', 'svg', 'js', 'css'] as Set
+		destinationDir.eachFileRecurse(groovy.io.FileType.FILES) { file ->
+			def extension = file.name.lastIndexOf('.') >= 0
+				? file.name.substring(file.name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT)
+				: ''
+			if (textNames.contains(file.name) || textExtensions.contains(extension)) {
+				def source = file.getText('UTF-8')
+				file.setText(source.replace('\r\n', '\n').replace('\r', '\n'), 'UTF-8')
+			}
+		}
+	}
 }
 
 tasks.withType(Test).configureEach {

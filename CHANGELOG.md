@@ -7,6 +7,8 @@ principles; alpha versions are tied to an exact Minecraft version.
 
 - Run the beta external-mod matrix and cross-platform archive reproducibility
   gates automatically on pushes to the 0.3 beta release branch.
+- Normalize generated Javadoc text to LF so main and standalone API Javadoc
+  archives reproduce byte-for-byte across Linux and Windows.
 
 ### 0.3.0-beta.1+26.1.2 development
 
