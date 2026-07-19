@@ -10,6 +10,8 @@ base {
 	archivesName = project.archives_base_name
 }
 
+sourceSets.main.java.srcDir project(':api').layout.projectDirectory.dir('src/main/java')
+
 repositories {
 	maven {
 		name = 'Nucleoid'
@@ -282,6 +284,31 @@ tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.Server
 
 def playtestEvidenceDirectory = layout.buildDirectory.dir('playtest')
 def clientDriverProject = project(':playtest:client-driver')
+def apiConsumerDirectory = layout.projectDirectory.dir('playtest/api-consumer')
+def apiConsumerJar = apiConsumerDirectory.file(
+	'build/libs/polymc-reborn-api-consumer-' + project.version + '.jar')
+
+tasks.register('publishApiToTestRepository') {
+	group = 'verification'
+	description = 'Publishes the standalone Beta API artifact into a bounded temporary Maven repository.'
+	dependsOn ':api:publishMavenJavaPublicationToTestRepositoryRepository'
+}
+
+tasks.register('buildApiConsumer', Exec) {
+	group = 'verification'
+	description = 'Builds the external API consumer only from its Maven coordinate.'
+	dependsOn tasks.named('publishApiToTestRepository')
+	workingDir rootDir
+	def repositoryPath = layout.buildDirectory.dir('test-maven-repository').get().asFile.absolutePath
+	def arguments = ['-p', apiConsumerDirectory.asFile.absolutePath, 'clean', 'build',
+		'--no-daemon', '-PapiRepository=' + repositoryPath]
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine file('gradlew.bat').absolutePath, *arguments
+	} else {
+		commandLine file('gradlew').absolutePath, *arguments
+	}
+	outputs.file(apiConsumerJar)
+}
 
 tasks.register('cleanPlaytest', Delete) {
 	group = 'verification'

@@ -13,6 +13,16 @@ principles; alpha versions are tied to an exact Minecraft version.
 - Corrected the 0.2 release-evidence references after auditing both successive
   GitHub Actions run pairs and their downloaded artifacts.
 
+#### Added
+
+- A standalone `polymc-reborn-api` Maven publication with Java 25
+  sources/Javadoc artifacts and one canonical source tree shared by the
+  production build.
+- Stable/experimental/internal Beta annotations, a deterministic API signature
+  baseline/check, and a negative signature-change test.
+- An independent Maven-coordinate-only API consumer fixture covering provider,
+  item, block, GUI, entity, and resource registrations.
+
 ### 0.2.0-alpha.1+26.1.2 development
 
 #### Added

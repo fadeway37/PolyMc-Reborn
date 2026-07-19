@@ -1,0 +1,177 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+group = project.maven_group
+version = project.mod_version
+
+base {
+	archivesName = 'polymc-reborn-api'
+}
+
+loom {
+	serverOnlyMinecraftJar()
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${minecraft_version}"
+	testImplementation platform("org.junit:junit-bom:${junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+sourceSets {
+	signatureTool {
+		java.srcDir 'src/signatureTool/java'
+	}
+}
+
+configurations.signatureToolImplementation.extendsFrom configurations.implementation
+
+dependencies {
+	signatureToolImplementation sourceSets.main.output
+	testImplementation sourceSets.signatureTool.output
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = 'UTF-8'
+}
+
+tasks.withType(Javadoc).configureEach {
+	options.encoding = 'UTF-8'
+	options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+}
+
+def buildGitCommit = providers.environmentVariable('GITHUB_SHA').orElse(
+	providers.exec {
+		commandLine 'git', 'rev-parse', 'HEAD'
+		ignoreExitValue = true
+	}.standardOutput.asText.map { it.trim().isEmpty() ? 'unknown' : it.trim() }
+)
+def buildGitDirty = providers.exec {
+	commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+	ignoreExitValue = true
+}.standardOutput.asText.map { it.trim().isEmpty() ? 'false' : 'true' }
+
+def normalizedLicenseFile = layout.buildDirectory.file('generated/legal/LICENSE_polymc-reborn-api')
+def normalizeApiLicense = tasks.register('normalizeApiLicense') {
+	inputs.file(rootProject.layout.projectDirectory.file('LICENSE'))
+	outputs.file(normalizedLicenseFile)
+	doLast {
+		def source = rootProject.layout.projectDirectory.file('LICENSE').asFile.getText('UTF-8')
+		def destination = normalizedLicenseFile.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(destination.parent)
+		java.nio.file.Files.writeString(destination,
+			source.replace('\r\n', '\n').replace('\r', '\n'),
+			java.nio.charset.StandardCharsets.UTF_8)
+	}
+}
+
+tasks.withType(Jar).configureEach {
+	dependsOn normalizeApiLicense
+	from(normalizedLicenseFile)
+	from(rootProject.layout.projectDirectory.file('NOTICE.md'))
+	from(rootProject.layout.projectDirectory.file('THIRD_PARTY_NOTICES.md'))
+	manifest {
+		attributes(
+			'Implementation-Title': 'PolyMc Reborn API',
+			'Implementation-Version': project.version,
+			'Minecraft-Version': project.minecraft_version,
+			'Git-Commit': buildGitCommit.get(),
+			'Git-Dirty': buildGitDirty.get()
+		)
+	}
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+	withSourcesJar()
+	withJavadocJar()
+}
+
+dependencyLocking {
+	lockAllConfigurations()
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			artifactId = 'polymc-reborn-api'
+			from components.java
+			pom {
+				name = 'PolyMc Reborn API'
+				description = 'Backend-neutral compatibility adapter API for PolyMc Reborn'
+				url = 'https://github.com/fadeway37/PolyMc-Reborn'
+				licenses {
+					license {
+						name = 'GNU Lesser General Public License v3.0 or later'
+						url = 'https://www.gnu.org/licenses/lgpl-3.0.html'
+					}
+				}
+			}
+		}
+	}
+	repositories {
+		maven {
+			name = 'testRepository'
+			url = rootProject.layout.buildDirectory.dir('test-maven-repository')
+		}
+	}
+}
+
+def generatedSignature = layout.buildDirectory.file('api-signatures/current.txt')
+def signatureBaseline = layout.projectDirectory.file(
+	'signatures/0.3.0-beta.1.txt')
+
+tasks.register('generateApiSignature', JavaExec) {
+	group = 'verification'
+	description = 'Generates the deterministic public Beta API signature.'
+	dependsOn tasks.named('classes'), tasks.named('signatureToolClasses')
+	classpath = sourceSets.signatureTool.runtimeClasspath + sourceSets.main.runtimeClasspath
+	mainClass = 'io.github.polymcreborn.tools.ApiSignatureGenerator'
+	args generatedSignature.get().asFile.absolutePath,
+		sourceSets.main.output.classesDirs.singleFile.absolutePath,
+		project.version.toString()
+	outputs.file(generatedSignature)
+}
+
+tasks.register('checkApiSignature', JavaExec) {
+	group = 'verification'
+	description = 'Fails when the generated public API differs from the accepted Beta baseline.'
+	dependsOn tasks.named('generateApiSignature')
+	inputs.file(signatureBaseline)
+	classpath = sourceSets.signatureTool.runtimeClasspath + sourceSets.main.runtimeClasspath
+	mainClass = 'io.github.polymcreborn.tools.ApiSignatureGenerator'
+	args '--verify', generatedSignature.get().asFile.absolutePath,
+		signatureBaseline.asFile.absolutePath
+}
+
+tasks.register('updateApiSignatureBaseline', Copy) {
+	group = 'build setup'
+	description = 'Explicitly replaces the accepted Beta API signature baseline.'
+	dependsOn tasks.named('generateApiSignature')
+	from generatedSignature
+	into layout.projectDirectory.dir('signatures')
+	rename { '0.3.0-beta.1.txt' }
+}
+
+tasks.named('checkApiSignature') {
+	mustRunAfter tasks.named('updateApiSignatureBaseline')
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('checkApiSignature')
+}

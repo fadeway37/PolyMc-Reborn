@@ -1,6 +1,9 @@
 /.gradle/
 /build/
+/api/build/
 /playtest/client-driver/build/
+/playtest/api-consumer/.gradle/
+/playtest/api-consumer/build/
 /playtest/external-cache/
 **/__pycache__/
 *.py[cod]
