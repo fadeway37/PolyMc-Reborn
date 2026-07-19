@@ -10,15 +10,22 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import io.github.polymcreborn.pack.PlayerPackStateService;
 
 /** Automatic item projection that never invokes Polymer's unsigned full-stack reverse payload. */
 public final class SafeItemOverlay implements PolymerItem {
     private volatile Item carrier;
     private final Identifier model;
+    private final PlayerPackStateService packStates;
 
     public SafeItemOverlay(Item carrier, Identifier model) {
+        this(carrier, model, null);
+    }
+
+    public SafeItemOverlay(Item carrier, Identifier model, PlayerPackStateService packStates) {
         this.carrier = carrier;
         this.model = model;
+        this.packStates = packStates;
     }
 
     void setCarrier(Item resolvedCarrier) {
@@ -32,7 +39,7 @@ public final class SafeItemOverlay implements PolymerItem {
 
     @Override
     public Identifier getPolymerItemModel(ItemStack stack, PacketContext context, HolderLookup.Provider lookup) {
-        return model;
+        return customResourcesAllowed(context) ? model : null;
     }
 
     @Override
@@ -48,7 +55,7 @@ public final class SafeItemOverlay implements PolymerItem {
         copy(DataComponents.DYED_COLOR, input, output);
         copy(DataComponents.UNBREAKABLE, input, output);
         copy(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, input, output);
-        if (model != null) {
+        if (model != null && customResourcesAllowed(context)) {
             output.set(DataComponents.ITEM_MODEL, model);
         }
 
@@ -66,6 +73,10 @@ public final class SafeItemOverlay implements PolymerItem {
             output.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
         }
         return output;
+    }
+
+    private boolean customResourcesAllowed(PacketContext context) {
+        return packStates == null || packStates.customResourcesAllowed(context);
     }
 
     private static <T> void copy(DataComponentType<T> type, ItemStack input, ItemStack output) {

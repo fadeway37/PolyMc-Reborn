@@ -18,10 +18,13 @@ import java.util.Set;
 public final class ConfigManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static final Set<String> ROOT_FIELDS = Set.of(
-            "schema_version", "enabled", "generate_resource_pack", "persistent_mappings", "safe_mode",
+            "schema_version", "enabled", "generate_resource_pack", "resource_pack_policy", "persistent_mappings", "safe_mode",
             "log_decision_chains", "packet_fallback_enabled", "creative_reverse_mapping_enabled",
             "override_native_polymer", "report_formats", "cache_limits", "resource_extraction_limits");
     private static final Set<String> CACHE_FIELDS = Set.of("max_entries", "max_bytes");
+    private static final Set<String> REQUIRED_ROOT_FIELDS = ROOT_FIELDS.stream()
+            .filter(field -> !field.equals("resource_pack_policy"))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
     private static final Set<String> EXTRACTION_FIELDS = Set.of(
             "max_files", "max_single_file_bytes", "max_total_bytes");
 
@@ -70,11 +73,20 @@ public final class ConfigManager {
         return root.resolve("cache");
     }
 
+    public Path diagnosticsPolicyFile() {
+        return root.resolve("diagnostics-policy.json");
+    }
+
+    public Path supportDirectory() {
+        return root.resolve("support");
+    }
+
     private void createLayout() {
         try {
             Files.createDirectories(compatDirectory());
             Files.createDirectories(reportsDirectory());
             Files.createDirectories(cacheDirectory());
+            Files.createDirectories(supportDirectory());
         } catch (IOException exception) {
             throw new ConfigurationException(configFile, "$", "Unable to create configuration layout", exception);
         }
@@ -88,7 +100,7 @@ public final class ConfigManager {
             }
             var root = element.getAsJsonObject();
             rejectUnknown(file, "$", root, ROOT_FIELDS);
-            requireFields(file, "$", root, ROOT_FIELDS);
+            requireFields(file, "$", root, REQUIRED_ROOT_FIELDS);
             var cacheLimits = requireObject(file, root, "cache_limits");
             rejectUnknown(file, "$.cache_limits", cacheLimits, CACHE_FIELDS);
             requireFields(file, "$.cache_limits", cacheLimits, CACHE_FIELDS);
@@ -118,6 +130,14 @@ public final class ConfigManager {
             requireBoolean(file, "$." + field, root.get(field));
         }
         requireStringArray(file, "$.report_formats", root.get("report_formats"));
+        if (root.has("resource_pack_policy")) {
+            requireString(file, "$.resource_pack_policy", root.get("resource_pack_policy"));
+            String policy = root.get("resource_pack_policy").getAsString();
+            if (!java.util.Set.of("REQUIRED", "OPTIONAL", "DISABLED").contains(policy)) {
+                throw new ConfigurationException(file, "$.resource_pack_policy",
+                        "Expected REQUIRED, OPTIONAL, or DISABLED");
+            }
+        }
         requireInteger(file, "$.cache_limits.max_entries", cacheLimits.get("max_entries"),
                 Integer.MIN_VALUE, Integer.MAX_VALUE);
         requireInteger(file, "$.cache_limits.max_bytes", cacheLimits.get("max_bytes"),

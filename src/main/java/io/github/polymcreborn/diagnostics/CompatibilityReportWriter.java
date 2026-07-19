@@ -97,6 +97,15 @@ public final class CompatibilityReportWriter {
             }
             markdown.append("\n");
         }
+        markdown.append("## Diagnostics\n\n")
+                .append("| Code | Registry | Original | Effective | Policy rule |\n")
+                .append("|---|---|---|---|---|\n");
+        diagnostics.snapshot().forEach(diagnostic -> markdown.append("| `")
+                .append(diagnostic.diagnosticCode()).append("` | `")
+                .append(diagnostic.registryId()).append("` | ")
+                .append(diagnostic.originalSeverity()).append(" | ")
+                .append(diagnostic.effectiveSeverity()).append(" | `")
+                .append(diagnostic.policyRuleId()).append("` |\n"));
         try {
             if (formats.contains("json")) {
                 AtomicFiles.write(reportsDirectory.resolve("compatibility-latest.json"),

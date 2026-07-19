@@ -49,6 +49,24 @@ public final class EntityProjectionRegistry {
             throw new IllegalArgumentException("entity projection offset must contain only finite coordinates");
         }
         var interaction = Objects.requireNonNull(adapter.interaction(), "adapter interaction");
+        var composition = Objects.requireNonNull(adapter.composition(), "adapter composition");
+        if (!Double.isFinite(composition.passengerOffset().x)
+                || !Double.isFinite(composition.passengerOffset().y)
+                || !Double.isFinite(composition.passengerOffset().z)) {
+            throw new IllegalArgumentException("passenger offset must contain only finite coordinates");
+        }
+        composition.passengerType().ifPresent(type -> {
+            Identifier passengerId = registeredId(type, "passenger entity type");
+            if (!passengerId.getNamespace().equals(Identifier.DEFAULT_NAMESPACE)) {
+                throw new IllegalArgumentException("passenger entity type must be vanilla: " + passengerId);
+            }
+        });
+        composition.equipment().forEach(equipment -> {
+            Identifier itemId = BuiltInRegistries.ITEM.getKey(equipment.item());
+            if (itemId == null || !itemId.getNamespace().equals(Identifier.DEFAULT_NAMESPACE)) {
+                throw new IllegalArgumentException("projected equipment must use a vanilla item");
+            }
+        });
 
         if (byAdapterId.containsKey(adapterId)) {
             throw new IllegalArgumentException("duplicate entity projection adapter id: " + adapterId);
@@ -57,7 +75,7 @@ public final class EntityProjectionRegistry {
             throw new IllegalArgumentException("duplicate entity projection target type: " + targetId);
         }
         var registration = new EntityProjectionRegistration(adapterId, targetId, surrogateId,
-                targetType, surrogateType, maxDistance, offset, interaction, adapter);
+                targetType, surrogateType, maxDistance, offset, composition, interaction, adapter);
         byAdapterId.put(adapterId, registration);
         byTargetId.put(targetId, registration);
     }

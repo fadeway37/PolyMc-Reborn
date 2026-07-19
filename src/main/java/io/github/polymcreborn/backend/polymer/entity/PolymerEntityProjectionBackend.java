@@ -7,6 +7,7 @@ import eu.pb4.polymer.virtualentity.api.ElementHolder;
 import eu.pb4.polymer.virtualentity.api.attachment.EntityAttachment;
 import eu.pb4.polymer.virtualentity.api.elements.SimpleEntityElement;
 import eu.pb4.polymer.virtualentity.api.elements.VirtualElement;
+import com.mojang.datafixers.util.Pair;
 import io.github.polymcreborn.api.entity.EntityProjectionInteraction;
 import io.github.polymcreborn.api.entity.EntityProjectionRegistration;
 import io.github.polymcreborn.api.entity.EntityProjectionRegistry;
@@ -16,9 +17,15 @@ import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
+import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +38,8 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Explicit-only Polymer Virtual Entity backend. The real mod entity remains the
@@ -49,6 +58,8 @@ public final class PolymerEntityProjectionBackend {
     private final AtomicLong replayRejectionCount = new AtomicLong();
     private final AtomicLong adapterFailureCount = new AtomicLong();
     private final AtomicLong sessionFailureCount = new AtomicLong();
+    private final AtomicLong passengerPacketCount = new AtomicLong();
+    private final AtomicLong equipmentPacketCount = new AtomicLong();
     private final Map<UUID, ProjectionSession> sessions = new ConcurrentHashMap<>();
     private volatile Map<EntityType<?>, EntityProjectionRegistration> activeAdapters = Map.of();
     private volatile Map<Identifier, String> skippedAdapters = Map.of();
@@ -135,6 +146,14 @@ public final class PolymerEntityProjectionBackend {
         return sessionFailureCount.get();
     }
 
+    public long passengerPacketCount() {
+        return passengerPacketCount.get();
+    }
+
+    public long equipmentPacketCount() {
+        return equipmentPacketCount.get();
+    }
+
     public Optional<Long> sessionGeneration(UUID entityId) {
         var session = sessions.get(entityId);
         return session == null ? Optional.empty() : Optional.of(session.generation);
@@ -152,13 +171,22 @@ public final class PolymerEntityProjectionBackend {
             return;
         }
 
-        var holder = new ElementHolder();
+        var holder = new ProjectionElementHolder(level, registration);
         var element = new AnchoredSurrogateElement(registration.surrogateType(), entity);
         element.setOffset(registration.offset());
         var session = new ProjectionSession(
                 nextGeneration.incrementAndGet(), entity, level, registration, holder, element);
         element.setInteractionHandler(new GuardedInteractionHandler(session));
         holder.addElement(element);
+        registration.composition().passengerType().ifPresent(passengerType -> {
+            var passenger = new SimpleEntityElement(passengerType);
+            passenger.setOffset(registration.composition().passengerOffset());
+            holder.addElement(passenger);
+            holder.configureComposition(element.getEntityId(), passenger.getEntityId());
+        });
+        if (registration.composition().passengerType().isEmpty()) {
+            holder.configureComposition(element.getEntityId(), -1);
+        }
 
         ProjectionSession previous = sessions.put(entity.getUUID(), session);
         if (previous != null) {
@@ -355,6 +383,55 @@ public final class PolymerEntityProjectionBackend {
             setCustomName(source.getCustomName());
             setCustomNameVisible(source.isCustomNameVisible());
             setGlowing(source.isCurrentlyGlowing());
+        }
+    }
+
+    private final class ProjectionElementHolder extends ElementHolder {
+        private final ServerLevel level;
+        private final EntityProjectionRegistration registration;
+        private ClientboundSetPassengersPacket passengers;
+        private int mainEntityId = -1;
+
+        private ProjectionElementHolder(ServerLevel level,
+                                        EntityProjectionRegistration registration) {
+            this.level = level;
+            this.registration = registration;
+        }
+
+        private void configureComposition(int mainId, int passengerId) {
+            this.mainEntityId = mainId;
+            if (passengerId < 0) {
+                return;
+            }
+            Entity vehicle = registration.surrogateType().create(level, EntitySpawnReason.COMMAND);
+            Entity rider = registration.composition().passengerType().orElseThrow()
+                    .create(level, EntitySpawnReason.COMMAND);
+            if (vehicle == null || rider == null) {
+                throw new IllegalStateException("Vanilla passenger composition could not create packet proxies");
+            }
+            vehicle.setId(mainId);
+            rider.setId(passengerId);
+            if (!rider.startRiding(vehicle, true, true)) {
+                throw new IllegalStateException("Vanilla passenger composition rejected its explicit relation");
+            }
+            this.passengers = new ClientboundSetPassengersPacket(vehicle);
+        }
+
+        @Override
+        protected void startWatchingExtraPackets(ServerGamePacketListenerImpl watcher,
+                Consumer<Packet<ClientGamePacketListener>> packets) {
+            if (passengers != null) {
+                packets.accept(passengers);
+                passengerPacketCount.incrementAndGet();
+            }
+            if (!registration.composition().equipment().isEmpty()) {
+                List<Pair<net.minecraft.world.entity.EquipmentSlot,
+                        net.minecraft.world.item.ItemStack>> equipment = registration.composition().equipment()
+                        .stream().map(entry -> Pair.of(entry.slot(),
+                                new net.minecraft.world.item.ItemStack(entry.item()))).toList();
+                packets.accept(new ClientboundSetEquipmentPacket(mainEntityId, equipment));
+                equipmentPacketCount.incrementAndGet();
+            }
         }
     }
 

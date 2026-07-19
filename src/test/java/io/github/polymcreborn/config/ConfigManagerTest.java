@@ -29,6 +29,7 @@ class ConfigManagerTest {
         assertTrue(Files.isDirectory(manager.compatDirectory()));
         assertTrue(Files.isDirectory(manager.reportsDirectory()));
         assertTrue(Files.isDirectory(manager.cacheDirectory()));
+        assertTrue(Files.isDirectory(manager.supportDirectory()));
         assertTrue(Files.readString(manager.root().resolve("config.json"), StandardCharsets.UTF_8)
                 .endsWith(System.lineSeparator()));
     }
@@ -117,5 +118,31 @@ class ConfigManagerTest {
 
         assertEquals("$.cache_limits.max_entries", failure.jsonPath());
         assertTrue(failure.getMessage().contains("Expected a JSON integer"));
+    }
+
+    @Test
+    void acceptsA02ConfigWithoutPackPolicyAsRequired() throws IOException {
+        var manager = new ConfigManager(temporaryDirectory);
+        manager.loadOrCreate();
+        var file = manager.root().resolve("config.json");
+        String old = Files.readString(file, StandardCharsets.UTF_8)
+                .replace("  \"resource_pack_policy\": \"REQUIRED\",\n", "");
+        Files.writeString(file, old, StandardCharsets.UTF_8);
+
+        assertEquals(io.github.polymcreborn.pack.ResourcePackPolicy.REQUIRED,
+                manager.validate().resourcePackPolicy());
+    }
+
+    @Test
+    void rejectsUnknownPackPolicyWithExactPath() throws IOException {
+        var manager = new ConfigManager(temporaryDirectory);
+        manager.loadOrCreate();
+        var file = manager.root().resolve("config.json");
+        Files.writeString(file, Files.readString(file, StandardCharsets.UTF_8)
+                .replace("\"resource_pack_policy\": \"REQUIRED\"",
+                        "\"resource_pack_policy\": \"SURPRISE\""), StandardCharsets.UTF_8);
+
+        var failure = assertThrows(ConfigurationException.class, manager::validate);
+        assertEquals("$.resource_pack_policy", failure.jsonPath());
     }
 }

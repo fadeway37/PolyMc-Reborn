@@ -19,6 +19,7 @@ import io.github.polymcreborn.mapping.MappingPlanDiff;
 import io.github.polymcreborn.mapping.MappingStoreDocument;
 import io.github.polymcreborn.mapping.PersistentMappingStore;
 import io.github.polymcreborn.mapping.StoredMapping;
+import io.github.polymcreborn.pack.PlayerPackStateService;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
@@ -55,6 +56,7 @@ public final class PolymerCompatibilityBackend {
     private final BoundedDiagnosticCollector diagnostics;
     private final boolean persistentMappings;
     private final boolean customModelsEnabled;
+    private final PlayerPackStateService packStates;
     private final Map<String, SafeItemOverlay> pendingSemanticItems = new TreeMap<>();
     private volatile MappingStoreDocument startupBase = MappingStoreDocument.empty();
     private volatile MappingStoreDocument mappingSnapshot = MappingStoreDocument.empty();
@@ -72,10 +74,17 @@ public final class PolymerCompatibilityBackend {
 
     public PolymerCompatibilityBackend(PersistentMappingStore store, BoundedDiagnosticCollector diagnostics,
                                        boolean persistentMappings, boolean customModelsEnabled) {
+        this(store, diagnostics, persistentMappings, customModelsEnabled, null);
+    }
+
+    public PolymerCompatibilityBackend(PersistentMappingStore store, BoundedDiagnosticCollector diagnostics,
+                                       boolean persistentMappings, boolean customModelsEnabled,
+                                       PlayerPackStateService packStates) {
         this.store = store;
         this.diagnostics = diagnostics;
         this.persistentMappings = persistentMappings;
         this.customModelsEnabled = customModelsEnabled;
+        this.packStates = packStates;
     }
 
     public MappingPlan apply(MappingPlan proposedPlan, String projectVersion) {
@@ -140,7 +149,7 @@ public final class PolymerCompatibilityBackend {
                 var carrier = BuiltInRegistries.ITEM.getValue(carrierId);
                 var overlay = new SafeItemOverlay(serverItem == carrier
                         ? BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace("paper")) : carrier,
-                        customModelsEnabled && itemDefinitionExists(effective) ? serverId : null);
+                        customModelsEnabled && itemDefinitionExists(effective) ? serverId : null, packStates);
                 PolymerItemUtils.registerOverlay(serverItem, overlay);
                 if (pendingSemantic) {
                     pendingSemanticItems.put(serverId.toString(), overlay);
@@ -422,7 +431,8 @@ public final class PolymerCompatibilityBackend {
                             state.storedState(), state.strategy(), carrierKey, resourceHash, createdWith,
                             projectVersion));
                 }
-                PolymerBlockUtils.registerOverlay(application.block(), new PlannedBlockOverlay(overlayStates));
+                PolymerBlockUtils.registerOverlay(application.block(),
+                        new PlannedBlockOverlay(overlayStates, packStates));
                 mappings.addAll(preparedMappings);
                 retiredMappings.addAll(application.retiredMappings());
                 BlockState defaultCarrier = overlayStates.get(application.block().defaultBlockState());

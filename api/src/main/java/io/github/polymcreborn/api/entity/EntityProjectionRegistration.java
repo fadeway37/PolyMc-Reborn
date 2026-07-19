@@ -17,6 +17,7 @@ public record EntityProjectionRegistration(
         EntityType<?> surrogateType,
         double maxInteractionDistance,
         Vec3 offset,
+        EntityProjectionComposition composition,
         EntityProjectionInteraction<? extends Entity> interaction,
         EntityProjectionAdapter<? extends Entity> adapter)
         implements Comparable<EntityProjectionRegistration> {
@@ -28,6 +29,7 @@ public record EntityProjectionRegistration(
         Objects.requireNonNull(targetType, "targetType");
         Objects.requireNonNull(surrogateType, "surrogateType");
         Objects.requireNonNull(offset, "offset");
+        Objects.requireNonNull(composition, "composition");
         Objects.requireNonNull(interaction, "interaction");
         Objects.requireNonNull(adapter, "adapter");
     }

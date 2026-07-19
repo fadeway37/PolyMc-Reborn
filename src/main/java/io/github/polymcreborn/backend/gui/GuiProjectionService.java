@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import io.github.polymcreborn.api.gui.GuiProjectionKind;
 
 /** Opens explicitly registered vanilla container projections and owns their bounded sessions. */
 public final class GuiProjectionService {
@@ -88,7 +89,9 @@ public final class GuiProjectionService {
                     if (menuPlayer != player) {
                         throw new IllegalStateException("Projected menu player changed during open");
                     }
-                    return new ProjectedContainerMenu(containerId, inventory, adapter.id(), projection, sessions);
+                    return projection.kind() == GuiProjectionKind.FURNACE
+                            ? new ProjectedFurnaceMenu(containerId, inventory, adapter.id(), projection, sessions)
+                            : new ProjectedContainerMenu(containerId, inventory, adapter.id(), projection, sessions);
                 }
             };
             return player.openMenu(provider);

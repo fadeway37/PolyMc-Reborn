@@ -28,6 +28,8 @@ import io.github.polymcreborn.config.RebornConfig;
 import io.github.polymcreborn.diagnostics.BoundedDiagnosticCollector;
 import io.github.polymcreborn.diagnostics.CompatibilityReportWriter;
 import io.github.polymcreborn.diagnostics.MappingDiffReportWriter;
+import io.github.polymcreborn.diagnostics.DiagnosticPolicyLoader;
+import io.github.polymcreborn.diagnostics.SupportBundleService;
 import io.github.polymcreborn.legacy.LegacyCompatibilityProvider;
 import io.github.polymcreborn.legacy.LegacyEntrypointBridge;
 import io.github.polymcreborn.legacy.LegacyPolymerBackend;
@@ -42,7 +44,9 @@ import io.github.polymcreborn.pack.DeterministicResourcePack;
 import io.github.polymcreborn.pack.PolymerPackService;
 import io.github.polymcreborn.pack.ResourcePackReportWriter;
 import io.github.polymcreborn.pack.SafeResourceCollector;
+import io.github.polymcreborn.pack.PlayerPackStateService;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.util.Map;
@@ -65,6 +69,8 @@ public final class RebornRuntime {
     private final MappingBackupService mappingBackups;
     private final PolymerEntityProjectionBackend entityProjectionBackend;
     private final GuiProjectionService guiProjectionService;
+    private final PlayerPackStateService playerPackStates;
+    private final SupportBundleService supportBundles;
 
     private volatile MappingPlan plan;
     private volatile PolymerCompatibilityBackend polymerBackend;
@@ -74,7 +80,8 @@ public final class RebornRuntime {
     public RebornRuntime() {
         this.configManager = new ConfigManager(FabricLoader.getInstance().getConfigDir());
         this.config = configManager.loadOrCreate();
-        this.diagnostics = new BoundedDiagnosticCollector(config.cacheLimits().maxEntries());
+        this.diagnostics = new BoundedDiagnosticCollector(config.cacheLimits().maxEntries(),
+                new DiagnosticPolicyLoader().loadOrCreate(configManager.diagnosticsPolicyFile()));
         this.mappingBackups = new MappingBackupService(configManager.root());
         if (mappingBackups.activatePendingRollback("26.1.2", PolyMcReborn.VERSION)) {
             diagnostics.record("mapping.rollback.activated", "mappings-v1.json",
@@ -88,14 +95,17 @@ public final class RebornRuntime {
         this.extensions = new ExtensionEntrypointLoader(providers, entityProjections, guiProjections);
         this.polymerPackService = new PolymerPackService(
                 configManager.cacheDirectory(), config.cacheLimits().maxBytes());
+        this.playerPackStates = new PlayerPackStateService(config.resourcePackPolicy(),
+                Math.min(65_536, config.cacheLimits().maxEntries()));
+        this.supportBundles = new SupportBundleService(this);
 
         if (config.creativeReverseMappingEnabled()) {
-            throw new IllegalStateException("creative_reverse_mapping_enabled=true is not available in 0.2: "
+            throw new IllegalStateException("creative_reverse_mapping_enabled=true is not available in 0.3 Beta: "
                     + "unsigned Polymer reverse payloads are intentionally rejected");
         }
         if (config.packetFallbackEnabled()) {
             diagnostics.record("packet_fallback.unavailable", "polymc-reborn",
-                    "packet_fallback_enabled was requested, but the 0.2 backend is a disabled no-op",
+                    "packet_fallback_enabled was requested, but the 0.3 Beta backend is a disabled no-op",
                     DiagnosticCollector.Severity.WARNING);
         }
         registerProviders();
@@ -103,6 +113,9 @@ public final class RebornRuntime {
                 Math.min(65_536, config.cacheLimits().maxEntries()));
         this.guiProjectionService = new GuiProjectionService(guiProjections.freeze(),
                 Math.min(65_536, config.cacheLimits().maxEntries()));
+        diagnostics.record("resource-pack.policy", "polymc-reborn",
+                "Resource-pack policy is " + config.resourcePackPolicy(),
+                DiagnosticCollector.Severity.INFO);
         registerLifecycle();
         RebornCommands.register(this);
     }
@@ -147,6 +160,8 @@ public final class RebornRuntime {
                 server.halt(false);
             }
         });
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
+                playerPackStates.disconnected(handler.player.getUUID()));
     }
 
     public synchronized MappingPlan ensureStaticPlanFrozen() {
@@ -175,7 +190,7 @@ public final class RebornRuntime {
             new LegacyPolymerBackend(legacy.registry()).apply(proposed);
             var backend = new PolymerCompatibilityBackend(
                     new PersistentMappingStore(configManager.root()), diagnostics, config.persistentMappings(),
-                    config.generateResourcePack());
+                    config.generateResourcePack(), playerPackStates);
             this.polymerBackend = backend;
             finalPlan = backend.apply(proposed, PolyMcReborn.VERSION);
             finalPlan = PolymerRegistrySanitizer.quarantineUnsupportedBlocks(finalPlan);
@@ -343,6 +358,14 @@ public final class RebornRuntime {
 
     public GuiProjectionService guiProjectionService() {
         return guiProjectionService;
+    }
+
+    public PlayerPackStateService playerPackStates() {
+        return playerPackStates;
+    }
+
+    public SupportBundleService supportBundles() {
+        return supportBundles;
     }
 
     public MappingStoreDocument mappingSnapshot() {

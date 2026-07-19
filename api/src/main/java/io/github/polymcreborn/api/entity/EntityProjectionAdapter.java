@@ -33,6 +33,11 @@ public interface EntityProjectionAdapter<T extends Entity> {
         return EntityProjectionInteraction.denyAll();
     }
 
+    /** Optional passenger/equipment composition, explicit and empty by default. */
+    default EntityProjectionComposition composition() {
+        return EntityProjectionComposition.none();
+    }
+
     static <T extends Entity> EntityProjectionAdapter<T> of(
             String id, EntityType<T> targetType, EntityType<?> surrogateType,
             EntityProjectionInteraction<T> interaction) {

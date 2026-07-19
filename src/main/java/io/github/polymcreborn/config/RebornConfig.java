@@ -2,6 +2,7 @@
 package io.github.polymcreborn.config;
 
 import com.google.gson.annotations.SerializedName;
+import io.github.polymcreborn.pack.ResourcePackPolicy;
 
 import java.util.List;
 
@@ -10,6 +11,7 @@ public record RebornConfig(
         @SerializedName("schema_version") int schemaVersion,
         boolean enabled,
         @SerializedName("generate_resource_pack") boolean generateResourcePack,
+        @SerializedName("resource_pack_policy") ResourcePackPolicy resourcePackPolicy,
         @SerializedName("persistent_mappings") boolean persistentMappings,
         @SerializedName("safe_mode") boolean safeMode,
         @SerializedName("log_decision_chains") boolean logDecisionChains,
@@ -24,6 +26,7 @@ public record RebornConfig(
     public static final long MAX_SINGLE_RESOURCE_BYTES = 268_435_456L;
 
     public RebornConfig {
+        resourcePackPolicy = resourcePackPolicy == null ? ResourcePackPolicy.REQUIRED : resourcePackPolicy;
         reportFormats = List.copyOf(reportFormats);
         if (schemaVersion != SCHEMA_VERSION) {
             throw new IllegalArgumentException("Unsupported config schema_version " + schemaVersion);
@@ -40,7 +43,7 @@ public record RebornConfig(
     }
 
     public static RebornConfig defaults() {
-        return new RebornConfig(SCHEMA_VERSION, true, true, true, true, true,
+        return new RebornConfig(SCHEMA_VERSION, true, true, ResourcePackPolicy.REQUIRED, true, true, true,
                 false, false, false, List.of("json", "markdown"),
                 new CacheLimits(4096, 67_108_864L),
                 new ResourceExtractionLimits(10_000, 8_388_608L, 268_435_456L));

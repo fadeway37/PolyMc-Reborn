@@ -54,6 +54,7 @@ public final class FixtureContent {
     public static Item TOOL_ITEM;
     public static Item LEGACY_ITEM;
     public static Item NATIVE_ITEM;
+    public static Item PROPERTY_GUI_ITEM;
     public static Block FULL_BLOCK;
     public static Block STATEFUL_BLOCK;
     public static Block NON_FULL_BLOCK;
@@ -66,9 +67,12 @@ public final class FixtureContent {
     public static EntityType<FixtureEntity> UNSUPPORTED_ENTITY_TYPE;
     public static MenuType<FixtureMenu> MENU_TYPE;
     public static MenuType<UnsupportedFixtureMenu> UNSUPPORTED_MENU_TYPE;
+    public static MenuType<PropertyFixtureMenu> PROPERTY_MENU_TYPE;
 
     private static boolean bootstrapped;
     private static final java.util.Map<java.util.UUID, FixtureContainer> GUI_CONTAINERS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, PropertyState> PROPERTY_STATES =
             new java.util.concurrent.ConcurrentHashMap<>();
 
     private FixtureContent() {
@@ -87,6 +91,8 @@ public final class FixtureContent {
                 .pickaxe(ToolMaterial.IRON, 1.0F, -2.8F)));
         LEGACY_ITEM = registerItem("legacy_item", new Item(itemProperties("legacy_item")));
         NATIVE_ITEM = registerItem("native_item", new Item(itemProperties("native_item")));
+        PROPERTY_GUI_ITEM = registerItem("property_gui_item",
+                new PropertyGuiOpenerItem(itemProperties("property_gui_item")));
 
         FULL_BLOCK = registerBlock("full_block", new Block(blockProperties("full_block")));
         STATEFUL_BLOCK = registerBlock("stateful_block",
@@ -125,6 +131,8 @@ public final class FixtureContent {
                 new MenuType<>(FixtureMenu::new, FeatureFlags.DEFAULT_FLAGS));
         UNSUPPORTED_MENU_TYPE = Registry.register(BuiltInRegistries.MENU, id("unsupported_menu"),
                 new MenuType<>(UnsupportedFixtureMenu::new, FeatureFlags.DEFAULT_FLAGS));
+        PROPERTY_MENU_TYPE = Registry.register(BuiltInRegistries.MENU, id("property_menu"),
+                new MenuType<>(PropertyFixtureMenu::new, FeatureFlags.DEFAULT_FLAGS));
 
         PolymerItemUtils.registerOverlay(NATIVE_ITEM, (stack, context) -> Items.STICK);
         PolymerBlockUtils.registerOverlay(NATIVE_BLOCK,
@@ -246,6 +254,35 @@ public final class FixtureContent {
         }
     }
 
+    /** Opens a real three-slot/property source through the explicit furnace adapter. */
+    public static final class PropertyGuiOpenerItem extends Item {
+        public PropertyGuiOpenerItem(Properties properties) {
+            super(properties);
+        }
+
+        @Override
+        public InteractionResult use(Level level, Player player, InteractionHand hand) {
+            if (level instanceof ServerLevel && player instanceof ServerPlayer serverPlayer) {
+                var opened = io.github.polymcreborn.core.PolyMcReborn.runtime().guiProjectionService().open(
+                        serverPlayer, new PropertyFixtureMenu(0, serverPlayer.getInventory()),
+                        net.minecraft.network.chat.Component.literal("PolyMc Reborn Property Furnace"));
+                if (opened.isPresent()) {
+                    PlaytestProbe.PROPERTY_GUI_OPEN_COUNT.incrementAndGet();
+                    return InteractionResult.SUCCESS;
+                }
+            }
+            return InteractionResult.PASS;
+        }
+    }
+
+    public static void tickPropertyMenus() {
+        PROPERTY_STATES.values().forEach(PropertyState::tick);
+    }
+
+    public static int fixtureContainerCount() {
+        return GUI_CONTAINERS.size();
+    }
+
     /** Deterministic food-like fixture whose real server action is observable without timing ambiguity. */
     public static final class SemanticFoodItem extends Item {
         public SemanticFoodItem(Properties properties) {
@@ -326,6 +363,68 @@ public final class FixtureContent {
         @Override
         public boolean stillValid(net.minecraft.world.entity.player.Player player) {
             return true;
+        }
+    }
+
+    public static final class PropertyFixtureMenu extends AbstractContainerMenu {
+        private final PropertyState state;
+
+        public PropertyFixtureMenu(int containerId, net.minecraft.world.entity.player.Inventory inventory) {
+            super(PROPERTY_MENU_TYPE, containerId);
+            this.state = PROPERTY_STATES.computeIfAbsent(inventory.player.getUUID(), ignored ->
+                    new PropertyState(inventory.player));
+        }
+
+        public net.minecraft.world.Container container() {
+            return state.container;
+        }
+
+        public net.minecraft.world.inventory.ContainerData data() {
+            return state.data;
+        }
+
+        @Override
+        public ItemStack quickMoveStack(Player player, int slot) {
+            return ItemStack.EMPTY;
+        }
+
+        @Override
+        public boolean stillValid(Player player) {
+            return state.container.stillValid(player);
+        }
+    }
+
+    private static final class PropertyState {
+        private final SimpleContainer container = new SimpleContainer(3);
+        private final net.minecraft.world.inventory.SimpleContainerData data =
+                new net.minecraft.world.inventory.SimpleContainerData(4);
+        private boolean completed;
+
+        private PropertyState(Player player) {
+            container.setItem(0, new ItemStack(Items.RAW_IRON));
+            container.setItem(1, new ItemStack(Items.COAL));
+            data.set(0, 200);
+            data.set(1, 200);
+            data.set(2, 0);
+            data.set(3, 100);
+        }
+
+        private void tick() {
+            if (completed) {
+                return;
+            }
+            int progress = Math.min(100, data.get(2) + 1);
+            data.set(0, Math.max(0, data.get(0) - 1));
+            data.set(2, progress);
+            PlaytestProbe.PROPERTY_TICK_COUNT.incrementAndGet();
+            if (progress == 100) {
+                container.setItem(0, ItemStack.EMPTY);
+                container.setItem(1, ItemStack.EMPTY);
+                container.setItem(2, new ItemStack(Items.IRON_INGOT));
+                completed = true;
+                PlaytestProbe.PROPERTY_COMPLETION_COUNT.incrementAndGet();
+            }
+            container.setChanged();
         }
     }
 

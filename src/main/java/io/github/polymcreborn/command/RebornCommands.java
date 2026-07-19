@@ -49,6 +49,8 @@ public final class RebornCommands {
                         .then(Commands.literal("build").executes(context -> packBuild(context, runtime))))
                 .then(Commands.literal("config").requires(RebornCommands::isAdmin)
                         .then(Commands.literal("validate").executes(context -> configValidate(context, runtime))))
+                .then(diagnosticCommands(runtime))
+                .then(supportCommands(runtime))
                 .then(mappingCommands("mappings", runtime))
                 .then(mappingCommands("mapping", runtime))
                 .then(Commands.literal("stats").requires(RebornCommands::isAdmin)
@@ -56,6 +58,28 @@ public final class RebornCommands {
                 .then(Commands.literal("client-profile").requires(RebornCommands::isAdmin)
                         .then(Commands.argument("player", EntityArgument.player())
                                 .executes(context -> clientProfile(context))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> diagnosticCommands(RebornRuntime runtime) {
+        return Commands.literal("diagnostics").requires(RebornCommands::isAdmin)
+                .then(Commands.literal("status").executes(context -> diagnosticsStatus(context, runtime)))
+                .then(Commands.literal("validate").executes(context -> diagnosticsValidate(context, runtime)))
+                .then(Commands.literal("why")
+                        .then(Commands.argument("code", StringArgumentType.word())
+                                .executes(context -> diagnosticsWhy(context, runtime,
+                                        StringArgumentType.getString(context, "code")))))
+                .then(Commands.literal("list")
+                        .executes(context -> diagnosticsList(context, runtime, null))
+                        .then(Commands.argument("mod-id", StringArgumentType.word())
+                                .executes(context -> diagnosticsList(context, runtime,
+                                        StringArgumentType.getString(context, "mod-id")))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> supportCommands(RebornRuntime runtime) {
+        return Commands.literal("support").requires(RebornCommands::isAdmin)
+                .then(Commands.literal("bundle").executes(context -> supportBundle(context, runtime))
+                        .then(Commands.literal("status")
+                                .executes(context -> supportBundleStatus(context, runtime))));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> mappingCommands(String name, RebornRuntime runtime) {
@@ -129,6 +153,61 @@ public final class RebornCommands {
         runtime.configManager().validate();
         new io.github.polymcreborn.config.CompatProfileLoader().load(runtime.configManager().compatDirectory());
         success(context, "config.json and compat.d are valid. Mapping changes require a server restart.");
+        return 1;
+    }
+
+    private static int diagnosticsStatus(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        success(context, "Diagnostic policy schema=" + runtime.diagnostics().policy().schemaVersion()
+                + ", rules=" + runtime.diagnostics().policy().rules().size()
+                + ", records=" + runtime.diagnostics().snapshot().size()
+                + ", dropped=" + runtime.diagnostics().droppedCount());
+        return 1;
+    }
+
+    private static int diagnosticsValidate(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        new io.github.polymcreborn.diagnostics.DiagnosticPolicyLoader()
+                .parse(runtime.configManager().diagnosticsPolicyFile());
+        success(context, "diagnostics-policy.json is valid; display policy changes require restart");
+        return 1;
+    }
+
+    private static int diagnosticsWhy(CommandContext<CommandSourceStack> context, RebornRuntime runtime,
+                                      String code) {
+        var records = runtime.diagnostics().snapshot().stream()
+                .filter(diagnostic -> diagnostic.diagnosticCode().equals(code)).toList();
+        records.forEach(diagnostic -> success(context, diagnostic.diagnosticCode() + " "
+                + diagnostic.originalSeverity() + " -> " + diagnostic.effectiveSeverity()
+                + " rule=" + diagnostic.policyRuleId() + " reason=" + diagnostic.policyReason()));
+        return records.size();
+    }
+
+    private static int diagnosticsList(CommandContext<CommandSourceStack> context, RebornRuntime runtime,
+                                       String modId) {
+        var records = runtime.diagnostics().snapshot().stream()
+                .filter(diagnostic -> modId == null || diagnostic.registryId().equals(modId)
+                        || diagnostic.registryId().startsWith(modId + ":"))
+                .limit(100).toList();
+        records.forEach(diagnostic -> success(context, diagnostic.effectiveSeverity() + " "
+                + diagnostic.diagnosticCode() + " " + diagnostic.registryId()));
+        return records.size();
+    }
+
+    private static int supportBundle(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        var result = runtime.supportBundles().build();
+        success(context, "Created local support bundle " + result.fileName() + ": sha256="
+                + result.sha256() + ", bytes=" + result.sizeBytes() + ", entries=" + result.entryCount()
+                + ", redactions=" + result.redactionCount() + "; no upload was performed");
+        return 1;
+    }
+
+    private static int supportBundleStatus(CommandContext<CommandSourceStack> context, RebornRuntime runtime) {
+        var result = runtime.supportBundles().status();
+        if (result == null) {
+            success(context, "No support bundle has been generated in this server process");
+            return 1;
+        }
+        success(context, result.fileName() + " sha256=" + result.sha256()
+                + " bytes=" + result.sizeBytes() + " entries=" + result.entryCount());
         return 1;
     }
 

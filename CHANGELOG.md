@@ -22,6 +22,26 @@ principles; alpha versions are tied to an exact Minecraft version.
   baseline/check, and a negative signature-change test.
 - An independent Maven-coordinate-only API consumer fixture covering provider,
   item, block, GUI, entity, and resource registrations.
+- Per-player `REQUIRED`, `OPTIONAL`, and `DISABLED` resource-pack policy state,
+  with safe model/block fallbacks for players without the generated pack.
+- Explicit entity compositions can declare one vanilla passenger and bounded
+  vanilla equipment; the fixture proves both on a real client.
+- Explicit furnace projections backed by the real three-slot `Container` and
+  four bounded `ContainerData` properties, including progress and Shift-click.
+- Strict diagnostic policy rules with protected security categories and a
+  bounded, path-sanitized, whitelist-only local support bundle.
+- Hash-locked real third-party Mod, two-client, pack-policy, 0.2 upgrade, and
+  mod-set expansion playtest gates with structured evidence.
+- CycloneDX SBOM, SHA-256/SHA-512 checksums, build provenance, reproducibility
+  checks, and manually gated Beta draft-release automation.
+
+#### Security
+
+- Resource-pack responses are tracked per player with idempotent terminal-state
+  counters and disconnected-session cleanup; OPTIONAL decline and DISABLED
+  mode never expose custom model identifiers.
+- Creative reverse mapping still fails startup when enabled. The 0.3 Beta does
+  not accept Polymer's unsigned reverse payload or claim a creative-mode path.
 
 ### 0.2.0-alpha.1+26.1.2 development
 
