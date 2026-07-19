@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "polymc-reborn-upgrade-expansion",
+  "version": "${version}",
+  "name": "PolyMc Reborn Upgrade Expansion Fixture",
+  "environment": "server",
+  "entrypoints": {
+    "main": ["io.github.polymcreborn.upgradeexpansionfixture.UpgradeExpansionFixture"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "=26.1.2",
+    "java": ">=25",
+    "fabric-api": "*",
+    "polymc-reborn": "*"
+  }
+}

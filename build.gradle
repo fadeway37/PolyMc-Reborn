@@ -11,6 +11,19 @@ base {
 }
 
 sourceSets.main.java.srcDir project(':api').layout.projectDirectory.dir('src/main/java')
+sourceSets {
+	upgradeFixture {
+		compileClasspath += sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.runtimeClasspath
+	}
+	upgradeExpansionFixture {
+		compileClasspath += sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.runtimeClasspath
+	}
+}
+configurations.upgradeFixtureImplementation.extendsFrom configurations.implementation
+configurations.upgradeExpansionFixtureImplementation.extendsFrom configurations.implementation
+evaluationDependsOn(':api')
 
 repositories {
 	maven {
@@ -95,6 +108,13 @@ tasks.named('runDedicatedServerSmoke') {
 
 def playtestServerPort = providers.gradleProperty('playtestServerPort').orElse('25576')
 def playtestPackPort = providers.gradleProperty('playtestPackPort').orElse('25577')
+def playtestPackPolicy = providers.gradleProperty('playtestPackPolicy').orElse('REQUIRED')
+def playtestMode = providers.gradleProperty('playtestMode').orElse('single')
+def playtestExternalModJar = providers.gradleProperty('playtestExternalModJar')
+def playtestExternalMode = providers.gradleProperty('playtestExternalMode').orElse('none')
+def playtestExternalModId = providers.gradleProperty('playtestExternalModId').orElse('none')
+def playtestExternalItemId = providers.gradleProperty('playtestExternalItemId').orElse('none')
+def playtestExternalBlockId = providers.gradleProperty('playtestExternalBlockId').orElse('none')
 def playtestServerRunRoot = layout.buildDirectory.dir('run')
 def playtestServerDirectory = layout.buildDirectory.dir('run/client-playtest-server')
 def playtestReportDirectory = providers.gradleProperty('playtestReportDir')
@@ -117,6 +137,9 @@ def productionJarSha256Argument = productionReleaseJar.map { archive ->
 	'-Dpolymc-reborn.playtest.productionJarSha256=' + java.util.HexFormat.of().formatHex(digest.digest())
 }
 def productionArtifactReport = layout.buildDirectory.file('reports/release/production-artifact.txt')
+def apiConsumerDirectory = layout.projectDirectory.dir('playtest/api-consumer')
+def apiConsumerJar = apiConsumerDirectory.file(
+	'build/libs/polymc-reborn-api-consumer-' + project.version + '.jar')
 
 tasks.register('verifyProductionArtifactSemantics') {
 	group = 'verification'
@@ -207,9 +230,96 @@ tasks.register('playtestFixturesJar', Jar) {
 	destinationDirectory = layout.buildDirectory.dir('playtest-libs')
 }
 
+tasks.named('processUpgradeFixtureResources') {
+	inputs.property 'version', project.version
+	filesMatching('fabric.mod.json') {
+		expand version: project.version
+	}
+}
+
+tasks.register('upgradeFixtureJar', Jar) {
+	dependsOn tasks.named('upgradeFixtureClasses')
+	from sourceSets.upgradeFixture.output
+	archiveClassifier = 'upgrade-fixture'
+	destinationDirectory = layout.buildDirectory.dir('playtest-libs')
+}
+
+tasks.named('processUpgradeExpansionFixtureResources') {
+	inputs.property 'version', project.version
+	filesMatching('fabric.mod.json') {
+		expand version: project.version
+	}
+}
+
+tasks.register('upgradeExpansionFixtureJar', Jar) {
+	dependsOn tasks.named('upgradeExpansionFixtureClasses')
+	from sourceSets.upgradeExpansionFixture.output
+	archiveClassifier = 'upgrade-expansion-fixture'
+	destinationDirectory = layout.buildDirectory.dir('playtest-libs')
+}
+
+def upgradeRebornJar = providers.gradleProperty('upgradeRebornJar')
+def upgradeMode = providers.gradleProperty('upgradeMode').orElse('upgrade')
+def upgradeExpanded = providers.gradleProperty('upgradeExpanded').orElse('false')
+def upgradeReport = providers.gradleProperty('upgradeReport')
+	.map { new File(it).absoluteFile }
+	.orElse(layout.buildDirectory.file('upgrade-playtest/fixture-state.json').map { it.asFile })
+def upgradeStopFile = providers.gradleProperty('upgradeStopFile')
+	.map { new File(it).absoluteFile }
+	.orElse(layout.buildDirectory.file('upgrade-playtest/stop.request').map { it.asFile })
+def upgradeServerPort = providers.gradleProperty('upgradeServerPort').orElse('25579')
+def upgradePackPort = providers.gradleProperty('upgradePackPort').orElse('25580')
+
+tasks.register('prepareUpgradeFixtureServer') {
+	outputs.upToDateWhen { false }
+	doLast {
+		def directory = layout.buildDirectory.dir('run/upgrade-server').get().asFile.toPath()
+		java.nio.file.Files.createDirectories(directory)
+		java.nio.file.Files.writeString(directory.resolve('eula.txt'), 'eula=true\n')
+		java.nio.file.Files.writeString(directory.resolve('server.properties'),
+			'online-mode=false\nserver-ip=127.0.0.1\nserver-port=' + upgradeServerPort.get()
+				+ '\ngenerate-structures=false\nlevel-seed=PolyMc-Reborn-upgrade-playtest\n'
+				+ 'spawn-protection=0\nview-distance=5\nsimulation-distance=5\nmax-tick-time=0\n')
+	}
+}
+
+tasks.register('runUpgradeFixtureServer', net.fabricmc.loom.task.prod.ServerProductionRunTask) {
+	group = 'verification'
+	description = 'Internal production-server leg for 0.2-to-0.3 mapping upgrade evidence.'
+	dependsOn tasks.named('upgradeFixtureJar'), tasks.named('prepareUpgradeFixtureServer')
+	mods.setFrom(configurations.productionRuntimeMods, upgradeRebornJar.map { file(it) },
+		tasks.named('upgradeFixtureJar').flatMap { it.archiveFile })
+	if (upgradeExpanded.get().toBoolean()) {
+		dependsOn tasks.named('upgradeExpansionFixtureJar')
+		mods.from(tasks.named('upgradeExpansionFixtureJar').flatMap { it.archiveFile })
+	}
+	runDir = layout.buildDirectory.dir('run/upgrade-server')
+	programArgs.add('--nogui')
+	jvmArgs.add(upgradeMode.map { '-Dpolymc-reborn.upgrade.mode=' + it })
+	jvmArgs.add(upgradeExpanded.map { '-Dpolymc-reborn.upgrade.expanded=' + it })
+	jvmArgs.add(upgradeReport.map { '-Dpolymc-reborn.upgrade.report=' + it.absolutePath })
+	jvmArgs.add(upgradeStopFile.map { '-Dpolymc-reborn.upgrade.stopFile=' + it.absolutePath })
+	jvmArgs.add(upgradeRebornJar.map { '-Dpolymc-reborn.upgrade.rebornJar=' + file(it).absolutePath })
+	jvmArgs.add(upgradePackPort.map { '-Dpolymc-reborn.upgrade.packPort=' + it })
+	doFirst {
+		def exact = mods.files.collect { it.canonicalFile }.sort { it.name }
+		def requested = file(upgradeRebornJar.get()).canonicalFile
+		if (!exact.contains(requested)) {
+			throw new GradleException('Upgrade server Mod path does not contain the requested production JAR')
+		}
+		def rebornCandidates = exact.findAll { it.name.startsWith('polymc-reborn-')
+			&& !it.name.contains('upgrade-fixture') && !it.name.contains('upgrade-expansion-fixture') }
+		if (rebornCandidates != [requested]) {
+			throw new GradleException('Upgrade server has ambiguous Reborn artifacts: ' + rebornCandidates)
+		}
+		logger.lifecycle('Upgrade server exact Mod files: {}', exact.collect { it.name })
+	}
+}
+
 tasks.register('prepareProductionServerPlaytest') {
 	inputs.property('playtestServerPort', playtestServerPort)
 	inputs.property('playtestPackPort', playtestPackPort)
+	inputs.property('playtestPackPolicy', playtestPackPolicy)
 	outputs.upToDateWhen { false }
 	outputs.files(playtestServerDirectory.map { directory -> [
 		directory.file('eula.txt').asFile,
@@ -230,11 +340,28 @@ tasks.register('prepareProductionServerPlaytest') {
 		java.nio.file.Files.writeString(directory.resolve('server.properties'),
 			'online-mode=false\nserver-ip=127.0.0.1\nserver-port=' + playtestServerPort.get()
 				+ '\nlevel-seed=PolyMc-Reborn-0.3-playtest\ngenerate-structures=false\n'
-				+ 'max-players=1\nspawn-animals=false\nspawn-monsters=false\nspawn-npcs=false\n'
+				+ 'max-players=2\nspawn-animals=false\nspawn-monsters=false\nspawn-npcs=false\n'
 				+ 'difficulty=normal\n'
 				+ 'spawn-protection=0\nview-distance=5\nsimulation-distance=5\n'
 				+ 'enable-command-block=false\nmax-tick-time=0\npause-when-empty-seconds=-1\n'
 				+ 'motd=PolyMc Reborn isolated client playtest\n')
+		def policy = playtestPackPolicy.get()
+		if (!['REQUIRED', 'OPTIONAL', 'DISABLED'].contains(policy)) {
+			throw new GradleException('playtestPackPolicy must be REQUIRED, OPTIONAL, or DISABLED')
+		}
+		def configDirectory = directory.resolve('config/polymc-reborn')
+		java.nio.file.Files.createDirectories(configDirectory)
+		java.nio.file.Files.writeString(configDirectory.resolve('config.json'),
+			groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+				schema_version: 1, enabled: true, generate_resource_pack: true,
+				resource_pack_policy: policy, persistent_mappings: true, safe_mode: true,
+				log_decision_chains: true, packet_fallback_enabled: false,
+				creative_reverse_mapping_enabled: false, override_native_polymer: false,
+				report_formats: ['json', 'markdown'],
+				cache_limits: [max_entries: 4096, max_bytes: 67108864],
+				resource_extraction_limits: [max_files: 10000,
+					max_single_file_bytes: 8388608, max_total_bytes: 268435456]
+			])) + '\n')
 	}
 }
 
@@ -247,12 +374,16 @@ tasks.register('assemblePlaytestServer') {
 
 tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.ServerProductionRunTask) {
 	dependsOn tasks.named('verifyProductionArtifactSemantics'), tasks.named('playtestFixturesJar'),
-		tasks.named('prepareProductionServerPlaytest')
+		tasks.named('prepareProductionServerPlaytest'), 'buildApiConsumer'
 	mods.setFrom(productionReleaseJar, configurations.named('productionRuntimeMods'),
-		tasks.named('playtestFixturesJar').flatMap { it.archiveFile })
+		tasks.named('playtestFixturesJar').flatMap { it.archiveFile }, apiConsumerJar)
+	if (playtestExternalModJar.isPresent()) {
+		mods.from(file(playtestExternalModJar.get()))
+	}
 	runDir = playtestServerDirectory
 	programArgs.add('--nogui')
 	jvmArgs.add('-Dpolymc-reborn.playtest.enabled=true')
+	jvmArgs.add(playtestMode.map { '-Dpolymc-reborn.playtest.mode=' + it })
 	jvmArgs.add(productionJarNameArgument)
 	jvmArgs.add(productionJarSha256Argument)
 	jvmArgs.add('-Dpolymc-reborn.playtest.stopFile=' + playtestServerDirectory.get()
@@ -261,6 +392,10 @@ tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.Server
 		.file('server-ready.json').asFile.absolutePath)
 	jvmArgs.add('-Dpolymc-reborn.playtest.reportDir=' + playtestReportDirectory.get().absolutePath)
 	jvmArgs.add(playtestPackPort.map { '-Dpolymc-reborn.playtest.packPort=' + it })
+	jvmArgs.add(playtestExternalMode.map { '-Dpolymc-reborn.playtest.externalMode=' + it })
+	jvmArgs.add(playtestExternalModId.map { '-Dpolymc-reborn.playtest.externalModId=' + it })
+	jvmArgs.add(playtestExternalItemId.map { '-Dpolymc-reborn.playtest.externalItemId=' + it })
+	jvmArgs.add(playtestExternalBlockId.map { '-Dpolymc-reborn.playtest.externalBlockId=' + it })
 	doFirst {
 		def expectedReleaseJar = productionReleaseJar.get().asFile.canonicalFile
 		def matchingReleaseJars = mods.files.findAll { candidate ->
@@ -284,9 +419,6 @@ tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.Server
 
 def playtestEvidenceDirectory = layout.buildDirectory.dir('playtest')
 def clientDriverProject = project(':playtest:client-driver')
-def apiConsumerDirectory = layout.projectDirectory.dir('playtest/api-consumer')
-def apiConsumerJar = apiConsumerDirectory.file(
-	'build/libs/polymc-reborn-api-consumer-' + project.version + '.jar')
 
 tasks.register('publishApiToTestRepository') {
 	group = 'verification'
@@ -307,6 +439,9 @@ tasks.register('buildApiConsumer', Exec) {
 	} else {
 		commandLine file('gradlew').absolutePath, *arguments
 	}
+	inputs.files(apiConsumerDirectory.file('build.gradle'), apiConsumerDirectory.file('settings.gradle'),
+		apiConsumerDirectory.file('gradle.properties'))
+	inputs.dir(apiConsumerDirectory.dir('src'))
 	outputs.file(apiConsumerJar)
 }
 
@@ -339,10 +474,107 @@ tasks.register('runProductionClientPlaytest', Exec) {
 	}
 }
 
+tasks.register('runExternalModMatrix', Exec) {
+	group = 'verification'
+	description = 'Downloads locked real content Mods and runs each in an isolated production playtest.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	workingDir rootDir
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/external_mod_matrix.py').absolutePath
+	} else {
+		commandLine 'python3', file('scripts/playtest/external_mod_matrix.py').absolutePath
+	}
+}
+
+tasks.register('runProductionMultiClientPlaytest', Exec) {
+	group = 'verification'
+	description = 'Runs two isolated real production clients concurrently with strict evidence.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/multi_client_playtest.py').absolutePath
+	} else {
+		commandLine 'python3', file('scripts/playtest/multi_client_playtest.py').absolutePath
+	}
+}
+
+tasks.register('runMultiClientPlaytest') {
+	group = 'verification'
+	description = 'Alias for the isolated production multi-client playtest.'
+	dependsOn tasks.named('runProductionMultiClientPlaytest')
+}
+
+tasks.register('runPackPolicyPlaytest', Exec) {
+	group = 'verification'
+	description = 'Runs real-client REQUIRED-decline and DISABLED safe-carrier policy tests.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/pack_policy_playtest.py').absolutePath
+	} else {
+		commandLine 'python3', file('scripts/playtest/pack_policy_playtest.py').absolutePath
+	}
+}
+
+def upgradePlaytestSummary = layout.buildDirectory.file('playtest/upgrade/summary.json')
+tasks.register('runUpgradeAndModSetPlaytest', Exec) {
+	group = 'verification'
+	description = 'Builds audited 0.2 and runs real upgrade plus mod-set expansion server legs.'
+	outputs.file(upgradePlaytestSummary)
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/upgrade_playtest.py').absolutePath
+	} else {
+		commandLine 'python3', file('scripts/playtest/upgrade_playtest.py').absolutePath
+	}
+}
+
+tasks.register('runUpgradePlaytest') {
+	group = 'verification'
+	description = 'Runs the audited 0.2-to-0.3 mapping upgrade playtest.'
+	dependsOn tasks.named('runUpgradeAndModSetPlaytest')
+}
+
+tasks.register('runModSetExpansionPlaytest') {
+	group = 'verification'
+	description = 'Runs deterministic mapping preservation after adding fixture content.'
+	dependsOn tasks.named('runUpgradeAndModSetPlaytest')
+}
+
+tasks.register('runSoakPlaytest', Exec) {
+	group = 'verification'
+	description = 'Runs five complete production client/reconnect lifecycles with stable-hash assertions.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/soak_playtest.py').absolutePath
+	} else {
+		commandLine 'python3', file('scripts/playtest/soak_playtest.py').absolutePath
+	}
+}
+
 tasks.register('runClientPlaytest') {
 	group = 'verification'
 	description = 'Alias for the production isolated-client playtest.'
 	dependsOn tasks.named('runProductionClientPlaytest')
+}
+
+tasks.register('runApiConsumerPlaytest') {
+	group = 'verification'
+	description = 'Runs the independent Maven-resolved API consumer in the isolated production playtest.'
+	dependsOn tasks.named('runProductionClientPlaytest')
+	doLast {
+		def source = layout.buildDirectory.dir('playtest/single-client').get().asFile
+		def target = layout.buildDirectory.dir('playtest/api-consumer').get().asFile
+		if (!source.isDirectory()) {
+			throw new GradleException('Single-client evidence is missing; API consumer evidence cannot be materialized')
+		}
+		delete target
+		copy {
+			from source
+			into target
+		}
+		def summary = new groovy.json.JsonSlurper().parse(new File(target, 'server-state.json'))
+		if (summary.api_consumer_loaded != true) {
+			throw new GradleException('Production server did not load the independent API consumer')
+		}
+	}
 }
 
 tasks.register('runPlaytest') {
@@ -382,6 +614,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.withType(Javadoc).configureEach {
 	options.encoding = 'UTF-8'
 	options.addStringOption('Xdoclint:none', '-quiet')
+	options.addBooleanOption('notimestamp', true)
 }
 
 tasks.withType(Test).configureEach {
@@ -445,5 +678,192 @@ publishing {
 		mavenJava(MavenPublication) {
 			from components.java
 		}
+	}
+}
+
+def releaseDirectory = layout.buildDirectory.dir('release')
+def sbomFile = releaseDirectory.map { it.file("polymc-reborn-${project.version}-cyclonedx.json") }
+def provenanceFile = releaseDirectory.map { it.file("polymc-reborn-${project.version}-provenance.json") }
+def buildManifestFile = releaseDirectory.map { it.file("polymc-reborn-${project.version}-build-manifest.json") }
+def checksumsFile = releaseDirectory.map { it.file('SHA256SUMS') }
+def checksums512File = releaseDirectory.map { it.file('SHA512SUMS') }
+def apiJarFile = project(':api').tasks.named('jar', Jar).flatMap { it.archiveFile }
+def apiSourcesJarFile = project(':api').tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
+def apiJavadocJarFile = project(':api').tasks.named('javadocJar', Jar).flatMap { it.archiveFile }
+
+def sha256Of = { File source ->
+	def digest = java.security.MessageDigest.getInstance('SHA-256')
+	source.withInputStream { input ->
+		def buffer = new byte[8192]
+		for (int read = input.read(buffer); read >= 0; read = input.read(buffer)) {
+			if (read > 0) digest.update(buffer, 0, read)
+		}
+	}
+	java.util.HexFormat.of().formatHex(digest.digest())
+}
+
+def sha512Of = { File source ->
+	def digest = java.security.MessageDigest.getInstance('SHA-512')
+	source.withInputStream { input ->
+		def buffer = new byte[8192]
+		for (int read = input.read(buffer); read >= 0; read = input.read(buffer)) {
+			if (read > 0) digest.update(buffer, 0, read)
+		}
+	}
+	java.util.HexFormat.of().formatHex(digest.digest())
+}
+
+tasks.register('generateSbom') {
+	group = 'release'
+	description = 'Generates a deterministic CycloneDX 1.5 SBOM from locked runtime artifacts.'
+	dependsOn tasks.named('jar')
+	outputs.file(sbomFile)
+	doLast {
+		def components = configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts
+			.collect { artifact ->
+				def id = artifact.moduleVersion.id
+				[
+					type: 'library', group: id.group, name: id.name, version: id.version,
+					'bom-ref': "pkg:maven/${id.group}/${id.name}@${id.version}",
+					purl: "pkg:maven/${id.group}/${id.name}@${id.version}",
+					hashes: [[alg: 'SHA-256', content: sha256Of(artifact.file)]]
+				]
+			}.sort { left, right -> left['bom-ref'] <=> right['bom-ref'] }
+		def document = [
+			bomFormat: 'CycloneDX', specVersion: '1.5', serialNumber: 'urn:uuid:'
+				+ java.util.UUID.nameUUIDFromBytes((project.group.toString() + ':'
+				+ project.name + ':' + project.version).getBytes('UTF-8')),
+			version: 1,
+			metadata: [component: [type: 'application', group: project.group.toString(),
+				name: project.archives_base_name, version: project.version.toString(),
+				'bom-ref': "pkg:maven/${project.group}/${project.archives_base_name}@${project.version}"]],
+			components: components
+		]
+		def output = sbomFile.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(output.parent)
+		java.nio.file.Files.writeString(output,
+			groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(document)) + '\n')
+	}
+}
+
+tasks.register('generateProvenance') {
+	group = 'release'
+	description = 'Writes path-free local build provenance for the Beta artifacts.'
+	dependsOn tasks.named('jar'), ':api:jar'
+	outputs.files(provenanceFile, buildManifestFile)
+	doLast {
+		def document = [
+			schema_version: 1,
+			builder: 'gradle-wrapper', gradle_version: gradle.gradleVersion,
+			gradle_runtime_java_feature: Runtime.version().feature(),
+			toolchain_java_feature: 25, bytecode_release: 25,
+			git_commit: buildGitCommit.get(), git_dirty: buildGitDirty.get().toBoolean(),
+			project_version: project.version.toString(), minecraft_version: project.minecraft_version,
+			mapping_namespace: 'official',
+			artifacts: [
+				[name: productionReleaseJar.get().asFile.name,
+				 sha256: sha256Of(productionReleaseJar.get().asFile)],
+				[name: apiJarFile.get().asFile.name, sha256: sha256Of(apiJarFile.get().asFile)]
+			]
+		]
+		def output = provenanceFile.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(output.parent)
+		java.nio.file.Files.writeString(output,
+			groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(document)) + '\n')
+		def manifest = [
+			schema_version: 1,
+			project: 'PolyMc Reborn', project_version: project.version.toString(),
+			minecraft_version: project.minecraft_version, java_release: 25,
+			gradle_version: gradle.gradleVersion, mapping_namespace: 'official',
+			git_commit: buildGitCommit.get(), git_dirty: buildGitDirty.get().toBoolean(),
+			archives: document.artifacts.sort { left, right -> left.name <=> right.name }
+		]
+		def manifestOutput = buildManifestFile.get().asFile.toPath()
+		java.nio.file.Files.writeString(manifestOutput,
+			groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)) + '\n')
+	}
+}
+
+tasks.register('verifyReleaseArtifacts') {
+	group = 'release'
+	dependsOn tasks.named('jar'), ':api:jar'
+	doLast {
+		new java.util.jar.JarFile(productionReleaseJar.get().asFile).withCloseable { archive ->
+			def forbidden = archive.entries().findAll { entry ->
+				entry.name.contains('/gametest/') || entry.name.contains('/playtest/')
+					|| entry.name.contains('/consumer/') || entry.name.endsWith('.jar')
+			}.collect { it.name }
+			if (!forbidden.isEmpty()) throw new GradleException('Release JAR contains test/consumer content: ' + forbidden)
+		}
+		new java.util.jar.JarFile(apiJarFile.get().asFile).withCloseable { archive ->
+			def forbidden = archive.entries().findAll { entry ->
+				entry.name.startsWith('io/github/polymcreborn/backend/')
+					|| entry.name.startsWith('io/github/polymcreborn/core/')
+					|| entry.name.contains('/tools/') || entry.name.endsWith('.jar')
+			}.collect { it.name }
+			if (!forbidden.isEmpty()) throw new GradleException('API JAR contains implementation/build tools: ' + forbidden)
+		}
+	}
+}
+
+tasks.register('generateReleaseChecksums') {
+	group = 'release'
+	dependsOn tasks.named('verifyReleaseArtifacts'), tasks.named('generateSbom'),
+		tasks.named('generateProvenance'), tasks.named('sourcesJar'), tasks.named('javadocJar'),
+		':api:sourcesJar', ':api:javadocJar'
+	outputs.files(checksumsFile, checksums512File)
+	doLast {
+		def files = [productionReleaseJar.get().asFile,
+			tasks.named('sourcesJar', Jar).get().archiveFile.get().asFile,
+			tasks.named('javadocJar', Jar).get().archiveFile.get().asFile,
+			apiJarFile.get().asFile, apiSourcesJarFile.get().asFile, apiJavadocJarFile.get().asFile,
+			sbomFile.get().asFile, provenanceFile.get().asFile, buildManifestFile.get().asFile,
+			file('api/signatures/0.3.0-beta.1.txt'), file('LICENSE'), file('NOTICE.md'),
+			file('THIRD_PARTY_NOTICES.md'), file('docs/0.3-release-notes.md')]
+		files.sort { it.name }
+		def output = checksumsFile.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(output.parent)
+		java.nio.file.Files.writeString(output, files.collect {
+			sha256Of(it) + '  ' + it.name
+		}.join('\n') + '\n')
+		def output512 = checksums512File.get().asFile.toPath()
+		java.nio.file.Files.writeString(output512, files.collect {
+			sha512Of(it) + '  ' + it.name
+		}.join('\n') + '\n')
+	}
+}
+
+tasks.register('assembleBetaArtifacts', Copy) {
+	group = 'release'
+	description = 'Assembles the bounded Beta artifact set without publishing it.'
+	dependsOn tasks.named('generateReleaseChecksums')
+	from productionReleaseJar
+	from tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
+	from tasks.named('javadocJar', Jar).flatMap { it.archiveFile }
+	from apiJarFile
+	from apiSourcesJarFile
+	from apiJavadocJarFile
+	from sbomFile
+	from provenanceFile
+	from buildManifestFile
+	from checksumsFile
+	from checksums512File
+	from file('api/signatures/0.3.0-beta.1.txt')
+	from file('LICENSE')
+	from file('NOTICE.md')
+	from file('THIRD_PARTY_NOTICES.md')
+	from file('docs/0.3-release-notes.md')
+	into releaseDirectory
+}
+
+tasks.register('verifyReproducibleArchives', Exec) {
+	group = 'release'
+	description = 'Builds main/API archives twice and compares their SHA-256 hashes.'
+	workingDir rootDir
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+			file('scripts/ci/verify-reproducible.ps1').absolutePath
+	} else {
+		commandLine 'bash', file('scripts/ci/verify-reproducible.sh').absolutePath
 	}
 }

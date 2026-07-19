@@ -168,6 +168,15 @@ try {
         "-PplaytestReportDir=$inputDirectory",
         'runProductionServerPlaytest'
     )
+    if ($env:POLYMC_REBORN_EXTERNAL_MOD_JAR) {
+        $serverArguments = @(
+            "-PplaytestExternalModJar=$($env:POLYMC_REBORN_EXTERNAL_MOD_JAR)",
+            "-PplaytestExternalMode=$($env:POLYMC_REBORN_EXTERNAL_MODE)",
+            "-PplaytestExternalModId=$($env:POLYMC_REBORN_EXTERNAL_MOD_ID)",
+            "-PplaytestExternalItemId=$($env:POLYMC_REBORN_EXTERNAL_ITEM_ID)",
+            "-PplaytestExternalBlockId=$($env:POLYMC_REBORN_EXTERNAL_BLOCK_ID)"
+        ) + $serverArguments
+    }
     $serverProcess = Start-Process -FilePath (Join-Path $projectRoot 'gradlew.bat') `
         -ArgumentList $serverArguments -WorkingDirectory $projectRoot -PassThru `
         -RedirectStandardOutput $serverStdout -RedirectStandardError $serverStderr -WindowStyle Hidden
@@ -215,6 +224,9 @@ try {
         "-PplaytestPackSha1=$packSha1",
         ':playtest:client-driver:runIsolatedProductionClientDriver'
     )
+    if ($env:POLYMC_REBORN_EXTERNAL_MODE) {
+        $clientArguments = @("-PplaytestExternalMode=$($env:POLYMC_REBORN_EXTERNAL_MODE)") + $clientArguments
+    }
     $clientProcess = Start-Process -FilePath (Join-Path $projectRoot 'gradlew.bat') `
         -ArgumentList $clientArguments -WorkingDirectory $projectRoot -PassThru `
         -RedirectStandardOutput $clientStdout -RedirectStandardError $clientStderr -WindowStyle Hidden

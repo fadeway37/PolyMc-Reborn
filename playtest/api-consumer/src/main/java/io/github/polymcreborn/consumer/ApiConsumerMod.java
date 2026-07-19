@@ -91,18 +91,11 @@ public final class ApiConsumerMod implements ModInitializer, PolyMcRebornEntrypo
     @Override
     public void registerResources(ResourceRegistry resources) {
         resources.register(MOD_ID, sink -> {
-            put(sink, "assets/" + MOD_ID + "/items/consumer_item.json",
-                    "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"" + MOD_ID
-                            + ":item/consumer_item\"}}");
-            put(sink, "assets/" + MOD_ID + "/models/item/consumer_item.json",
-                    "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"minecraft:item/paper\"}}");
-            put(sink, "assets/" + MOD_ID + "/blockstates/consumer_block.json",
-                    "{\"variants\":{\"\":{\"model\":\"" + MOD_ID + ":block/consumer_block\"}}}");
-            put(sink, "assets/" + MOD_ID + "/models/block/consumer_block.json",
-                    "{\"parent\":\"minecraft:block/cube_all\",\"textures\":{\"all\":\"minecraft:block/copper_block\"}}");
-            put(sink, "assets/" + MOD_ID + "/items/consumer_block.json",
-                    "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"" + MOD_ID
-                            + ":block/consumer_block\"}}");
+            // The actual item/block assets are ordinary JAR resources and are collected by the
+            // decision dependency traversal. This separate path proves the public contributor
+            // contract without attempting to overwrite resources owned by the same Mod JAR.
+            put(sink, "assets/" + MOD_ID + "/polymc-reborn/consumer-contribution.json",
+                    "{\"schema_version\":1,\"consumer\":\"" + MOD_ID + "\"}");
         });
     }
 

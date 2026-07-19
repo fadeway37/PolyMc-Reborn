@@ -214,20 +214,28 @@ if [[ "${#orchestration_failure_messages[@]}" -eq 0 ]]; then
   cd "$project_root" || add_failure 'Could not enter the project root.'
 fi
 if [[ "${#orchestration_failure_messages[@]}" -eq 0 ]]; then
+  server_gradle_args=(
+    --no-daemon --console=plain
+    "-PplaytestServerPort=$server_port"
+    "-PplaytestPackPort=$pack_port"
+    "-PplaytestReportDir=$input_dir"
+  )
+  if [[ -n "${POLYMC_REBORN_EXTERNAL_MOD_JAR:-}" ]]; then
+    server_gradle_args+=(
+      "-PplaytestExternalModJar=$POLYMC_REBORN_EXTERNAL_MOD_JAR"
+      "-PplaytestExternalMode=${POLYMC_REBORN_EXTERNAL_MODE:-none}"
+      "-PplaytestExternalModId=${POLYMC_REBORN_EXTERNAL_MOD_ID:-none}"
+      "-PplaytestExternalItemId=${POLYMC_REBORN_EXTERNAL_ITEM_ID:-none}"
+      "-PplaytestExternalBlockId=${POLYMC_REBORN_EXTERNAL_BLOCK_ID:-none}"
+    )
+  fi
+  server_gradle_args+=(runProductionServerPlaytest)
   if command -v setsid >/dev/null 2>&1; then
-    setsid ./gradlew --no-daemon --console=plain \
-      "-PplaytestServerPort=$server_port" \
-      "-PplaytestPackPort=$pack_port" \
-      "-PplaytestReportDir=$input_dir" \
-      runProductionServerPlaytest \
+    setsid ./gradlew "${server_gradle_args[@]}" \
       >"$input_dir/server-launcher.stdout.log" 2>"$input_dir/server-launcher.stderr.log" &
     server_grouped=1
   else
-    ./gradlew --no-daemon --console=plain \
-    "-PplaytestServerPort=$server_port" \
-    "-PplaytestPackPort=$pack_port" \
-    "-PplaytestReportDir=$input_dir" \
-      runProductionServerPlaytest \
+    ./gradlew "${server_gradle_args[@]}" \
       >"$input_dir/server-launcher.stdout.log" 2>"$input_dir/server-launcher.stderr.log" &
   fi
   server_pid=$!
@@ -310,22 +318,23 @@ PY
   fi
 
   if [[ "$server_tcp_ready" -eq 1 ]]; then
+    client_gradle_args=(
+      --no-daemon --console=plain
+      "-PplaytestAddress=127.0.0.1:$server_port"
+      "-PplaytestReportDir=$input_dir"
+      "-PplaytestPackSha256=$pack_sha256"
+      "-PplaytestPackSha1=$pack_sha1"
+    )
+    if [[ -n "${POLYMC_REBORN_EXTERNAL_MODE:-}" ]]; then
+      client_gradle_args+=("-PplaytestExternalMode=$POLYMC_REBORN_EXTERNAL_MODE")
+    fi
+    client_gradle_args+=(:playtest:client-driver:runIsolatedProductionClientDriver)
     if command -v setsid >/dev/null 2>&1; then
-      setsid ./gradlew --no-daemon --console=plain \
-        "-PplaytestAddress=127.0.0.1:$server_port" \
-        "-PplaytestReportDir=$input_dir" \
-        "-PplaytestPackSha256=$pack_sha256" \
-        "-PplaytestPackSha1=$pack_sha1" \
-        :playtest:client-driver:runIsolatedProductionClientDriver \
+      setsid ./gradlew "${client_gradle_args[@]}" \
         >"$input_dir/client-launcher.stdout.log" 2>"$input_dir/client-launcher.stderr.log" &
       client_grouped=1
     else
-      ./gradlew --no-daemon --console=plain \
-      "-PplaytestAddress=127.0.0.1:$server_port" \
-      "-PplaytestReportDir=$input_dir" \
-      "-PplaytestPackSha256=$pack_sha256" \
-      "-PplaytestPackSha1=$pack_sha1" \
-        :playtest:client-driver:runIsolatedProductionClientDriver \
+      ./gradlew "${client_gradle_args[@]}" \
         >"$input_dir/client-launcher.stdout.log" 2>"$input_dir/client-launcher.stderr.log" &
     fi
     client_pid=$!

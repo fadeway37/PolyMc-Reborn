@@ -35,7 +35,15 @@ processResources {
 }
 
 def isolatedClientRunRoot = layout.buildDirectory.dir('run')
-def isolatedClientRunDirectory = layout.buildDirectory.dir('run/client-playtest')
+def playtestClientId = providers.gradleProperty('playtestClientId').orElse('single')
+def playtestScenario = providers.gradleProperty('playtestScenario').orElse('single')
+def isolatedClientRunDirectory = playtestClientId.map { clientId ->
+	if (!(clientId ==~ /[a-z0-9-]{1,24}/)) {
+		throw new GradleException('playtestClientId must contain only lowercase letters, digits, or hyphens')
+	}
+	layout.buildDirectory.dir('run/' + (clientId == 'single' ? 'client-playtest' :
+		'client-playtest-' + clientId)).get()
+}
 
 tasks.register('prepareIsolatedProductionClientRun') {
 	group = 'verification'
@@ -44,7 +52,9 @@ tasks.register('prepareIsolatedProductionClientRun') {
 	doLast {
 		def safeRunRoot = isolatedClientRunRoot.get().asFile.toPath().toAbsolutePath().normalize()
 		def directory = isolatedClientRunDirectory.get().asFile.toPath().toAbsolutePath().normalize()
-		def expectedDirectory = safeRunRoot.resolve('client-playtest').normalize()
+		def clientId = playtestClientId.get()
+		def expectedDirectory = safeRunRoot.resolve(clientId == 'single' ? 'client-playtest' :
+			'client-playtest-' + clientId).normalize()
 		if (!directory.startsWith(safeRunRoot) || directory.equals(safeRunRoot)
 				|| !directory.equals(expectedDirectory)) {
 			throw new GradleException('Refusing to prepare unexpected isolated-client directory: '
@@ -64,6 +74,13 @@ tasks.register('runIsolatedProductionClientDriver', net.fabricmc.loom.task.prod.
 	jvmArgs.add('-Dfabric.client.gametest')
 	jvmArgs.add('-Dfabric.client.gametest.disableNetworkSynchronizer=true')
 	jvmArgs.add('-Dfabric.client.gametest.modid=polymc-reborn-client-driver')
+	jvmArgs.add(playtestClientId.map { '-Dpolymc-reborn.playtest.clientId=' + it })
+	jvmArgs.add(playtestScenario.map { '-Dpolymc-reborn.playtest.scenario=' + it })
+	jvmArgs.add(providers.gradleProperty('playtestCoordinatorDir')
+		.map { '-Dpolymc-reborn.playtest.coordinatorDir=' + new File(it).absolutePath }
+		.orElse('-Dpolymc-reborn.playtest.coordinatorDir=missing'))
+	programArgs.add('--username')
+	programArgs.add(providers.gradleProperty('playtestUsername').orElse('RebornClient'))
 	jvmArgs.add(providers.gradleProperty('playtestAddress')
 		.map { '-Dpolymc-reborn.playtest.address=' + it }
 		.orElse('-Dpolymc-reborn.playtest.address=127.0.0.1:25576'))
@@ -77,6 +94,9 @@ tasks.register('runIsolatedProductionClientDriver', net.fabricmc.loom.task.prod.
 	jvmArgs.add(providers.gradleProperty('playtestPackSha1')
 		.map { '-Dpolymc-reborn.playtest.packSha1=' + it }
 		.orElse('-Dpolymc-reborn.playtest.packSha1=missing'))
+	jvmArgs.add(providers.gradleProperty('playtestExternalMode')
+		.map { '-Dpolymc-reborn.playtest.externalMode=' + it }
+		.orElse('-Dpolymc-reborn.playtest.externalMode=none'))
 }
 
 tasks.register('verifyIsolatedClientDriver') {

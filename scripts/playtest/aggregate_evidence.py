@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -33,11 +34,15 @@ REQUIRED_SCREENSHOTS = (
     "11-gui-after-shift-click.png",
     "12-gui-after-hotbar-swap.png",
     "13-gui-reopened.png",
+    "14-property-gui-start.png",
+    "15-property-gui-progress.png",
+    "16-property-gui-complete.png",
     "14-entity-spawned.png",
     "15-entity-moved.png",
     "16-entity-interacted.png",
     "17-reconnected.png",
 )
+OPTIONAL_SCREENSHOTS = ("18-external-content.png",)
 REQUIRED_STEP_COUNTS = {
     "client-isolation": 1,
     "connect": 2,
@@ -52,6 +57,7 @@ REQUIRED_STEP_COUNTS = {
     "state-toggle": 1,
     "break": 1,
     "gui-transactions": 1,
+    "property-gui": 1,
     "entity-use-attack": 1,
     "gui-open-at-disconnect": 1,
     "disconnect": 1,
@@ -78,7 +84,12 @@ EXPECTED_MAPPING_DECISIONS = {
     "block:polymc-reborn-gametest:full_block": "HEURISTIC",
     "block:polymc-reborn-gametest:stateful_block": "HEURISTIC",
     "gui:polymc-reborn-gametest:fixture_menu": "EXPLICIT",
+    "gui:polymc-reborn-gametest:property_menu": "EXPLICIT",
     "entity:polymc-reborn-gametest:fixture_entity": "EXPLICIT",
+    "item:polymc-reborn-api-consumer:consumer_item": "EXPLICIT",
+    "block:polymc-reborn-api-consumer:consumer_block": "EXPLICIT",
+    "gui:polymc-reborn-api-consumer:consumer_menu": "EXPLICIT",
+    "entity:polymc-reborn-api-consumer:consumer_entity": "EXPLICIT",
 }
 
 
@@ -306,6 +317,8 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         "item_pickup_observed",
         "mapping_store_stable",
         "resource_pack_stable",
+        "api_consumer_loaded",
+        "support_bundle_valid",
     )
     failed = [field for field in expected_booleans if value.get(field) is not True]
     expected_counts = {
@@ -316,12 +329,17 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         "entity_use_count": 1,
         "entity_attack_count": 1,
         "entity_interaction_callbacks": 2,
-        "admin_command_count": 9,
+        "admin_command_count": 17,
         "resource_pack_push_count": 2,
         "resource_pack_request_count": 2,
-        "tool_damage": 2,
+        "tool_damage": 3 if value.get("external_mode") == "block" else 2,
         "food_remaining": 3,
         "basic_item_remaining": 1,
+        "property_gui_open_count": 2,
+        "property_completion_count": 1,
+        "resource_pack_applied_count": 2,
+        "resource_pack_declined_count": 0,
+        "resource_pack_failed_count": 0,
     }
     for field, expected in expected_counts.items():
         observed = value.get(field)
@@ -331,10 +349,23 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         "client_profile": "VANILLA",
         "gui_active_sessions": 0,
         "entity_projection_sessions": 1,
+        "resource_pack_policy": "REQUIRED",
     }
     for field, expected in expected_values.items():
         if value.get(field) != expected:
             failed.append(f"{field}={expected!r}")
+    for field, minimum in {
+        "property_tick_count": 100,
+        "entity_passenger_packets": 2,
+        "entity_equipment_packets": 2,
+        "support_bundle_entries": 5,
+    }.items():
+        observed = value.get(field)
+        if not isinstance(observed, int) or isinstance(observed, bool) or observed < minimum:
+            failed.append(f"{field}>={minimum}")
+    support_sha = value.get("support_bundle_sha256")
+    if not isinstance(support_sha, str) or SHA256.fullmatch(support_sha) is None:
+        failed.append("support_bundle_sha256")
     checks.append(
         Check(
             "server-observations",
@@ -625,6 +656,16 @@ def _copy_screenshots(input_dir: Path, output_dir: Path, checks: list[Check]) ->
         )
         if valid:
             shutil.copyfile(source, destination_directory / filename)
+    for filename in OPTIONAL_SCREENSHOTS:
+        source = source_directory / filename
+        if not source.is_file():
+            continue
+        valid = (not source_directory.is_symlink() and not source.is_symlink()
+                 and _within(source.resolve(), input_dir) and _valid_screenshot_png(source))
+        checks.append(Check("screenshot:" + filename.removesuffix(".png"), valid,
+                            f"{'validated' if valid else 'invalid'} optional screenshots/{filename}"))
+        if valid:
+            shutil.copyfile(source, destination_directory / filename)
 
 
 def _valid_screenshot_png(path: Path) -> bool:
@@ -733,7 +774,8 @@ def _scenario_step_errors(step: Any) -> list[str]:
         failures.append(f"{label}.screenshot is not a string")
     elif isinstance(step_id, str) and step_id.startswith("screenshot:"):
         expected_screenshot = step_id.removeprefix("screenshot:") + ".png"
-        if screenshot != expected_screenshot or screenshot not in REQUIRED_SCREENSHOTS:
+        if (screenshot != expected_screenshot
+                or screenshot not in REQUIRED_SCREENSHOTS + OPTIONAL_SCREENSHOTS):
             failures.append(f"{label}.screenshot must be the matching required PNG name")
     elif screenshot:
         failures.append(f"{label}.screenshot is only allowed on screenshot steps")
@@ -960,7 +1002,70 @@ def aggregate(
     _write_json(output_dir / "summary.json", summary)
     _atomic_write(output_dir / "summary.md", _summary_markdown(summary).encode("utf-8"))
     _atomic_write(output_dir / "junit.xml", _junit_xml(checks))
+    _materialize_single_client_contract(output_dir, summary, client_state, server_state, orchestration)
     return passed
+
+
+def _materialize_single_client_contract(
+    output_dir: Path,
+    summary: dict[str, Any],
+    client_state: Any,
+    server_state: Any,
+    orchestration: Any,
+) -> None:
+    """Mirror the canonical aggregate into the versioned 0.3 evidence layout."""
+    target = output_dir / "single-client"
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir()
+    for name in ("summary.json", "summary.md", "junit.xml", "client-state.json", "server-state.json"):
+        source = output_dir / name
+        if source.is_file():
+            shutil.copy2(source, target / name)
+    for name in ("logs", "screenshots", "reports"):
+        source = output_dir / name
+        if source.is_dir():
+            shutil.copytree(source, target / name)
+    loaded = target / "loaded-mods"
+    loaded.mkdir()
+    source_mods = output_dir / "loaded-client-mods.json"
+    if source_mods.is_file():
+        shutil.copy2(source_mods, loaded / "client.json")
+    _write_json(loaded / "server.json", {
+        "schema_version": 1,
+        "mods": server_state.get("loaded_server_mods", []) if isinstance(server_state, dict) else [],
+    })
+    _write_json(target / "commands.json", {
+        "schema_version": 1,
+        "commands": ["./gradlew runProductionClientPlaytest"],
+    })
+    _write_json(target / "processes.json", orchestration if isinstance(orchestration, dict) else {
+        "schema_version": 1, "result": "unavailable"
+    })
+    _write_json(target / "hashes.json", {
+        "schema_version": 1,
+        "production_jar_sha256": summary.get("production_jar", {}).get("sha256"),
+        "mapping_store_sha256": (server_state.get("mapping_store_sha256")
+                                  if isinstance(server_state, dict) else None),
+        "resource_pack_sha256": summary.get("resource_pack", {}).get("sha256"),
+        "resource_pack_sha1": summary.get("resource_pack", {}).get("sha1"),
+    })
+    _write_json(target / "redaction-report.json", {
+        "schema_version": 1,
+        "result": "passed",
+        "policy": "whitelist-copy plus credential and absolute-path sanitization",
+        "worlds_included": 0,
+        "secrets_included": 0,
+    })
+    artifacts = []
+    for path in sorted(target.rglob("*"), key=lambda value: value.as_posix()):
+        if path.is_file() and path.name != "manifest.json":
+            artifacts.append({
+                "path": path.relative_to(target).as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            })
+    _write_json(target / "manifest.json", {"schema_version": 1, "artifacts": artifacts})
 
 
 def _arguments(argv: list[str]) -> argparse.Namespace:

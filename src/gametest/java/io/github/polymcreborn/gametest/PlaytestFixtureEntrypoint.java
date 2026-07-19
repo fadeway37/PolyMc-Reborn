@@ -6,20 +6,28 @@ import com.sun.net.httpserver.HttpServer;
 import io.github.polymcreborn.config.AtomicFiles;
 import io.github.polymcreborn.core.PolyMcReborn;
 import io.github.polymcreborn.api.ContentType;
+import io.github.polymcreborn.pack.ResourcePackPolicy;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.BlockPos;
+import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ClientboundResourcePackPushPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.phys.Vec3;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -43,6 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class PlaytestFixtureEntrypoint implements ModInitializer {
     private static final BlockPos PLACE_TARGET = new BlockPos(0, 100, -1);
     private static final BlockPos SIMPLE_TARGET = new BlockPos(1, 100, -1);
+    private static final BlockPos EXTERNAL_TARGET = new BlockPos(2, 100, -1);
     private static HttpServer packServer;
     private static ExecutorService packExecutor;
     private static String resourcePackUrl;
@@ -51,9 +60,14 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
     private static Path reportDirectory;
     private static boolean targetWasPlaced;
     private static boolean simpleTargetWasPlaced;
+    private static boolean externalTargetWasPlaced;
+    private static boolean externalBlockPlaced;
+    private static boolean externalBlockBroken;
+    private static boolean externalItemEquipped;
     private static String resourcePackSha256 = "missing";
     private static String resourcePackSha1 = "missing";
     private static String initialMappingSha256 = "missing";
+    private static final java.util.Set<UUID> INITIALIZED_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final List<String> COMMANDS = List.of(
             "pmcr about",
             "pmcr scan",
@@ -62,7 +76,15 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             "pmcr why polymc-reborn-gametest:basic_item",
             "pmcr why polymc-reborn-gametest:stateful_block",
             "pmcr why polymc-reborn-gametest:fixture_menu",
+            "pmcr why polymc-reborn-gametest:property_menu",
             "pmcr why polymc-reborn-gametest:fixture_entity",
+            "pmcr why polymc-reborn-api-consumer:consumer_item",
+            "pmcr diagnostics status",
+            "pmcr diagnostics validate",
+            "pmcr diagnostics why resource-pack.policy",
+            "pmcr diagnostics list polymc-reborn",
+            "pmcr support bundle",
+            "pmcr support bundle status",
             "pmcr stats");
 
     @Override
@@ -71,6 +93,12 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             return;
         }
         FixtureContent.bootstrap();
+        CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) ->
+                dispatcher.register(Commands.literal("polymcreborn-playtest")
+                        .then(Commands.literal("dimension-cycle")
+                                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                                .executes(context -> cycleDimension(
+                                        context.getSource().getPlayerOrException())))));
         stopFile = controlledPath("polymc-reborn.playtest.stopFile", "stop.request");
         readyFile = controlledPath("polymc-reborn.playtest.readyFile", "server-ready.json");
         reportDirectory = Path.of(requiredProperty("polymc-reborn.playtest.reportDir"))
@@ -177,6 +205,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         level.setBlockAndUpdate(new BlockPos(-3, 100, 0), FixtureContent.FULL_BLOCK.defaultBlockState());
         level.setBlockAndUpdate(new BlockPos(0, 100, 0), Blocks.STONE.defaultBlockState());
         level.setBlockAndUpdate(new BlockPos(1, 100, 0), Blocks.STONE.defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(2, 100, 0), Blocks.STONE.defaultBlockState());
         var entity = new FixtureContent.FixtureEntity(FixtureContent.ENTITY_TYPE, level);
         // Keep the surrogate inside the vanilla survival entity-pick range. The
         // adapter's server-side distance guard is intentionally not a client
@@ -191,15 +220,48 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         }
     }
 
+    private static int cycleDimension(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
+        if (server == null) {
+            return 0;
+        }
+        ServerLevel target = player.level().dimension() == Level.NETHER
+                ? server.overworld() : server.getLevel(Level.NETHER);
+        if (target == null) {
+            return 0;
+        }
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -6; z <= -2; z++) {
+                target.setBlockAndUpdate(new BlockPos(x, 99, z), Blocks.STONE.defaultBlockState());
+                for (int y = 100; y <= 103; y++) {
+                    target.setBlockAndUpdate(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState());
+                }
+            }
+        }
+        ServerPlayer teleported = player.teleport(new TeleportTransition(target,
+                new Vec3(0.5D, 100.0D, -4.5D), Vec3.ZERO, 0.0F, 0.0F,
+                TeleportTransition.DO_NOTHING));
+        if (teleported == null) {
+            return 0;
+        }
+        PlaytestProbe.DIMENSION_CHANGE_COUNT.incrementAndGet();
+        return 1;
+    }
+
     private static void join(ServerPlayer player) {
         int joins = PlaytestProbe.JOIN_COUNT.incrementAndGet();
         player.setGameMode(GameType.SURVIVAL);
-        player.teleportTo(0.5D, 100.0D, -4.5D);
+        // Keep simultaneous clients on distinct sight lines to the projected
+        // entity. Spawning them at the same coordinates makes the other real
+        // player an ambiguous vanilla pick target and does not test the
+        // surrogate interaction guard deterministically.
+        double spawnX = player.getName().getString().endsWith("MultiB") ? 2.5D : 0.5D;
+        player.teleportTo(spawnX, 100.0D, -4.5D);
         player.forceSetRotation(0.0F, true, 0.0F, true);
         player.getFoodData().setFoodLevel(10);
         player.getFoodData().setSaturation(0.0F);
         var inventory = player.getInventory();
-        if (joins == 1) {
+        if (INITIALIZED_PLAYERS.add(player.getUUID())) {
             inventory.clearContent();
             inventory.setItem(0, namedStack(FixtureContent.BASIC_ITEM, 1,
                     "PolyMc Reborn Fixture Item", "Vanilla carrier; real server item"));
@@ -211,10 +273,32 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     "PolyMc Reborn Fixture Food", "Semantic food carrier"));
             inventory.setItem(4, namedStack(FixtureContent.FULL_BLOCK.asItem(), 4,
                     "PolyMc Reborn Full Block", "Simple full-cube projection"));
+            inventory.setItem(6, namedStack(FixtureContent.PROPERTY_GUI_ITEM, 1,
+                    "PolyMc Reborn Property Furnace", "Explicit server-authoritative property GUI"));
+            String externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
+            if (!"none".equals(externalMode)) {
+                var externalId = net.minecraft.resources.Identifier.parse(requiredProperty(
+                        "polymc-reborn.playtest.externalItemId"));
+                var externalItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(externalId);
+                if (externalItem == Items.AIR) {
+                    throw new IllegalStateException("External matrix item is not registered: " + externalId);
+                }
+                int slot = 7;
+                inventory.setItem(slot, namedStack(externalItem, 1,
+                        "External Matrix " + externalId,
+                        "Real third-party content; server-only Mod installation"));
+            }
             inventory.setSelectedSlot(0);
         }
         if (resourcePackUrl == null || resourcePackSha1 == null || resourcePackSha256 == null) {
             throw new IllegalStateException("Playtest client joined before resource pack host was ready");
+        }
+        var policy = PolyMcReborn.runtime().config().resourcePackPolicy();
+        PolyMcReborn.runtime().playerPackStates().offered(player.getUUID());
+        if (policy == ResourcePackPolicy.DISABLED) {
+            player.sendSystemMessage(Component.literal(
+                    "PolyMc Reborn resource pack disabled; safe vanilla carriers are active"));
+            return;
         }
         // Resource-pack IDs identify individual protocol pushes, not the immutable ZIP content.
         // Use a distinct deterministic ID per connection so a reconnect cannot deduplicate the
@@ -222,7 +306,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         var pushId = UUID.nameUUIDFromBytes(("polymc-reborn-playtest:" + resourcePackSha256
                 + ":connection:" + joins).getBytes(StandardCharsets.UTF_8));
         var packPacket = new ClientboundResourcePackPushPacket(pushId, resourcePackUrl,
-                resourcePackSha1, true,
+                resourcePackSha1, policy == ResourcePackPolicy.REQUIRED,
                 Optional.of(Component.literal("PolyMc Reborn isolated compatibility playtest")));
         player.connection.send(packPacket);
         PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.incrementAndGet();
@@ -239,6 +323,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
     }
 
     private static void tick(MinecraftServer server) {
+        FixtureContent.tickPropertyMenus();
         var state = server.overworld().getBlockState(PLACE_TARGET);
         if (state.is(FixtureContent.STATEFUL_BLOCK)) {
             targetWasPlaced = true;
@@ -252,6 +337,25 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             PlaytestProbe.simpleBlockPlacedObserved = true;
         } else if (simpleTargetWasPlaced && simpleState.isAir()) {
             PlaytestProbe.simpleBlockBrokenObserved = true;
+        }
+        String externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
+        if ("block".equals(externalMode)) {
+            var blockId = net.minecraft.resources.Identifier.parse(requiredProperty(
+                    "polymc-reborn.playtest.externalBlockId"));
+            var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(blockId);
+            var externalState = server.overworld().getBlockState(EXTERNAL_TARGET);
+            if (externalState.is(block)) {
+                externalTargetWasPlaced = true;
+                externalBlockPlaced = true;
+            } else if (externalTargetWasPlaced && externalState.isAir()) {
+                externalBlockBroken = true;
+            }
+        } else if ("armor".equals(externalMode)) {
+            var itemId = net.minecraft.resources.Identifier.parse(requiredProperty(
+                    "polymc-reborn.playtest.externalItemId"));
+            var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(itemId);
+            externalItemEquipped |= server.getPlayerList().getPlayers().stream()
+                    .anyMatch(player -> player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(item));
         }
         server.getPlayerList().getPlayers().forEach(PlaytestFixtureEntrypoint::observeInventory);
         if (Files.exists(stopFile)) {
@@ -308,9 +412,33 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             boolean productionJarValid = productionJarName.matches("polymc-reborn-.+\\.jar")
                     && !productionJarName.contains("/") && !productionJarName.contains("\\")
                     && productionJarSha256.matches("[0-9a-f]{64}");
+            boolean apiConsumerLoaded = FabricLoader.getInstance().isModLoaded(
+                    "polymc-reborn-api-consumer");
             long projectedInteractions = PolyMcReborn.runtime().entityProjectionBackend()
                     .acceptedInteractionCount();
-            boolean passed = PlaytestProbe.JOIN_COUNT.get() == 2
+            long entityPassengerPackets = PolyMcReborn.runtime().entityProjectionBackend()
+                    .passengerPacketCount();
+            long entityEquipmentPackets = PolyMcReborn.runtime().entityProjectionBackend()
+                    .equipmentPacketCount();
+            var packPolicy = PolyMcReborn.runtime().config().resourcePackPolicy();
+            var packStats = PolyMcReborn.runtime().playerPackStates().stats();
+            String playtestMode = System.getProperty("polymc-reborn.playtest.mode", "single");
+            boolean multiClient = "multi".equals(playtestMode);
+            int expectedPackPushes = packPolicy == ResourcePackPolicy.DISABLED ? 0 : multiClient ? 3
+                    : playtestMode.startsWith("pack-") ? 1 : 2;
+            SupportAudit supportAudit = auditSupportBundle();
+            String externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
+            String externalModId = System.getProperty("polymc-reborn.playtest.externalModId", "none");
+            boolean externalLoaded = "none".equals(externalMode)
+                    || FabricLoader.getInstance().isModLoaded(externalModId);
+            boolean externalContentPassed = switch (externalMode) {
+                case "armor" -> externalItemEquipped;
+                case "block" -> externalBlockPlaced && externalBlockBroken;
+                case "none" -> true;
+                default -> false;
+            };
+            int expectedToolDamage = "block".equals(externalMode) ? 3 : 2;
+            boolean singlePassed = PlaytestProbe.JOIN_COUNT.get() == 2
                     && PlaytestProbe.DISCONNECT_COUNT.get() == 2
                     && PlaytestProbe.placedBlockObserved
                     && PlaytestProbe.brokenBlockObserved
@@ -320,26 +448,85 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     && PlaytestProbe.GUI_OPEN_COUNT.get() == 3
                     && PlaytestProbe.GUI_CLOSE_COUNT.get() == 3
                     && PlaytestProbe.guiInventoryIntegrity
+                    && PlaytestProbe.PROPERTY_GUI_OPEN_COUNT.get() == 2
+                    && PlaytestProbe.PROPERTY_TICK_COUNT.get() >= 100
+                    && PlaytestProbe.PROPERTY_COMPLETION_COUNT.get() == 1
                     && PlaytestProbe.ENTITY_USE_COUNT.get() == 1
                     && PlaytestProbe.ENTITY_ATTACK_COUNT.get() == 1
                     && projectedInteractions == 2
+                    && entityPassengerPackets >= 2
+                    && entityEquipmentPackets >= 2
                     && PlaytestProbe.semanticUseObserved
                     && PlaytestProbe.itemDropObserved
                     && PlaytestProbe.itemPickupObserved
                     && basicItemRemaining == 1
                     && foodRemaining == 3
-                    && toolDamage == 2
+                    && toolDamage == expectedToolDamage
                     && PlaytestProbe.COMMAND_COUNT.get() == COMMANDS.size()
-                    && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == 2
-                    && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == 2
+                    && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == expectedPackPushes
+                    && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == expectedPackPushes
                     && guiSessions == 0
                     && entitySessions == 1
+                    && apiConsumerLoaded
+                    && supportAudit.valid()
+                    && externalLoaded
+                    && externalContentPassed
                     && productionJarValid
                     && mappingStable
                     && packStable;
+            boolean multiPassed = PlaytestProbe.JOIN_COUNT.get() == 3
+                    && PlaytestProbe.DISCONNECT_COUNT.get() == 3
+                    && PlaytestProbe.GUI_OPEN_COUNT.get() == 2
+                    && PlaytestProbe.GUI_CLOSE_COUNT.get() == 2
+                    && PlaytestProbe.guiInventoryIntegrity
+                    && FixtureContent.fixtureContainerCount() == 2
+                    && PlaytestProbe.ENTITY_USE_COUNT.get() == 1
+                    && PlaytestProbe.ENTITY_ATTACK_COUNT.get() == 1
+                    && projectedInteractions == 2
+                    && entityPassengerPackets >= 3
+                    && entityEquipmentPackets >= 3
+                    && PlaytestProbe.COMMAND_COUNT.get() == COMMANDS.size()
+                    && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == 3
+                    && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == 1
+                    && packPolicy == ResourcePackPolicy.OPTIONAL
+                    && packStats.applied() == 1
+                    && packStats.declined() == 2
+                    && packStats.failed() == 0
+                    && guiSessions == 0
+                    && entitySessions == 1
+                    && apiConsumerLoaded
+                    && supportAudit.valid()
+                    && productionJarValid
+                    && mappingStable
+                    && packStable;
+            boolean requiredDeclinePassed = "pack-required-decline".equals(playtestMode)
+                    && packPolicy == ResourcePackPolicy.REQUIRED
+                    && PlaytestProbe.JOIN_COUNT.get() == 1
+                    && PlaytestProbe.DISCONNECT_COUNT.get() == 1
+                    && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == 1
+                    && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == 0
+                    && packStats.applied() == 0 && packStats.declined() == 1
+                    && packStats.requiredRejected() == 1 && packStats.failed() == 0
+                    && PlaytestProbe.COMMAND_COUNT.get() == COMMANDS.size()
+                    && apiConsumerLoaded && supportAudit.valid() && productionJarValid
+                    && mappingStable && packStable;
+            boolean disabledPackPassed = "pack-disabled".equals(playtestMode)
+                    && packPolicy == ResourcePackPolicy.DISABLED
+                    && PlaytestProbe.JOIN_COUNT.get() == 1
+                    && PlaytestProbe.DISCONNECT_COUNT.get() == 1
+                    && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == 0
+                    && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == 0
+                    && packStats.applied() == 0 && packStats.declined() == 0 && packStats.failed() == 0
+                    && PlaytestProbe.COMMAND_COUNT.get() == COMMANDS.size()
+                    && apiConsumerLoaded && supportAudit.valid() && productionJarValid
+                    && mappingStable && packStable;
+            boolean passed = multiClient ? multiPassed
+                    : "pack-required-decline".equals(playtestMode) ? requiredDeclinePassed
+                    : "pack-disabled".equals(playtestMode) ? disabledPackPassed : singlePassed;
             String json = "{\n"
                     + "  \"schema_version\": 1,\n"
                     + "  \"result\": \"" + (passed ? "passed" : "failed") + "\",\n"
+                    + "  \"playtest_mode\": \"" + jsonEscape(playtestMode) + "\",\n"
                     + "  \"reason\": \"" + reason + "\",\n"
                     + "  \"completed_at\": \"" + Instant.now() + "\",\n"
                     + "  \"join_count\": " + PlaytestProbe.JOIN_COUNT.get() + ",\n"
@@ -352,9 +539,19 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + "  \"gui_open_count\": " + PlaytestProbe.GUI_OPEN_COUNT.get() + ",\n"
                     + "  \"gui_close_count\": " + PlaytestProbe.GUI_CLOSE_COUNT.get() + ",\n"
                     + "  \"gui_inventory_integrity\": " + PlaytestProbe.guiInventoryIntegrity + ",\n"
+                    + "  \"gui_container_count\": " + FixtureContent.fixtureContainerCount() + ",\n"
+                    + "  \"property_gui_open_count\": "
+                    + PlaytestProbe.PROPERTY_GUI_OPEN_COUNT.get() + ",\n"
+                    + "  \"property_tick_count\": " + PlaytestProbe.PROPERTY_TICK_COUNT.get() + ",\n"
+                    + "  \"property_completion_count\": "
+                    + PlaytestProbe.PROPERTY_COMPLETION_COUNT.get() + ",\n"
                     + "  \"entity_use_count\": " + PlaytestProbe.ENTITY_USE_COUNT.get() + ",\n"
                     + "  \"entity_attack_count\": " + PlaytestProbe.ENTITY_ATTACK_COUNT.get() + ",\n"
+                    + "  \"dimension_change_count\": "
+                    + PlaytestProbe.DIMENSION_CHANGE_COUNT.get() + ",\n"
                     + "  \"entity_interaction_callbacks\": " + projectedInteractions + ",\n"
+                    + "  \"entity_passenger_packets\": " + entityPassengerPackets + ",\n"
+                    + "  \"entity_equipment_packets\": " + entityEquipmentPackets + ",\n"
                     + "  \"semantic_use_observed\": " + PlaytestProbe.semanticUseObserved + ",\n"
                     + "  \"item_drop_observed\": " + PlaytestProbe.itemDropObserved + ",\n"
                     + "  \"item_pickup_observed\": " + PlaytestProbe.itemPickupObserved + ",\n"
@@ -362,6 +559,12 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + "  \"tool_damage\": " + toolDamage + ",\n"
                     + "  \"food_remaining\": " + foodRemaining + ",\n"
                     + "  \"client_profile\": \"VANILLA\",\n"
+                    + "  \"resource_pack_policy\": \"" + packPolicy + "\",\n"
+                    + "  \"resource_pack_applied_count\": " + packStats.applied() + ",\n"
+                    + "  \"resource_pack_declined_count\": " + packStats.declined() + ",\n"
+                    + "  \"resource_pack_required_rejected_count\": "
+                    + packStats.requiredRejected() + ",\n"
+                    + "  \"resource_pack_failed_count\": " + packStats.failed() + ",\n"
                     + "  \"admin_command_count\": " + PlaytestProbe.COMMAND_COUNT.get() + ",\n"
                     + "  \"resource_pack_push_count\": "
                     + PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() + ",\n"
@@ -369,6 +572,17 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() + ",\n"
                     + "  \"gui_active_sessions\": " + guiSessions + ",\n"
                     + "  \"entity_projection_sessions\": " + entitySessions + ",\n"
+                    + "  \"api_consumer_loaded\": " + apiConsumerLoaded + ",\n"
+                    + "  \"support_bundle_valid\": " + supportAudit.valid() + ",\n"
+                    + "  \"support_bundle_sha256\": \"" + supportAudit.sha256() + "\",\n"
+                    + "  \"support_bundle_entries\": " + supportAudit.entries() + ",\n"
+                    + "  \"external_mode\": \"" + jsonEscape(externalMode) + "\",\n"
+                    + "  \"external_mod_id\": \"" + jsonEscape(externalModId) + "\",\n"
+                    + "  \"external_mod_loaded\": " + externalLoaded + ",\n"
+                    + "  \"external_content_passed\": " + externalContentPassed + ",\n"
+                    + "  \"external_item_equipped\": " + externalItemEquipped + ",\n"
+                    + "  \"external_block_placed\": " + externalBlockPlaced + ",\n"
+                    + "  \"external_block_broken\": " + externalBlockBroken + ",\n"
                     + "  \"production_jar_name\": \"" + jsonEscape(productionJarName) + "\",\n"
                     + "  \"production_jar_sha256\": \"" + productionJarSha256 + "\",\n"
                     + "  \"mapping_store_sha256\": \"" + finalMappingSha256 + "\",\n"
@@ -442,6 +656,39 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         }
     }
 
+    private static SupportAudit auditSupportBundle() {
+        Path bundle = FabricLoader.getInstance().getConfigDir().resolve("polymc-reborn")
+                .resolve("support").resolve("polymc-reborn-support.zip");
+        if (!Files.isRegularFile(bundle, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            return new SupportAudit(false, "missing", 0);
+        }
+        int entries = 0;
+        try (var zip = new java.util.zip.ZipFile(bundle.toFile(), StandardCharsets.UTF_8)) {
+            var enumeration = zip.entries();
+            while (enumeration.hasMoreElements()) {
+                var entry = enumeration.nextElement();
+                entries++;
+                String name = entry.getName();
+                if (entry.isDirectory() || name.contains("..") || name.endsWith(".jar")
+                        || name.toLowerCase(java.util.Locale.ROOT).contains("world")) {
+                    return new SupportAudit(false, "unsafe-entry", entries);
+                }
+                String text = new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+                String lower = text.toLowerCase(java.util.Locale.ROOT);
+                if (text.matches("(?s).*[A-Za-z]:\\\\.*") || lower.contains("github_token=")
+                        || lower.contains("authorization: bearer") || lower.contains("hmac_key=")) {
+                    return new SupportAudit(false, "sensitive-content", entries);
+                }
+            }
+            return new SupportAudit(entries >= 5, digest("SHA-256", Files.readAllBytes(bundle)), entries);
+        } catch (IOException exception) {
+            return new SupportAudit(false, "io-error", entries);
+        }
+    }
+
+    private record SupportAudit(boolean valid, String sha256, int entries) {
+    }
+
     private static String loadedServerModsJson() {
         var mods = FabricLoader.getInstance().getAllMods().stream()
                 .map(container -> container.getMetadata().getId() + "@"
@@ -460,12 +707,26 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
     private static String mappingDecisionsJson() {
         record Expected(ContentType type, String registryId) {
         }
-        var expected = List.of(
+        var expected = new java.util.ArrayList<>(List.of(
                 new Expected(ContentType.ITEM, FixtureContent.MOD_ID + ":food_item"),
                 new Expected(ContentType.BLOCK, FixtureContent.MOD_ID + ":full_block"),
                 new Expected(ContentType.BLOCK, FixtureContent.MOD_ID + ":stateful_block"),
                 new Expected(ContentType.GUI, FixtureContent.MOD_ID + ":fixture_menu"),
-                new Expected(ContentType.ENTITY, FixtureContent.MOD_ID + ":fixture_entity"));
+                new Expected(ContentType.GUI, FixtureContent.MOD_ID + ":property_menu"),
+                new Expected(ContentType.ENTITY, FixtureContent.MOD_ID + ":fixture_entity"),
+                new Expected(ContentType.ITEM, "polymc-reborn-api-consumer:consumer_item"),
+                new Expected(ContentType.BLOCK, "polymc-reborn-api-consumer:consumer_block"),
+                new Expected(ContentType.GUI, "polymc-reborn-api-consumer:consumer_menu"),
+                new Expected(ContentType.ENTITY, "polymc-reborn-api-consumer:consumer_entity")));
+        String externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
+        if (!"none".equals(externalMode)) {
+            String itemId = requiredProperty("polymc-reborn.playtest.externalItemId");
+            expected.add(new Expected(ContentType.ITEM, itemId));
+            if ("block".equals(externalMode)) {
+                expected.add(new Expected(ContentType.BLOCK,
+                        requiredProperty("polymc-reborn.playtest.externalBlockId")));
+            }
+        }
         var json = new StringBuilder("{");
         for (int index = 0; index < expected.size(); index++) {
             var key = expected.get(index);

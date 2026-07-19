@@ -9,8 +9,12 @@ public final class PlaytestProbe {
     public static final AtomicInteger DISCONNECT_COUNT = new AtomicInteger();
     public static final AtomicInteger GUI_OPEN_COUNT = new AtomicInteger();
     public static final AtomicInteger GUI_CLOSE_COUNT = new AtomicInteger();
+    public static final AtomicInteger PROPERTY_GUI_OPEN_COUNT = new AtomicInteger();
+    public static final AtomicInteger PROPERTY_TICK_COUNT = new AtomicInteger();
+    public static final AtomicInteger PROPERTY_COMPLETION_COUNT = new AtomicInteger();
     public static final AtomicInteger ENTITY_USE_COUNT = new AtomicInteger();
     public static final AtomicInteger ENTITY_ATTACK_COUNT = new AtomicInteger();
+    public static final AtomicInteger DIMENSION_CHANGE_COUNT = new AtomicInteger();
     public static final AtomicInteger COMMAND_COUNT = new AtomicInteger();
     public static final AtomicInteger RESOURCE_PACK_PUSH_COUNT = new AtomicInteger();
     public static final AtomicInteger RESOURCE_PACK_REQUEST_COUNT = new AtomicInteger();

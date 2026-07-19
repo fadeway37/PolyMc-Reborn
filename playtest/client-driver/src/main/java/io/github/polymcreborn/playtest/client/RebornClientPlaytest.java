@@ -20,12 +20,14 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.FurnaceMenu;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -48,10 +50,14 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             "polymc-reborn-client-driver");
     private static final Identifier PACK_PROBE = Identifier.fromNamespaceAndPath(
             "polymc-reborn-gametest", "items/basic_item.json");
+    private static final Identifier UPGRADE_PACK_PROBE = Identifier.fromNamespaceAndPath(
+            "polymc-reborn-upgrade-fixture", "items/stable_item.json");
     private static final BlockPos PLACE_SUPPORT = new BlockPos(0, 100, 0);
     private static final BlockPos PLACED_BLOCK = new BlockPos(0, 100, -1);
     private static final BlockPos SIMPLE_SUPPORT = new BlockPos(1, 100, 0);
     private static final BlockPos SIMPLE_BLOCK = new BlockPos(1, 100, -1);
+    private static final BlockPos EXTERNAL_SUPPORT = new BlockPos(2, 100, 0);
+    private static final BlockPos EXTERNAL_BLOCK = new BlockPos(2, 100, -1);
 
     private final List<Step> steps = new ArrayList<>();
     private Path reportDirectory;
@@ -63,6 +69,10 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
     private String measuredResourcePackSha1 = "missing";
     private long measuredResourcePackBytes;
     private String inventoryBeforeReconnect;
+    private String externalMode;
+    private String clientId;
+    private String scenario;
+    private Path coordinatorDirectory;
     private Instant lastStepBoundary = Instant.now();
 
     @Override
@@ -72,6 +82,9 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                 .toLowerCase(java.util.Locale.ROOT);
         expectedResourcePackSha1 = requiredProperty("polymc-reborn.playtest.packSha1")
                 .toLowerCase(java.util.Locale.ROOT);
+        externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
+        clientId = System.getProperty("polymc-reborn.playtest.clientId", "single");
+        scenario = System.getProperty("polymc-reborn.playtest.scenario", "single");
         reportDirectory = Path.of(requiredProperty("polymc-reborn.playtest.reportDir"))
                 .toAbsolutePath().normalize();
         screenshotsDirectory = reportDirectory.resolve("screenshots");
@@ -81,6 +94,22 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             verifyClientIsolation();
             pass("client-isolation", "Only the driver and its minimal Fabric client test dependencies are loaded");
 
+            if (scenario.startsWith("pack-")) {
+                runPackPolicyScenario(context);
+                return;
+            }
+            if (scenario.startsWith("multi-")) {
+                coordinatorDirectory = Path.of(requiredProperty("polymc-reborn.playtest.coordinatorDir"))
+                        .toAbsolutePath().normalize();
+                Files.createDirectories(coordinatorDirectory);
+                runMultiClientScenario(context);
+                return;
+            }
+            if (scenario.startsWith("upgrade-")) {
+                runUpgradeScenario(context);
+                return;
+            }
+
             connect(context);
             screenshot(context, "01-connected");
             acceptAndWaitForPack(context, "initial connection", true);
@@ -89,7 +118,9 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             exerciseDropAndPickup(context);
             exercisePlaceAndBreak(context);
             exerciseGui(context);
+            exercisePropertyGui(context);
             exerciseEntity(context);
+            exerciseExternalContent(context);
 
             inventoryBeforeReconnect = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
             openProjectedGui(context);
@@ -130,6 +161,269 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             }
             throw new IllegalStateException("Client playtest failed", failure);
         }
+    }
+
+    private void runUpgradeScenario(ClientGameTestContext context) {
+        connect(context);
+        screenshot(context, "01-upgrade-connected");
+        acceptAndWaitForPack(context, "upgrade connection", true);
+        context.waitFor(client -> client.player != null
+                && !client.player.getInventory().getItem(0).isEmpty(), 400);
+        String inventory = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
+        screenshot(context, "04-upgrade-persisted-item");
+        pass("upgrade-player-inventory",
+                "The isolated client received a non-empty persisted hotbar stack: " + inventory);
+        disconnect(context);
+        pass("upgrade-disconnect", "Upgrade client disconnected normally after applying the server pack");
+    }
+
+    private void runPackPolicyScenario(ClientGameTestContext context) {
+        connect(context);
+        if ("pack-required-decline".equals(scenario)) {
+            context.waitFor(client -> client.screen instanceof ConfirmScreen, 1200);
+            screenshot(context, "01-required-pack-prompt");
+            clickPackDecline(context);
+            context.waitFor(client -> client.level == null, 1200);
+            context.runOnClient(client -> client.setScreen(new TitleScreen()));
+            context.waitFor(client -> client.screen instanceof TitleScreen, 200);
+            pass("required-pack-decline",
+                    "Declining a REQUIRED pack caused the vanilla protocol to end the connection");
+            return;
+        }
+        if ("pack-disabled".equals(scenario)) {
+            context.waitTicks(80);
+            context.computeOnClient(client -> {
+                if (client.screen instanceof ConfirmScreen
+                        || client.getResourceManager().getResource(PACK_PROBE).isPresent()) {
+                    throw new AssertionError("DISABLED policy unexpectedly offered or applied a resource pack");
+                }
+                return true;
+            });
+            assertSafeCarrierWithoutPack(context);
+            screenshot(context, "01-disabled-safe-carrier");
+            disconnect(context);
+            pass("disabled-pack-safe-carrier",
+                    "DISABLED policy sent no pack and retained a vanilla-safe carrier");
+            return;
+        }
+        throw new IllegalArgumentException("Unknown pack-policy scenario " + scenario);
+    }
+
+    private void runMultiClientScenario(ClientGameTestContext context) {
+        boolean clientA = "multi-a".equals(scenario);
+        if (!clientA && !"multi-b".equals(scenario)) {
+            throw new IllegalArgumentException("Unknown multi-client scenario " + scenario);
+        }
+        String role = clientA ? "a" : "b";
+        String other = clientA ? "b" : "a";
+        connect(context);
+        if (clientA) {
+            acceptAndWaitForPack(context, "multi-client-a", true);
+        } else {
+            declineOptionalPack(context);
+            assertSafeCarrierWithoutPack(context);
+        }
+        screenshot(context, "01-multi-online-" + role);
+        writeMarker("online-" + role, inventoryFingerprint(context));
+        // Client processes initialize sequentially to avoid two simultaneous LWJGL/DataFixer cold starts
+        // exhausting a constrained CI renderer. Client A stays live while B starts, so every scenario below
+        // still executes with both independent network sessions online.
+        waitMarker(context, "online-" + other, 4000);
+        concurrentProjectedGui(context, role, other);
+        screenshot(context, "02-multi-gui-" + role);
+
+        context.waitFor(client -> clientSurrogate(client) != null, 200);
+        aimAtProjectedEntity(context);
+        context.getInput().pressKey(options -> clientA ? options.keyUse : options.keyAttack);
+        context.waitTicks(6);
+        pass(clientA ? "multi-entity-use" : "multi-entity-attack",
+                "Client " + role.toUpperCase(java.util.Locale.ROOT)
+                        + " sent an independent guarded interaction to the live surrogate");
+        screenshot(context, "03-multi-entity-" + role);
+        writeMarker("entity-" + role, "completed");
+        waitMarker(context, "entity-" + other, 1600);
+        exerciseMultiDimensionIsolation(context, clientA);
+
+        if (clientA) {
+            disconnect(context);
+            writeMarker("disconnected-a", "normal-disconnect");
+            waitMarker(context, "survived-b", 1200);
+            connect(context);
+            declineOptionalPack(context);
+            context.waitFor(client -> client.level != null && java.util.stream.StreamSupport.stream(
+                            client.level.entitiesForRendering().spliterator(), false)
+                    .filter(entity -> entity.getType() == EntityType.ARMOR_STAND
+                            && entity.getCustomName() != null
+                            && entity.getCustomName().getString().contains("Projected Fixture Entity"))
+                    .count() == 1L, 400);
+            writeMarker("reconnected-a", inventoryFingerprint(context));
+            pass("multi-reconnect-a",
+                    "Client A reconnected after Client B survived and saw exactly one projected surrogate");
+            screenshot(context, "04-multi-reconnected-a");
+            disconnect(context);
+        } else {
+            waitMarker(context, "disconnected-a", 1200);
+            context.computeOnClient(client -> {
+                if (client.level == null || client.player == null || client.getConnection() == null) {
+                    throw new AssertionError("Client B lost its independent connection when Client A disconnected");
+                }
+                return true;
+            });
+            writeMarker("survived-b", inventoryFingerprint(context));
+            pass("multi-disconnect-isolation",
+                    "Client B remained connected with its own inventory after Client A disconnected");
+            screenshot(context, "04-multi-survived-b");
+            waitMarker(context, "reconnected-a", 1200);
+            disconnect(context);
+        }
+        pass("multi-client-complete", "Independent client role " + role + " completed cleanly");
+    }
+
+    private void exerciseMultiDimensionIsolation(ClientGameTestContext context, boolean clientA) {
+        if (clientA) {
+            context.runOnClient(client -> client.player.connection.sendCommand(
+                    "polymcreborn-playtest dimension-cycle"));
+            context.waitFor(client -> client.level != null && client.level.dimension() == Level.NETHER,
+                    1200);
+            context.computeOnClient(client -> {
+                long staleSurrogates = java.util.stream.StreamSupport.stream(
+                                client.level.entitiesForRendering().spliterator(), false)
+                        .filter(entity -> entity.getType() == EntityType.ARMOR_STAND
+                                && entity.getCustomName() != null
+                                && entity.getCustomName().getString().contains("Projected Fixture Entity"))
+                        .count();
+                if (staleSurrogates != 0L) {
+                    throw new AssertionError("Old-dimension surrogate remained after dimension transfer");
+                }
+                return true;
+            });
+            writeMarker("dimension-left-a", "minecraft:the_nether");
+            screenshot(context, "04-multi-dimension-a");
+            waitMarker(context, "dimension-survived-b", 1600);
+            context.runOnClient(client -> client.player.connection.sendCommand(
+                    "polymcreborn-playtest dimension-cycle"));
+            context.waitFor(client -> client.level != null && client.level.dimension() == Level.OVERWORLD
+                    && java.util.stream.StreamSupport.stream(
+                                    client.level.entitiesForRendering().spliterator(), false)
+                            .filter(entity -> entity.getType() == EntityType.ARMOR_STAND
+                                    && entity.getCustomName() != null
+                                    && entity.getCustomName().getString().contains("Projected Fixture Entity"))
+                            .count() == 1L, 1200);
+            writeMarker("dimension-returned-a", "minecraft:overworld");
+            pass("multi-dimension-a",
+                    "Client A left and returned while its old projection was removed and rebuilt once");
+        } else {
+            waitMarker(context, "dimension-left-a", 1600);
+            context.computeOnClient(client -> {
+                long surrogates = java.util.stream.StreamSupport.stream(
+                                client.level.entitiesForRendering().spliterator(), false)
+                        .filter(entity -> entity.getType() == EntityType.ARMOR_STAND
+                                && entity.getCustomName() != null
+                                && entity.getCustomName().getString().contains("Projected Fixture Entity"))
+                        .count();
+                if (client.level.dimension() != Level.OVERWORLD || surrogates != 1L) {
+                    throw new AssertionError("Client B tracking changed when Client A left the dimension");
+                }
+                return true;
+            });
+            writeMarker("dimension-survived-b", "minecraft:overworld");
+            waitMarker(context, "dimension-returned-a", 1600);
+            pass("multi-dimension-b",
+                    "Client B remained in the overworld and continued tracking exactly one surrogate");
+        }
+    }
+
+    private void declineOptionalPack(ClientGameTestContext context) {
+        clickPackDecline(context);
+        context.waitFor(client -> client.screen == null && client.level != null && client.player != null
+                && client.getResourceManager().getResource(PACK_PROBE).isEmpty(), 1200);
+        pass("resource-pack-declined", "Declined OPTIONAL pack and remained in the live server session");
+    }
+
+    private void clickPackDecline(ClientGameTestContext context) {
+        context.waitFor(client -> client.screen instanceof ConfirmScreen, 1200);
+        var declineButton = context.computeOnClient(client -> {
+            if (!(client.screen instanceof ConfirmScreen confirm)) {
+                throw new IllegalStateException("Optional resource-pack prompt disappeared before decline");
+            }
+            var buttons = confirm.children().stream().filter(AbstractButton.class::isInstance)
+                    .map(AbstractButton.class::cast).toList();
+            if (buttons.size() < 2) {
+                throw new IllegalStateException("Optional resource-pack prompt has no decline button");
+            }
+            var button = buttons.getLast();
+            return windowCursor(client, button.getX() + button.getWidth() / 2.0D,
+                    button.getY() + button.getHeight() / 2.0D);
+        });
+        context.getInput().setCursorPos(declineButton[0], declineButton[1]);
+        context.getInput().pressMouse(0);
+    }
+
+    private void assertSafeCarrierWithoutPack(ClientGameTestContext context) {
+        context.computeOnClient(client -> {
+            var stack = client.player.getInventory().getItem(0);
+            Identifier carrier = BuiltInRegistries.ITEM.getKey(stack.getItem());
+            Identifier model = stack.get(DataComponents.ITEM_MODEL);
+            if (stack.isEmpty() || !Identifier.DEFAULT_NAMESPACE.equals(carrier.getNamespace())
+                    || model != null && !Identifier.DEFAULT_NAMESPACE.equals(model.getNamespace())) {
+                throw new AssertionError("Declined-pack client received a custom registry/model identifier");
+            }
+            return true;
+        });
+        pass("resource-pack-safe-carrier", "Declined-pack client received only a vanilla carrier/model");
+    }
+
+    private void concurrentProjectedGui(ClientGameTestContext context, String role, String other) {
+        openProjectedGui(context);
+        assertMenuStack(context, 0, Items.DIAMOND, 16);
+        assertMenuStack(context, 1, Items.EMERALD, 8);
+        writeMarker("gui-open-" + role, projectedMenuFingerprint(context));
+        waitMarker(context, "gui-open-" + other, 400);
+        int sourceSlot = "a".equals(role) ? 0 : 1;
+        int targetSlot = "a".equals(role) ? 2 : 3;
+        var source = containerSlot(context, sourceSlot);
+        var target = containerSlot(context, targetSlot);
+        context.getInput().setCursorPos(source[0], source[1]);
+        context.getInput().pressMouse(1);
+        context.waitTicks(2);
+        context.getInput().setCursorPos(target[0], target[1]);
+        context.getInput().pressMouse(0);
+        context.waitTicks(2);
+        context.computeOnClient(client -> {
+            if (client.player.containerMenu.getCarried().isEmpty()
+                    && !client.player.containerMenu.slots.get(targetSlot).getItem().isEmpty()) {
+                return true;
+            }
+            throw new AssertionError("Concurrent projected GUI transaction left a ghost or empty target");
+        });
+        writeMarker("gui-state-" + role, projectedMenuFingerprint(context));
+        context.getInput().pressKey(options -> options.keyInventory);
+        context.waitFor(client -> !(client.screen instanceof AbstractContainerScreen<?>), 100);
+        pass("multi-gui-" + role,
+                "Client " + role.toUpperCase(java.util.Locale.ROOT)
+                        + " mutated its own authoritative container while both GUI sessions were open");
+    }
+
+    private String inventoryFingerprint(ClientGameTestContext context) {
+        return context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
+    }
+
+    private String projectedMenuFingerprint(ClientGameTestContext context) {
+        return context.computeOnClient(RebornClientPlaytest::projectedMenuFingerprint);
+    }
+
+    private void writeMarker(String name, String value) {
+        try {
+            Files.writeString(coordinatorDirectory.resolve(name + ".marker"), value + "\n",
+                    StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not write multi-client coordination marker " + name, exception);
+        }
+    }
+
+    private void waitMarker(ClientGameTestContext context, String name, int timeoutTicks) {
+        Path marker = coordinatorDirectory.resolve(name + ".marker");
+        context.waitFor(client -> Files.isRegularFile(marker), timeoutTicks);
     }
 
     private void verifyClientIsolation() {
@@ -203,7 +497,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         });
         context.getInput().setCursorPos(acceptButton[0], acceptButton[1]);
         context.getInput().pressMouse(0);
-        context.waitFor(client -> client.getResourceManager().getResource(PACK_PROBE).isPresent(), 1200);
+        context.waitFor(client -> client.getResourceManager().getResource(packProbe()).isPresent(), 1200);
         context.waitFor(client -> client.getOverlay() == null && client.screen == null
                 && client.level != null && client.player != null, 1200);
         context.waitTicks(10);
@@ -212,8 +506,12 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             screenshot(context, "03-resource-pack-applied");
         }
         pass("resource-pack-" + phase.replace(' ', '-'),
-                "Accepted the vanilla prompt and the live resource manager exposes the fixture-only model after "
+                "Accepted the vanilla prompt and the live resource manager exposes the scenario pack probe after "
                         + phase);
+    }
+
+    private Identifier packProbe() {
+        return scenario.startsWith("upgrade-") ? UPGRADE_PACK_PROBE : PACK_PROBE;
     }
 
     private void measureDownloadedResourcePack(int expectedCopies) {
@@ -579,6 +877,15 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             if (target == null || !target.isCurrentlyGlowing()) {
                 throw new AssertionError("Projected entity did not synchronize its glowing metadata");
             }
+            if (!(target instanceof net.minecraft.world.entity.LivingEntity living)
+                    || !living.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD)
+                    .is(Items.GOLDEN_HELMET)) {
+                throw new AssertionError("Projected entity did not receive explicit vanilla equipment");
+            }
+            if (target.getPassengers().size() != 1
+                    || target.getPassengers().getFirst().getType() != EntityType.PARROT) {
+                throw new AssertionError("Projected entity did not receive its explicit passenger");
+            }
             return true;
         });
         var initialPosition = context.computeOnClient(client -> clientSurrogate(client).position());
@@ -610,6 +917,109 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         pass("entity-use-attack", "Use and attack input targeted the tracked vanilla surrogate entity");
     }
 
+    private void exercisePropertyGui(ClientGameTestContext context) {
+        context.getInput().pressKey(options -> options.keyHotbarSlots[6]);
+        context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 6, 100);
+        context.getInput().lookAt(0.0F, -70.0F);
+        context.getInput().pressKey(options -> options.keyUse);
+        context.waitFor(client -> client.player.containerMenu instanceof FurnaceMenu
+                && client.screen instanceof AbstractContainerScreen<?>, 200);
+        assertMenuStack(context, 0, Items.RAW_IRON, 1);
+        assertMenuStack(context, 1, Items.COAL, 1);
+        float initialProgress = context.computeOnClient(client ->
+                ((FurnaceMenu) client.player.containerMenu).getBurnProgress());
+        screenshot(context, "14-property-gui-start");
+        context.waitFor(client -> ((FurnaceMenu) client.player.containerMenu).getBurnProgress()
+                > initialProgress, 200);
+        screenshot(context, "15-property-gui-progress");
+        context.waitFor(client -> client.player.containerMenu.slots.get(2).getItem().is(Items.IRON_INGOT), 300);
+        screenshot(context, "16-property-gui-complete");
+
+        var output = furnaceSlot(context, 124.0D, 43.0D);
+        context.getInput().setCursorPos(output[0], output[1]);
+        context.waitTicks(1);
+        pressModifiedLogical(context, 124.0D, 43.0D, org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT);
+        context.waitFor(client -> client.player.containerMenu.slots.get(2).getItem().isEmpty(), 100);
+        context.computeOnClient(client -> {
+            boolean received = false;
+            for (int slot = 0; slot < client.player.getInventory().getContainerSize(); slot++) {
+                received |= client.player.getInventory().getItem(slot).is(Items.IRON_INGOT);
+            }
+            if (!received || !client.player.containerMenu.getCarried().isEmpty()) {
+                throw new AssertionError("Furnace result was not transferred authoritatively");
+            }
+            return true;
+        });
+        context.getInput().pressKey(options -> options.keyInventory);
+        context.waitFor(client -> !(client.screen instanceof AbstractContainerScreen<?>), 100);
+        context.getInput().lookAt(0.0F, -70.0F);
+        context.getInput().pressKey(options -> options.keyUse);
+        context.waitFor(client -> client.player.containerMenu instanceof FurnaceMenu, 200);
+        context.waitFor(client -> client.player.containerMenu.slots.get(2).getItem().isEmpty(), 100);
+        context.getInput().pressKey(options -> options.keyInventory);
+        context.waitFor(client -> !(client.screen instanceof AbstractContainerScreen<?>), 100);
+        pass("property-gui", "Observed burn/cook progress, transferred output, and reopened the authoritative furnace");
+    }
+
+    private void exerciseExternalContent(ClientGameTestContext context) {
+        if ("none".equals(externalMode)) {
+            return;
+        }
+        context.getInput().pressKey(options -> options.keyHotbarSlots[7]);
+        context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 7, 100);
+        context.computeOnClient(client -> {
+            var stack = client.player.getInventory().getSelectedItem();
+            if (stack.isEmpty() || !stack.getHoverName().getString().startsWith("External Matrix ")) {
+                throw new AssertionError("Server did not supply the locked third-party content item");
+            }
+            Identifier carrier = BuiltInRegistries.ITEM.getKey(stack.getItem());
+            if (!Identifier.DEFAULT_NAMESPACE.equals(carrier.getNamespace())) {
+                throw new AssertionError("Third-party registry id leaked to the unmodified client: " + carrier);
+            }
+            return true;
+        });
+        if ("armor".equals(externalMode)) {
+            context.getInput().lookAt(0.0F, -70.0F);
+            context.getInput().pressKey(options -> options.keyUse);
+            context.waitFor(client -> !client.player.getItemBySlot(
+                    net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty(), 200);
+            context.computeOnClient(client -> {
+                Identifier carrier = BuiltInRegistries.ITEM.getKey(client.player.getItemBySlot(
+                        net.minecraft.world.entity.EquipmentSlot.HEAD).getItem());
+                if (!Identifier.DEFAULT_NAMESPACE.equals(carrier.getNamespace())) {
+                    throw new AssertionError("Equipped third-party item leaked its registry id");
+                }
+                return true;
+            });
+            screenshot(context, "18-external-content");
+            pass("external-content", "Equipped one real third-party armor item through vanilla use input");
+            return;
+        }
+        if (!"block".equals(externalMode)) {
+            throw new IllegalArgumentException("Unknown external playtest mode " + externalMode);
+        }
+        context.getInput().lookAt(EXTERNAL_SUPPORT);
+        context.waitFor(client -> client.hitResult instanceof BlockHitResult hit
+                && hit.getBlockPos().equals(EXTERNAL_SUPPORT), 200);
+        context.getInput().pressKey(options -> options.keyUse);
+        context.waitFor(client -> !client.level.getBlockState(EXTERNAL_BLOCK).isAir(), 200);
+        assertBlockModelPresent(context,
+                context.computeOnClient(client -> client.level.getBlockState(EXTERNAL_BLOCK)));
+        screenshot(context, "18-external-content");
+        context.getInput().pressKey(options -> options.keyHotbarSlots[2]);
+        context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 2, 100);
+        context.getInput().lookAt(EXTERNAL_BLOCK);
+        context.waitFor(client -> client.hitResult instanceof BlockHitResult hit
+                && hit.getBlockPos().equals(EXTERNAL_BLOCK), 200);
+        context.getInput().holdKey(options -> options.keyAttack);
+        try {
+            context.waitFor(client -> client.level.getBlockState(EXTERNAL_BLOCK).isAir(), 600);
+        } finally {
+            context.getInput().releaseKey(options -> options.keyAttack);
+        }
+        pass("external-content", "Placed and broke one real third-party full-cube block through vanilla input");
+    }
+
     private void aimAtProjectedEntity(ClientGameTestContext context) {
         var aim = context.computeOnClient(client -> {
             Entity target = clientSurrogate(client);
@@ -637,7 +1047,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         }
         context.getInput().lookAt(aim.yaw(), aim.pitch());
         context.waitFor(client -> client.hitResult instanceof EntityHitResult hit
-                && hit.getEntity().getType() == EntityType.ARMOR_STAND, 200);
+                && hit.getEntity().getType() == EntityType.ARMOR_STAND, 1200);
     }
 
     private void openProjectedGui(ClientGameTestContext context) {
@@ -781,6 +1191,27 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         });
     }
 
+    private double[] furnaceSlot(ClientGameTestContext context, double x, double y) {
+        return context.computeOnClient(client -> windowCursor(client,
+                (client.getWindow().getGuiScaledWidth() - 176) / 2.0D + x,
+                (client.getWindow().getGuiScaledHeight() - 166) / 2.0D + y));
+    }
+
+    private void pressModifiedLogical(ClientGameTestContext context, double x, double y, int modifiers) {
+        context.runOnClient(client -> {
+            if (!(client.screen instanceof AbstractContainerScreen<?> screen)) {
+                throw new IllegalStateException("Modified input requires a vanilla container screen");
+            }
+            double logicalX = (client.getWindow().getGuiScaledWidth() - 176) / 2.0D + x;
+            double logicalY = (client.getWindow().getGuiScaledHeight() - 166) / 2.0D + y;
+            var event = new MouseButtonEvent(logicalX, logicalY, new MouseButtonInfo(0, modifiers));
+            if (!screen.mouseClicked(event, false)) {
+                throw new AssertionError("Modified property GUI input was not handled");
+            }
+            screen.mouseReleased(event);
+        });
+    }
+
     private static double[] logicalContainerSlot(net.minecraft.client.Minecraft client, int slot) {
         return new double[]{
                 (client.getWindow().getGuiScaledWidth() - 176) / 2.0D + 17.0D + (slot % 9) * 18.0D,
@@ -860,6 +1291,8 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     .append("  \"result\": \"").append(success ? "passed" : "failed").append("\",\n")
                     .append("  \"minecraft_version\": \"26.1.2\",\n")
                     .append("  \"client_kind\": \"isolated-fabric-client-driver\",\n")
+                    .append("  \"client_id\": \"").append(escape(clientId)).append("\",\n")
+                    .append("  \"scenario\": \"").append(escape(scenario)).append("\",\n")
                     .append("  \"client_profile\": \"VANILLA\",\n")
                     .append("  \"resource_pack_sha256\": \"").append(escape(measuredResourcePackSha256))
                     .append("\",\n")
@@ -1003,14 +1436,29 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     "gui_open_count=3, gui_close_count=3, integrity=true and active sessions=0 at shutdown", 200,
                     "Close or disconnect the projected menu", List.of("polymc-reborn-gametest:fixture_menu"),
                     "EXPLICIT standard-9xn via Polymer menu sanitization");
+            case "property-gui" -> new ScenarioSpec(
+                    "An explicit three-slot property adapter owns one real server container and four properties",
+                    "Open the furnace, observe progress, Shift-click its result, close and reopen",
+                    "Vanilla FurnaceMenu shows bounded progress and transfers one iron ingot without a ghost stack",
+                    "property ticks reach completion once; two opens use one authoritative state",
+                    400, "Close the projected furnace screen",
+                    List.of("polymc-reborn-gametest:property_menu"),
+                    "EXPLICIT furnace property projection");
             case "entity-use-attack" -> new ScenarioSpec(
                     "Exactly one tracked Armor Stand surrogate is alive and within vanilla reach",
                     "Aim through EntityHitResult, then press use once and attack once",
-                    "Name, glow, position and rotation synchronize; the surrogate stays unique",
-                    "entity use/attack callbacks are each exactly one", 200,
+                    "Name, glow, position, rotation, passenger and vanilla equipment synchronize; the main surrogate stays unique",
+                    "entity callbacks are exact and passenger/equipment packet counters are at least two", 200,
                     "Entity interaction keys are released; server owns session cleanup",
                     List.of("polymc-reborn-gametest:fixture_entity"),
                     "EXPLICIT Polymer Virtual Entity vanilla-surrogate");
+            case "external-content" -> new ScenarioSpec(
+                    "A hash-locked 26.1.2 third-party content Mod is installed only on the server",
+                    "Use/equip its real item or place and break its real full-cube block",
+                    "Only a vanilla carrier/state is visible and the interaction completes",
+                    "external_mod_loaded and external_content_passed are true",
+                    600, "Release held input; client never installs the tested Mod", List.of(),
+                    "Server report records the exact external registry decision");
             case "disconnect", "reconnect" -> new ScenarioSpec("A live projected session exists",
                     "Disconnect to TitleScreen, reconnect, and accept the required pack again",
                     "Inventory/component fingerprint is unchanged and exactly one surrogate returns",
