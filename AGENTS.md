@@ -130,6 +130,15 @@ java -version
 ./gradlew runClientPlaytest
 ./gradlew runProductionClientPlaytest
 ./gradlew runPlaytest
+./gradlew checkApiSignature
+./gradlew buildApiConsumer
+./gradlew runApiConsumerPlaytest
+./gradlew runProductionMultiClientPlaytest
+./gradlew runPackPolicyPlaytest
+./gradlew runUpgradePlaytest
+./gradlew runModSetExpansionPlaytest
+./gradlew runExternalModMatrix
+./gradlew assembleBetaArtifacts verifyReleaseArtifacts verifyReproducibleArchives
 ./gradlew dependencies
 git diff --check
 ```
@@ -150,6 +159,10 @@ runtime mods, and worlds are ignored build output and never enter the release
 JAR. A missing assertion, timeout, non-zero process result, or forced cleanup
 is failed/incomplete, never success. Test-harness source is not proof a run
 passed.
+
+The standalone API is published from `api/`; its canonical Java sources are
+also compiled into the main Mod. Public changes require annotation/signature
+review, the independent Maven-coordinate consumer, and no backend leakage.
 
 Before committing, inspect `git status --short`, dependency locks/verification,
 the release JAR manifest and `fabric.mod.json`, and confirm no build output,

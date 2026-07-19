@@ -47,7 +47,7 @@ confidence, degradation, complete ordered reason/candidate chain, resources,
 warnings, and failure reason. `/why` and machine reports preserve accepted and
 rejected candidates in stable order.
 
-## Content rules in 0.2
+## Content rules in 0.3 Beta
 
 ### Items
 
@@ -79,8 +79,10 @@ compatible.
 An entity is projected only by native Polymer behavior or a reviewed explicit
 adapter. The adapter names a registered vanilla virtual surrogate, a bounded
 offset/distance, and approved callbacks. The real entity remains authoritative.
-Automatic surrogate choice, equipment/passenger/leash synchronization, broad
-metadata, and dimension specialization are not implemented.
+One explicitly declared vanilla passenger and bounded explicit vanilla
+equipment can be synchronized by a reviewed adapter. Automatic surrogate,
+equipment, or passenger choice, leash synchronization, broad metadata, and
+dimension specialization are not implemented.
 
 An unsupported/error custom entity type is registered server-only at freeze
 time and receives an invisible marker quarantine solely for registry safety.
@@ -91,9 +93,10 @@ claimed.
 
 A GUI adapter exposes the real server `Container`, a complete bijective mapping
 for a vanilla generic 9xN screen, and an interaction policy. Transactions remain
-server-authoritative and sessions are bounded/cleaned. Furnace/property menus,
-custom buttons, paging, arbitrary slot types/layouts, and automatic slot-count
-inference are not implemented.
+server-authoritative and sessions are bounded/cleaned. A reviewed furnace
+specialization can expose a real three-slot `Container` and four bounded
+`ContainerData` properties. Custom buttons, paging, arbitrary slot
+types/layouts, and automatic slot-count inference are not implemented.
 
 An unsupported/error custom menu type is marked server-only at freeze time.
 That quarantine prevents an unknown menu registry entry from reaching a
@@ -118,7 +121,7 @@ remap.
 
 ## Client profiles
 
-`VANILLA` is the only active 0.2 profile. `REBORN_COMPANION` and
+`VANILLA` is the only active 0.3 profile. `REBORN_COMPANION` and
 `TRUSTED_MODDED` are future API values. Unknown clients are vanilla; Fabric
 presence never enables raw registry passthrough. Any future trusted path must
 authenticate exact registry and mod fingerprints.

@@ -44,7 +44,7 @@ errors instead of leaking parser exceptions.
 
 ### Stable diff
 
-Startup compares the store loaded before planning with the final proposal and
+Startup compares the store loaded before planning with the final active proposal and
 atomically writes:
 
 ```text
@@ -66,6 +66,12 @@ Entries have stable ordering and may contain:
 
 Reassigned, invalidated, and capacity-risk results are incompatible. A
 resource-only change is visible but does not itself mean carrier reassignment.
+
+Allocations belonging to a temporarily absent Mod remain dormant in the
+persistent store so a later re-add cannot recycle or reorder them. They are
+nevertheless absent from the active proposal and therefore appear as
+`REMOVED` in the startup diff. Re-adding the same valid content replays the
+retained assignment.
 
 ### Dry run
 

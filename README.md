@@ -5,8 +5,8 @@ platform for **Minecraft 26.1.2**. It keeps each mod's real registered objects
 and game logic authoritative on the server while Polymer supplies conservative
 vanilla-facing overlays.
 
-The current development release is `0.2.0-alpha.1+26.1.2`, the **Interactive
-Compatibility Alpha**. It is not an official continuation endorsed by
+The current development release is `0.3.0-beta.1+26.1.2`, the **Real-World
+Compatibility Beta**. It is not an official continuation endorsed by
 TheEpicBlock or the original PolyMc contributors.
 
 > PolyMc Reborn does not make every content mod compatible. Compatibility is a
@@ -28,7 +28,7 @@ TheEpicBlock or the original PolyMc contributors.
 The project uses Minecraft's official names. It has no Yarn mappings
 dependency and does not use intermediary-named source.
 
-## What 0.2 implements
+## What 0.3 Beta implements
 
 Reborn discovers registered content in stable identifier order, asks ordered
 compatibility providers for candidates, freezes an immutable mapping plan, and
@@ -36,15 +36,22 @@ applies the selected representation through Polymer. Every decision records
 the chosen provider/backend, confidence, degradation, reason chain, required
 resources, warnings, and failure information.
 
-The 0.2 implementation adds to the 0.1 foundation:
+The 0.3 implementation adds to the existing deterministic foundation:
 
 - conservative semantic item carriers and safe client-component projection;
 - deterministic per-state mappings for full-cube blocks whose variants and
   resource dependencies can be resolved safely;
 - an explicit standard-container GUI API backed by the real server
   `Container`, bounded sessions, policy-gated interactions, and resync support;
+- an explicit furnace projection backed by a real three-slot `Container` and
+  four bounded progress properties;
 - an explicit Polymer Virtual Entity API with a vanilla surrogate, guarded
-  use/attack callbacks, and lifecycle cleanup;
+  use/attack callbacks, lifecycle cleanup, one explicit vanilla passenger, and
+  bounded vanilla equipment;
+- a standalone Maven API artifact and an independently compiled consumer Mod;
+- per-player `REQUIRED`, `OPTIONAL`, and `DISABLED` pack policy, with safe
+  vanilla carriers when resources are unavailable;
+- diagnostic display policy and local whitelist-only support bundles;
 - mapping status, strict validation, stable diff, no-write dry run, checksummed
   backup, and restart-only rollback preparation;
 - a two-process production playtest harness: an independent dedicated server
@@ -59,11 +66,11 @@ entity, menu, and container are never replaced with a vanilla registration.
 
 ## Explicit limits
 
-0.2 does **not** provide arbitrary GUI conversion or automatic entity guessing.
-Only reviewed GUI/entity adapters are projected. Furnace/property menus,
-pagination, custom client screens, broad entity metadata/equipment/passenger
-synchronization, complex block geometry, custom client renderers, and broad
-packet rewriting remain unsupported or roadmap work.
+0.3 does **not** provide arbitrary GUI conversion or automatic entity guessing.
+Only reviewed GUI/entity adapters are projected. Arbitrary property menus,
+pagination, custom client screens, automatic passenger/equipment selection,
+complex block geometry, custom client renderers, and broad packet rewriting
+remain unsupported or roadmap work.
 
 Runtime creative reverse mapping remains disabled. The `REBORN_COMPANION` and
 `TRUSTED_MODDED` client profiles remain future API values; Fabric presence does
@@ -86,7 +93,9 @@ See [migration-from-polymc.md](docs/migration-from-polymc.md).
 
 Reborn and Polymer are server dependencies. Ordinary players are not required
 to install them. Visual fidelity can require accepting the server resource
-pack. Polymer AutoHost is optional and is not bundled.
+pack. `REQUIRED` disconnects a declining client, `OPTIONAL` retains a safe
+vanilla fallback, and `DISABLED` does not offer the pack. Polymer AutoHost is
+optional and is not bundled.
 
 Do not install another real mod whose metadata ID is `polymc` beside Reborn.
 Reborn advertises `polymc` through `provides` for recompiled extensions and
@@ -104,6 +113,8 @@ Server state lives below `config/polymc-reborn/`:
 | `backups/mappings/` | checksummed mapping backups |
 | `reports/` | compatibility, mapping-diff, and resource-pack reports |
 | `cache/` | bounded, rebuildable generated-data cache |
+| `diagnostics-policy.json` | display-only diagnostic policy |
+| `support/` | local sanitized support bundle output |
 
 Unknown fields are rejected. Mapping-affecting changes are read during startup
 and never hot-apply to a frozen plan. Corrupt mappings are a startup error;
@@ -139,6 +150,8 @@ only when that literal is free.
 - `/polymcreborn stats`
 - `/polymcreborn client-profile <player>`
 - `/polymcreborn mappings <status|validate|diff|dry-run|backup|rollback>`
+- `/polymcreborn diagnostics <status|validate|why|list>`
+- `/polymcreborn support bundle [status]`
 
 `scan` and mapping commands inspect the frozen plan; they do not remap a live
 server. Reports omit absolute local paths by default.
@@ -171,10 +184,17 @@ java -version
 ./gradlew runClientPlaytest
 ./gradlew runProductionClientPlaytest
 ./gradlew runPlaytest
+./gradlew runApiConsumerPlaytest
+./gradlew runProductionMultiClientPlaytest
+./gradlew runPackPolicyPlaytest
+./gradlew runUpgradePlaytest
+./gradlew runModSetExpansionPlaytest
+./gradlew runExternalModMatrix
+./gradlew generateSbom verifyReleaseArtifacts
 ```
 
 On Windows use `gradlew.bat`. The canonical full interactive entrypoint is
-`runPlaytest`. It writes ignored evidence below `build/playtest/`, including
+`runPlaytest`. It writes ignored evidence below `build/playtest/single-client/`, including
 summary JSON/Markdown, JUnit XML, loaded-client mods, independent client/server
 state, logs, and screenshots.
 
@@ -184,9 +204,10 @@ and the automation driver. It is therefore not a pure zero-mod vanilla client.
 The driver contains no Reborn, Polymer, server fixture, server content
 definitions, or private mapping-plan access and rejects those mods at startup.
 
-A pure zero-mod vanilla-client smoke and a completed third-party content-mod
-matrix are separate P1 layers and are not implemented or claimed by this
-release. On 2026-07-18 the local `runClientPlaytest`,
+A pure zero-mod vanilla-client smoke remains a separate P1 layer and is not
+implemented or claimed by this release. The external matrix uses two exact,
+hash-locked third-party server Mods and reports only named tested features,
+never whole-Mod compatibility. On 2026-07-18 the 0.2 baseline local `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` commands each completed
 successfully; the retained final evidence reports 53/53 checks, 35/35 client
 steps, and 17/17 screenshots. GitHub Actions Client Playtest run

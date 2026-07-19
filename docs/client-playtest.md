@@ -1,6 +1,6 @@
 # Isolated client playtest
 
-The 0.2 harness launches a real Minecraft 26.1.2 client against an independently
+The production harness launches a real Minecraft 26.1.2 client against an independently
 launched dedicated server and drives gameplay with Fabric Client GameTest input
 APIs. It is not a pure zero-mod vanilla-client test.
 
@@ -28,6 +28,8 @@ account credentials or tokens are required.
 ./gradlew runClientPlaytest
 ./gradlew runProductionClientPlaytest
 ./gradlew runPlaytest
+./gradlew runProductionMultiClientPlaytest
+./gradlew runPackPolicyPlaytest
 ./gradlew cleanPlaytest
 ```
 
@@ -148,9 +150,10 @@ standard CI run
 [`29642433896`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433896)
 also passed and its distribution JAR was inspected.
 
-## Separate P1 layers
+## 0.3 extensions and separate P1 layers
 
 A pure zero-mod client smoke contains no Fabric and no driver; it is not
-implemented/run for 0.2. The external third-party mod matrix is also separate
-and has no completed compatibility result in 0.2. Neither may be inferred from
-an internal fixture run.
+implemented/run for 0.3. Multi-client, pack-policy, API-consumer, upgrade, and
+external-Mod runs use their own evidence roots and claims; none may be inferred
+from a single-client internal fixture run. Runtime creative reverse mapping
+also remains fail-closed and has no client attack-test result.

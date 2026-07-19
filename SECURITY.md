@@ -40,10 +40,16 @@ commitment.
   markers and an allowlisted component set; malformed or forged markers are
   rejected. Polymer's ordinary restoration metadata is not authentication.
 - Unknown clients are `VANILLA`. Merely detecting Fabric is not authentication.
-- Packet fallback is disabled by default and 0.2 contains no broad packet
+- Packet fallback is disabled by default and 0.3 Beta contains no broad packet
   rewrite engine.
 - Reports sanitize local filesystem paths by default. Operators should still
   inspect reports and logs before sharing them.
 
 Mods execute server-side code with the server process's privileges. PolyMc
 Reborn cannot sandbox an installed mod and should not be described as doing so.
+
+Use `/pmcr support bundle` when possible. It creates a bounded local whitelist
+archive and never uploads it; review its manifest/redaction report before
+sharing. Security/corruption/signature/path diagnostics cannot be downgraded by
+display policy. Creative reverse mapping and packet fallback remain
+fail-closed/disabled in 0.3 Beta.

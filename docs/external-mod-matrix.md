@@ -1,73 +1,49 @@
-# External content-mod compatibility matrix
+# External content-Mod matrix
 
-## 0.2 status: `NOT_TESTED`
+The 0.3 Beta matrix runs exact third-party artifacts one at a time on the
+production server. The isolated client keeps its eight-Mod allow-list and never
+installs the tested content Mod. A passing row describes only the named
+scenario; it is not a whole-Mod compatibility claim.
 
-Research was performed on 2026-07-18 against official Modrinth project/version
-metadata. Two exact 26.1.2 artifacts were downloaded to the bounded ignored
-`playtest/external-cache/`, verified against publisher-provided SHA-512, and
-inspected without execution. Both contain zero Java classes and therefore do
-not register the custom Minecraft objects this matrix must exercise. No
-third-party compatibility result is claimed. The internal Reborn fixture is
-project-authored and is not third-party evidence.
-
-Exact inspection metadata is locked in
+The executable lock is
 [`playtest/external-mods.lock.json`](../playtest/external-mods.lock.json).
+Downloads are bounded to 8 MiB, must match exact size, SHA-256, and SHA-512,
+remain under ignored `build/external-mods/`, and are never copied into release
+or evidence artifacts.
 
-| Candidate | Exact version | License/source | Client requirement | Inspection or exclusion | Result |
-| --- | --- | --- | --- | --- | --- |
-| [Bubblellaneous](https://modrinth.com/mod/bubblellaneous) | `3.0.3+mod` (`x8ZQ7W3e`) | CC-BY-SA-4.0; [source](https://github.com/bbfh-dev/bubblellaneous-pack) | optional | SHA-256 `70daf7d061281a54ec832e921bcd3f1f0424d86465da8e8ba5b6091dc4471b5f`; 0 classes, 5,795 data and 4,237 asset entries; data/resource-pack content, not custom registrations | `NOT_TESTED` |
-| [Silly Eatables](https://modrinth.com/mod/silly-eatables) | `v4.3.1+mod` (`oVpaJYK7`) | MIT; [source](https://github.com/Classics-Craftworks/Silly-Eatables) | optional/unsupported | SHA-256 `a1a83db6cea2803e4f1fcb22d78a01dbfbcc8c58668952d22eb65b896fefc412`; 0 classes and 72 data entries; recipe/data content only | `NOT_TESTED` |
-| [Immersive Armors](https://modrinth.com/mod/immersive-armors) | `1.8.0+26.1.2` (`pNvZzj5v`) | GPL-3.0-only; [source](https://github.com/Luke100000/ImmersiveArmors) | required | would install the tested content definitions on the client, violating the minimal-client matrix | `NOT_TESTED` |
-| [Improved Crystals](https://modrinth.com/mod/improved-crystals) | `1.0.1` (`DWSYJIz0`) | MIT; [source](https://github.com/Thumpbacker/ImprovedCrystals) | required | content-rich, but its official metadata requires the mod on the client | `NOT_TESTED` |
-| [Amethyst Addon](https://modrinth.com/mod/amethyst-addon) | project advertises 26.1.2 | all-rights-reserved; no source link | required | license/source and minimal-client requirements do not meet the matrix policy | `NOT_TESTED` |
-| [Oxidizium](https://modrinth.com/mod/oxidizium) | 26.1.2 variants | MIT; [source](https://github.com/Tater-Certified/Oxidizium) | optional | Rust-backed Minecraft rewrite/optimization project, not a bounded content-registration fixture; variant/runtime surface is unsuitable here | `NOT_TESTED` |
+| Mod | Exact artifact | License/source | Server scenario | Expected classification |
+|---|---|---|---|---|
+| Immersive Armors | `1.8.0+26.1.2`, Modrinth version `pNvZzj5v`, SHA-256 `1ca08b0d30fa860eae0b0451c3348f9a3bc88ced6b3f9ca3c06e1f994ac117cf` | GPL-3.0-only, source commit `4cd05c99a7a61b8f0e34825cf1a667f6db404a85` | acquire real `immersive_armors:bone_helmet`, verify a vanilla carrier, equip it through normal use | `FULL_FOR_TESTED_SCOPE` only if every named item assertion passes |
+| Many More Ores and Crafts | `2.0.1`, Modrinth version `sZLzO94K`, SHA-256 `aebcb5c7763300ecafd588eb7e22b8f665815ad9d534d1aa1d90eecd30fe08f2` | MIT, source commit `941837076ee80e0e616e74330508d496ca10b10a` | acquire, place, and break real `many_more_ores_and_crafts:adamantite_block`; verify stable mapping | `FULL_FOR_TESTED_SCOPE` only if every named block assertion passes |
 
-Because no candidate met all gates (real custom registrations, exact 26.1.2,
-clear license/source, and no client installation), no external JAR was enabled
-in the production playtest and no external-matrix workflow was activated. This
-is an explicit P1 deferral, not a passing or failing compatibility outcome.
+Run:
 
-Do not turn successful mapping of an internal fixture into a claim about a
-similarly shaped external mod.
+```text
+./gradlew runExternalModMatrix
+```
 
-## Procedure for a future entry
+The task downloads from the locked publisher URL, launches a fresh production
+client/server run per entry, and writes sanitized results below
+`build/playtest/external-mods/`. Infrastructure/download failures are recorded
+as failures, never reclassified as Mod incompatibility. A zero-scenario client
+startup failure with no crash, decoder, or registry-sync signature receives one
+bounded retry after host resources settle; both attempt bundles remain in the
+evidence. Content assertion failures are never retried.
 
-1. Select a mod that explicitly supports Fabric and exactly Minecraft 26.1.2.
-2. Use only a publisher-controlled GitHub release, official Modrinth project,
-   or another documented official source.
-3. Review and record artifact/source licenses; public download access is not
-   permission to redistribute.
-4. Record project/source/download URLs, exact version, size, SHA-256, and
-   license in `playtest/external-mods.lock.json`.
-5. Download to a bounded ignored cache, verify size/hash before use, and never
-   commit/upload the JAR unless licensing/project policy explicitly permits it.
-6. Install the mod on the isolated production server only. Keep the client
-   allow-list unchanged and do not install the tested mod on the client.
-7. Run login, pack application, item acquisition/use, safe block place/break,
-   report inspection, reconnect, and screenshot scenarios.
-8. Preserve sanitized per-mod evidence and classify each tested feature rather
-   than only server startup.
+The local Windows execution for this Beta completed both locked rows with
+`FULL_FOR_TESTED_SCOPE`: 41 checks per row, 42 screenshots total, separate
+client/server logs and loaded-Mod lists, and clean reconnects. Immersive Armors
+proved real helmet acquisition/equipment; Many More Ores and Crafts proved real
+custom-block placement and breaking. The first Immersive Armors attempt exposed
+three custom data-component registry entries during login; Reborn now registers
+non-vanilla component types with Polymer's server-only registry filtering while
+retaining their real server values. These statements apply only to the named
+scenarios and exact locked artifacts.
 
-Allowed results:
+Improved Crystals was researched but excluded: its public project/repository
+license metadata and packaged Fabric metadata did not agree. PolyMc-Extra was
+not inspected or used as an implementation source.
 
-- `FULL`: every explicitly listed scenario passed, never all mod content;
-- `PARTIAL`: named capabilities passed and named capabilities degraded/failed;
-- `FALLBACK`: safe carriers were used with documented degradation;
-- `UNSUPPORTED`: content was safely refused;
-- `CRASH`: server/client failed with evidence retained;
-- `NOT_TESTED`: no completed evidence-producing run.
-
-## Safety and CI
-
-When at least one artifact passes selection, its external matrix workflow must
-be manual/scheduled, separately timed, and
-must not fetch unbounded or unverified binaries. It may upload sanitized Reborn
-reports/logs/screenshots, but not the third-party JAR, world, credentials,
-external IPs, usernames, or absolute local paths.
-
-Download/infrastructure failure is not a compatibility result. An artifact
-whose exact 26.1.2 support, source, hash, or license cannot be verified remains
-`NOT_TESTED`. Runtime compatibility-code download/execution is forbidden.
-
-Pure zero-mod vanilla-client smoke is a separate P1 layer. Running an external
-mod against the Fabric Client GameTest driver would not prove that layer.
+Allowed reporting terms are `FULL` for all explicitly enumerated scenarios,
+`PARTIAL`, `FALLBACK`, `UNSUPPORTED`, `CRASH`, and `NOT_TESTED`. This Beta does
+not use `FULL` to mean every feature of a Mod.

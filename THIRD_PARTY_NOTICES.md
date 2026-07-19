@@ -41,3 +41,11 @@ a generated resource pack.
 Exact coordinates are authoritative in `gradle.properties`, `build.gradle`,
 and `gradle.lockfile`. If those files change, update this
 notice in the same change.
+
+## External compatibility-test artifacts
+
+The ignored matrix may download exact server-test copies of Immersive Armors
+1.8.0+26.1.2 (GPL-3.0-only) and Many More Ores and Crafts 2.0.1 (MIT) from
+publisher-controlled Modrinth URLs. Hashes/source commits are locked in
+`playtest/external-mods.lock.json`. These JARs are not redistributed, shaded,
+included in evidence, or included in release artifacts.

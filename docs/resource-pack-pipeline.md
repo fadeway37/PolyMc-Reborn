@@ -142,3 +142,11 @@ determinism tests. The playtest is passing only when the real client process
 downloads/applies the pack, the known fixture resource is visible after reload
 and reconnect, both process reports agree, and the orchestrator exits cleanly.
 Harness source or a server-only pack build is not evidence that those steps ran.
+
+## 0.3 per-player policy
+
+`resource_pack_policy` is `REQUIRED`, `OPTIONAL`, or `DISABLED`. Packet-time
+lookups are O(1) against a bounded per-player map. REQUIRED may expose planned
+resources because vanilla disconnects a decline; OPTIONAL exposes them only
+after `SUCCESSFULLY_LOADED`; DISABLED never does. Duplicate terminal responses
+are idempotent, and disconnect removes the live entry.

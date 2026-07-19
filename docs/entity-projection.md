@@ -49,8 +49,9 @@ complete scenario successfully.
 | position/tracking, rotation, name, glowing | implemented |
 | guarded use and attack callbacks | implemented |
 | unload/replacement/server-stop cleanup | implemented |
-| equipment | not implemented |
-| passengers, leashes, poses, animations | not implemented |
+| bounded explicit vanilla equipment | implemented in 0.3 Beta |
+| one explicit vanilla passenger | implemented in 0.3 Beta |
+| leashes, poses, animations | not implemented |
 | arbitrary tracked-data mapping | not implemented |
 | dimension-transfer specialization | not implemented |
 | automatic surrogate heuristic | deliberately unsupported |
@@ -60,3 +61,11 @@ capacity exhaustion skips new projections with an explicit diagnostic. Each
 entity's interaction replay guard is also bounded to 1,024 keys.
 The surrogate is only a presentation and does not promise an identical hitbox
 or animation; adapters must document degradation.
+
+## 0.3 explicit composition
+
+An adapter may declare one vanilla passenger and bounded vanilla equipment.
+Stacks are created only after component binding, and watcher packets are sent
+per live session. The production client asserts one parrot passenger and a
+golden helmet. Automatic surrogate/passenger/equipment choice, arbitrary
+metadata, and leashes remain unsupported.

@@ -205,3 +205,12 @@ clean shutdown, and the complete `build/playtest/` evidence contract. This is
 not a pure zero-mod vanilla-client test. See
 [client-playtest.md](client-playtest.md) and
 [ADR 0004](adr/0004-client-playtest-architecture.md).
+
+## 0.3 Beta boundaries
+
+The public API is also published as `io.github.polymcreborn:polymc-reborn-api`
+without backend implementation classes. Furnace projection, explicit entity
+composition, pack state, diagnostic policy, and support bundling remain narrow
+services around the immutable plan. Two-client state is per player/connection;
+clients share no statics or private plan access. Upgrade testing runs audited
+0.2 and current JARs against one persistent store.

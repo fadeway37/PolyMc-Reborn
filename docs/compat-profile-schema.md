@@ -141,6 +141,7 @@ The generated v1 defaults are:
   "schema_version": 1,
   "enabled": true,
   "generate_resource_pack": true,
+  "resource_pack_policy": "REQUIRED",
   "persistent_mappings": true,
   "safe_mode": true,
   "log_decision_chains": true,

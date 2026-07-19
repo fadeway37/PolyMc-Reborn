@@ -1,5 +1,17 @@
 # Roadmap
 
+## 0.3 Real-World Compatibility Beta
+
+- standalone annotated/signature-checked API and external consumer;
+- per-player pack policy, explicit furnace properties, and explicit entity
+  passenger/equipment composition;
+- two-client, external-Mod, upgrade, and mod-set preservation evidence;
+- diagnostic policy/support bundles and Beta supply-chain artifacts.
+
+Pure zero-Mod vanilla automation and authenticated creative reverse mapping are
+not complete; creative enablement fails startup. The bounded five-run soak is
+not the future full 10,000-tick/stress target.
+
 This roadmap separates implemented alpha scope from future work. An interface,
 fixture, or harness does not by itself prove a release claim.
 
@@ -32,7 +44,7 @@ passed on 2026-07-18 and their retained evidence was inspected. GitHub Actions
 Client Playtest `29642433900` and standard CI `29642433896` also passed; their
 downloaded evidence and release-JAR artifacts were inspected.
 
-## P1 work not completed for 0.2
+## Historical 0.2 P1 gaps
 
 - Authenticated, rate-limited runtime creative reverse mapping and real
   creative-slot adversarial playtests.
@@ -45,19 +57,26 @@ downloaded evidence and release-JAR artifacts were inspected.
 
 These remain fail-closed. No incomplete runtime switch should imply support.
 
-## Candidate 0.3 direction
+## 0.3 delivery status
 
-- Add explicit furnace/property adapters only after full transaction/property
-  synchronization tests.
-- Add reviewed equipment/passenger compositions without generic entity
-  guessing while retaining the bounded projection registry.
+- The explicit furnace/property adapter and reviewed equipment/passenger
+  composition are implemented behind narrow registries and have dedicated
+  production playtest assertions.
+- The standalone API Artifact, signature baseline, consumer, diagnostic policy,
+  support bundle, external-Mod matrix, upgrade/mod-set harness, SBOM, checksums,
+  provenance, and manual Beta workflow are implemented release gates.
+- The per-player REQUIRED/OPTIONAL/DISABLED resource-pack policy remains
+  presentation-only; it never alters the frozen mapping plan.
+
+## Candidate 0.4 / release-candidate direction
+
 - Design authenticated creative reverse mapping with replay/rate/component
   protection before enabling its packet path.
-- Run a legal zero-mod client smoke and a small pinned external-mod matrix with
-  sanitized reproducible artifacts.
-- Add diagnostic policy with audit-preserving reason chains.
-- Gather downstream feedback before extracting/versioning a separate API JAR.
-- Add release provenance/signing and manual release automation.
+- Run a legal zero-Mod client smoke with no Fabric or automation driver.
+- Expand the license-reviewed external matrix and gather downstream API
+  feedback without weakening feature-scoped claims.
+- Add hosted artifact attestations/signing after the manual Beta provenance
+  workflow has accumulated stable evidence.
 
 ## Permanent non-goals
 

@@ -32,6 +32,9 @@ principles; alpha versions are tied to an exact Minecraft version.
   bounded, path-sanitized, whitelist-only local support bundle.
 - Hash-locked real third-party Mod, two-client, pack-policy, 0.2 upgrade, and
   mod-set expansion playtest gates with structured evidence.
+- A five-leg cross-process upgrade harness that runs the audited 0.2 JAR and
+  0.3 JAR over one world, then adds, removes, and re-adds an independent Mod
+  while checking world/player data, resource packs, and mapping bytes.
 - CycloneDX SBOM, SHA-256/SHA-512 checksums, build provenance, reproducibility
   checks, and manually gated Beta draft-release automation.
 
@@ -40,6 +43,9 @@ principles; alpha versions are tied to an exact Minecraft version.
 - Resource-pack responses are tracked per player with idempotent terminal-state
   counters and disconnected-session cleanup; OPTIONAL decline and DISABLED
   mode never expose custom model identifiers.
+- Non-vanilla data-component types are registered with Polymer registry
+  filtering so real server components remain authoritative without leaking
+  custom registry entries to vanilla clients.
 - Creative reverse mapping still fails startup when enabled. The 0.3 Beta does
   not accept Polymer's unsigned reverse payload or claim a creative-mode path.
 

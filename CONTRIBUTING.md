@@ -61,3 +61,8 @@ downloading executable code. Do not copy PolyMc-Extra source.
 
 By contributing, you agree that your contribution is licensed under
 `LGPL-3.0-or-later`.
+
+Public API changes additionally require `checkApiSignature`,
+`buildApiConsumer`, stability/migration notes, and an intentional baseline
+review. Pack, GUI, entity, persistence, or diagnostics behavior changes require
+their applicable production evidence gate, not only a unit test.

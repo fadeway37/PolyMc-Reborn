@@ -68,3 +68,10 @@ close/reopen, and inventory-integrity checks. GitHub Actions Client Playtest
 The existence of a row-count API does not mean every similarly sized menu is
 compatible. Adapters must document and test truthful transaction semantics.
 Runtime creative clone and global creative reverse-item mapping remain disabled.
+
+## 0.3 explicit property specialization
+
+`GuiProjection.furnace` adds one reviewed specialization over the same
+server-authoritative session machinery. It accepts exactly three real slots and
+four bounded properties and presents a vanilla `FurnaceMenu`. No arbitrary
+menu is inferred. See [property-gui.md](property-gui.md).

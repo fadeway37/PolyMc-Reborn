@@ -16,6 +16,12 @@ java -version
 ./gradlew runClientPlaytest
 ./gradlew runProductionClientPlaytest
 ./gradlew runPlaytest
+./gradlew runApiConsumerPlaytest
+./gradlew runProductionMultiClientPlaytest
+./gradlew runPackPolicyPlaytest
+./gradlew runUpgradePlaytest
+./gradlew runModSetExpansionPlaytest
+./gradlew runExternalModMatrix
 git diff --check
 ```
 
@@ -32,8 +38,11 @@ passed.
 | Dedicated-server smoke | server-only production source set | startup and absence of client-class linkage |
 | Isolated Client Driver Playtest | real client + independent server | multiplayer, pack, input, presentation, reconnect observations |
 | Production Client Playtest | same two processes using the final official-namespace distribution JAR | artifact/classpath isolation plus the interactive scenario |
-| Pure zero-mod vanilla smoke | no Fabric/client driver | P1, not implemented/run for 0.2 |
-| External-mod matrix | pinned third-party server mod, absent from client | P1 framework only; no completed compatibility result claimed |
+| Multi-Client Driver Playtest | two isolated clients plus one production server | concurrent sessions, pack state, disconnect isolation |
+| API Consumer Playtest | independent Maven-coordinate consumer on production server | standalone API resolution/runtime registration |
+| Upgrade/Mod-set Playtest | audited 0.2 then 0.3 over one world/store, then independent Mod B add/remove/re-add | world/player preservation, active removal diagnostics, dormant allocation retention, byte-stable re-add |
+| External-mod matrix | hash-locked third-party server Mod, absent from client | only named item/block scenarios |
+| Pure zero-mod vanilla smoke | no Fabric/client driver | P1, not implemented/run for 0.3 Beta |
 
 The Client Driver Playtest is a real Minecraft 26.1.2 client, but includes a
 minimal Fabric automation mod. It must not be called an unmodified or pure
@@ -95,7 +104,7 @@ The scenario contract includes:
 The evidence root is:
 
 ```text
-build/playtest/
+build/playtest/single-client/
   summary.json
   summary.md
   junit.xml
@@ -124,6 +133,9 @@ The required screenshot contract is:
 11-gui-after-shift-click.png
 12-gui-after-hotbar-swap.png
 13-gui-reopened.png
+14-property-gui-start.png
+15-property-gui-progress.png
+16-property-gui-complete.png
 14-entity-spawned.png
 15-entity-moved.png
 16-entity-interacted.png
@@ -166,8 +178,15 @@ manifest with project version, Minecraft version, Git commit, and dirty state.
 It must not contain Client GameTest/driver classes, fixtures, screenshots,
 reports, worlds, caches, secrets, local JARs, or absolute developer paths.
 
+## 0.3 Beta evidence roots
+
+Single client, multi-client, API consumer, upgrade, mod-set expansion, external
+Mods, and bounded soak evidence have separate children under `build/playtest/`.
+Each gate uses structured summaries, process exits, loaded Mod lists, hashes,
+redaction metadata, and manifests; harness source alone is not evidence.
+
 ## P1 test status
 
-The pure zero-mod vanilla-client smoke, runtime creative reverse-mapping client
-scenario, and completed external third-party mod matrix are not implemented/run
-for 0.2. Internal fixture success must not be generalized to unrelated mods.
+The pure zero-mod vanilla-client smoke and runtime creative reverse-mapping
+client scenario are not implemented/run for 0.3 Beta. Creative enablement
+fails startup. External results remain feature-scoped.
