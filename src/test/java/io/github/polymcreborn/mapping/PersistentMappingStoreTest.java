@@ -127,6 +127,25 @@ class PersistentMappingStoreTest {
     }
 
     @Test
+    void retainsDormantAssignmentsWhileActiveDiffReportsRemoval() {
+        var store = new PersistentMappingStore(temporaryDirectory);
+        var active = mapping("demo:active", ContentType.ITEM, "minecraft:paper");
+        var dormant = mapping("removed:dormant", ContentType.ITEM, "minecraft:paper");
+        var existing = new MappingStoreDocument(1, MappingStoreDocument.ALGORITHM_VERSION,
+                List.of(active, dormant));
+
+        var persisted = store.mergePreservingAssignments(existing, List.of(active));
+        var activeSnapshot = new MappingStoreDocument(1, MappingStoreDocument.ALGORITHM_VERSION,
+                List.of(active));
+        var diff = MappingPlanDiff.compare(existing, activeSnapshot);
+
+        assertEquals(2, persisted.mappings().size());
+        assertEquals(1, diff.counts().get(MappingPlanDiff.ChangeKind.REMOVED));
+        assertTrue(diff.entries().stream().anyMatch(entry -> entry.key().equals(dormant.key())
+                && entry.changes().contains(MappingPlanDiff.ChangeKind.REMOVED)));
+    }
+
+    @Test
     void validatesIdentifiersHashesAndDuplicateKeys() {
         assertThrows(IllegalArgumentException.class, () -> new StoredMapping(
                 "missing_namespace", ContentType.ITEM, "", "item", "minecraft:paper", "",

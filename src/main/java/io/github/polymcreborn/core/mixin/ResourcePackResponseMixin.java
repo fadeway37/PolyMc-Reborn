@@ -2,6 +2,8 @@
 package io.github.polymcreborn.core.mixin;
 
 import io.github.polymcreborn.core.PolyMcReborn;
+import io.github.polymcreborn.api.DiagnosticCollector;
+import io.github.polymcreborn.diagnostics.DiagnosticContext;
 import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
 import net.minecraft.server.network.ServerCommonPacketListenerImpl;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -18,7 +20,15 @@ abstract class ResourcePackResponseMixin {
                                                            CallbackInfo callback) {
         Object listener = this;
         if (listener instanceof ServerGamePacketListenerImpl game) {
-            PolyMcReborn.runtime().playerPackStates().response(game.player.getUUID(), packet.action());
+            var runtime = PolyMcReborn.runtime();
+            var state = runtime.playerPackStates().response(game.player.getUUID(), packet.action());
+            runtime.diagnostics().record("resource-pack.state", new DiagnosticContext(
+                            "client-session", "", "", "", "", "", "VANILLA",
+                            state.name(), "", "network-session"),
+                    "Vanilla resource-pack response changed the session state to " + state,
+                    state == io.github.polymcreborn.pack.PlayerPackStateService.State.FAILED
+                            || state == io.github.polymcreborn.pack.PlayerPackStateService.State.REQUIRED_REJECTED
+                            ? DiagnosticCollector.Severity.WARNING : DiagnosticCollector.Severity.INFO);
         }
     }
 }

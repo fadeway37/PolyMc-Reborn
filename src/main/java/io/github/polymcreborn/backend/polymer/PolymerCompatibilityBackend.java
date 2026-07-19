@@ -60,6 +60,7 @@ public final class PolymerCompatibilityBackend {
     private final Map<String, SafeItemOverlay> pendingSemanticItems = new TreeMap<>();
     private volatile MappingStoreDocument startupBase = MappingStoreDocument.empty();
     private volatile MappingStoreDocument mappingSnapshot = MappingStoreDocument.empty();
+    private volatile MappingStoreDocument activeMappingSnapshot = MappingStoreDocument.empty();
     private volatile MappingPlanDiff startupDiff = MappingPlanDiff.compare(
             MappingStoreDocument.empty(), MappingStoreDocument.empty());
 
@@ -102,7 +103,8 @@ public final class PolymerCompatibilityBackend {
         MappingStoreDocument mergeBase = withoutRetiredMappings(existing, retiredMappings);
         var merged = store.mergePreservingAssignments(mergeBase, newMappings);
         mappingSnapshot = merged;
-        startupDiff = MappingPlanDiff.compare(startupBase, merged);
+        activeMappingSnapshot = document(newMappings);
+        startupDiff = MappingPlanDiff.compare(startupBase, activeMappingSnapshot);
         if (persistentMappings) {
             store.save(merged.mappings());
         }
@@ -224,11 +226,13 @@ public final class PolymerCompatibilityBackend {
             var merged = store.mergePreservingAssignments(existing, resolvedMappings);
             store.save(merged.mappings());
             mappingSnapshot = merged;
-            startupDiff = MappingPlanDiff.compare(startupBase, merged);
+            activeMappingSnapshot = store.mergePreservingAssignments(activeMappingSnapshot, resolvedMappings);
+            startupDiff = MappingPlanDiff.compare(startupBase, activeMappingSnapshot);
         } else if (!resolvedMappings.isEmpty()) {
             var merged = store.mergePreservingAssignments(mappingSnapshot, resolvedMappings);
             mappingSnapshot = merged;
-            startupDiff = MappingPlanDiff.compare(startupBase, merged);
+            activeMappingSnapshot = store.mergePreservingAssignments(activeMappingSnapshot, resolvedMappings);
+            startupDiff = MappingPlanDiff.compare(startupBase, activeMappingSnapshot);
         }
         return current.replaceDecisions(List.copyOf(updated.values()));
     }
@@ -243,6 +247,11 @@ public final class PolymerCompatibilityBackend {
 
     public synchronized boolean hasPendingSemanticItems() {
         return !pendingSemanticItems.isEmpty();
+    }
+
+    private static MappingStoreDocument document(List<StoredMapping> mappings) {
+        return new MappingStoreDocument(MappingStoreDocument.SCHEMA_VERSION,
+                MappingStoreDocument.ALGORITHM_VERSION, List.copyOf(mappings));
     }
 
     private static Item carrierForCategory(String category) {

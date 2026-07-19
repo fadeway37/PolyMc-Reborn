@@ -32,9 +32,12 @@ public final class SupportBundleService {
     private static final long MAX_BUNDLE_BYTES = 8_388_608L;
     private static final int MAX_ENTRIES = 20;
     private static final Pattern WINDOWS_PATH = Pattern.compile(
-            "(?i)[a-z]:\\\\[^\\r\\n\\\"\\s]+");
+            "(?i)(?:[a-z]:\\\\|/(?:home|users|root|private|tmp)/)[^\\r\\n\\\"']+?"
+                    + "(?=\\s+\\\"?(?:token|secret|password|authorization|hmac[_-]?key)"
+                    + "\\\"?\\s*[:=]|[\\r\\n\\\"']|$)");
     private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
-            "(?i)(token|secret|password|authorization|hmac[_-]?key)\\s*[:=]\\s*[^,\\s\\\"]+");
+            "(?i)\\\"?(?:token|secret|password|authorization|hmac[_-]?key)\\\"?"
+                    + "\\s*[:=]\\s*\\\"?[^,\\s\\\"}]+\\\"?");
     private final RebornRuntime runtime;
     private volatile SupportBundleResult lastResult;
 

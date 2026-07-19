@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymcreborn.github.io/schema/diagnostics-policy-v1.json",
+  "title": "PolyMc Reborn diagnostics policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rules"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "rules": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "code", "effective_severity", "reason", "operator_note", "known_issue"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+          "code": {"$ref": "#/$defs/glob"},
+          "registry_id": {"$ref": "#/$defs/glob"},
+          "mod_id": {"$ref": "#/$defs/glob"},
+          "content_type": {"$ref": "#/$defs/glob"},
+          "provider_id": {"$ref": "#/$defs/glob"},
+          "adapter_id": {"$ref": "#/$defs/glob"},
+          "mapping_status": {"$ref": "#/$defs/glob"},
+          "client_profile": {"$ref": "#/$defs/glob"},
+          "pack_status": {"$ref": "#/$defs/glob"},
+          "decision_id": {"$ref": "#/$defs/glob"},
+          "effective_severity": {"enum": ["INFO", "WARNING", "ERROR"]},
+          "reason": {"type": "string", "maxLength": 512},
+          "operator_note": {"type": "string", "maxLength": 512},
+          "known_issue": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "glob": {"type": "string", "minLength": 1, "maxLength": 256}
+  }
+}

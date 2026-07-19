@@ -27,14 +27,21 @@ public final class BoundedDiagnosticCollector implements DiagnosticCollector {
 
     @Override
     public synchronized void record(String code, String registryId, String message, Severity severity) {
+        record(code, DiagnosticContext.basic(registryId), message, severity);
+    }
+
+    public synchronized void record(String code, DiagnosticContext context, String message,
+                                    Severity severity) {
         if (diagnostics.size() == capacity) {
             dropped++;
             return;
         }
-        var applied = policy.apply(code, registryId, severity);
-        diagnostics.add(new Diagnostic(code, registryId, message, severity, applied.severity(),
+        var applied = policy.apply(code, context, severity);
+        diagnostics.add(new Diagnostic(code, context.registryId(), context.modId(), context.contentType(),
+                context.providerId(), context.adapterId(), context.mappingStatus(), context.clientProfile(),
+                context.packStatus(), message, severity, applied.severity(),
                 applied.ruleId(), applied.source(), applied.reason(), applied.operatorNote(),
-                applied.knownIssue(), "initialization"));
+                applied.knownIssue(), context.lifecycleStage(), context.decisionId()));
     }
 
     public synchronized List<Diagnostic> snapshot() {

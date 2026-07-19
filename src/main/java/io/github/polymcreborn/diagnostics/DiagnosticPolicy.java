@@ -22,8 +22,13 @@ public record DiagnosticPolicy(int schemaVersion, List<Rule> rules, String sourc
     }
 
     public Applied apply(String code, String registryId, DiagnosticCollector.Severity severity) {
+        return apply(code, DiagnosticContext.basic(registryId), severity);
+    }
+
+    public Applied apply(String code, DiagnosticContext context,
+                         DiagnosticCollector.Severity severity) {
         for (Rule rule : rules) {
-            if (rule.code().matches(code) && rule.registry().matches(registryId)) {
+            if (rule.matches(code, context)) {
                 DiagnosticCollector.Severity effective = rule.effectiveSeverity();
                 if (protectedDiagnostic(code) && effective.ordinal() < severity.ordinal()) {
                     effective = severity;
@@ -37,22 +42,45 @@ public record DiagnosticPolicy(int schemaVersion, List<Rule> rules, String sourc
 
     static boolean protectedDiagnostic(String code) {
         String normalized = code.toLowerCase(java.util.Locale.ROOT);
-        return normalized.startsWith("security.") || normalized.contains("corrupt")
+        return normalized.startsWith("security.") || normalized.startsWith("fatal.")
+                || normalized.contains("corrupt")
                 || normalized.contains("signature") || normalized.contains("zip-slip")
                 || normalized.contains("path-traversal") || normalized.contains("forgery")
-                || normalized.contains("duplication") || normalized.contains("decode-failure");
+                || normalized.contains("duplicat") || normalized.contains("decode")
+                || normalized.contains("hmac") || normalized.contains("authentication");
     }
 
-    public record Rule(String id, SafeGlob code, SafeGlob registry,
+    public record Rule(String id, SafeGlob code, SafeGlob registry, SafeGlob modId,
+                       SafeGlob contentType, SafeGlob providerId, SafeGlob adapterId,
+                       SafeGlob mappingStatus, SafeGlob clientProfile, SafeGlob packStatus,
+                       SafeGlob decisionId,
                        DiagnosticCollector.Severity effectiveSeverity,
                        String reason, String operatorNote, boolean knownIssue) {
         public Rule {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(code, "code");
             Objects.requireNonNull(registry, "registry");
+            Objects.requireNonNull(modId, "modId");
+            Objects.requireNonNull(contentType, "contentType");
+            Objects.requireNonNull(providerId, "providerId");
+            Objects.requireNonNull(adapterId, "adapterId");
+            Objects.requireNonNull(mappingStatus, "mappingStatus");
+            Objects.requireNonNull(clientProfile, "clientProfile");
+            Objects.requireNonNull(packStatus, "packStatus");
+            Objects.requireNonNull(decisionId, "decisionId");
             Objects.requireNonNull(effectiveSeverity, "effectiveSeverity");
             reason = Objects.requireNonNull(reason, "reason");
             operatorNote = Objects.requireNonNull(operatorNote, "operatorNote");
+        }
+
+        boolean matches(String diagnosticCode, DiagnosticContext context) {
+            return code.matches(diagnosticCode) && registry.matches(context.registryId())
+                    && modId.matches(context.modId()) && contentType.matches(context.contentType())
+                    && providerId.matches(context.providerId()) && adapterId.matches(context.adapterId())
+                    && mappingStatus.matches(context.mappingStatus())
+                    && clientProfile.matches(context.clientProfile())
+                    && packStatus.matches(context.packStatus())
+                    && decisionId.matches(context.decisionId());
         }
     }
 

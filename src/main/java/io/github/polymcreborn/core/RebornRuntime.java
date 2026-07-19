@@ -160,8 +160,14 @@ public final class RebornRuntime {
                 server.halt(false);
             }
         });
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
-                playerPackStates.disconnected(handler.player.getUUID()));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            var finalState = playerPackStates.disconnected(handler.player.getUUID());
+            if (finalState == PlayerPackStateService.State.REQUIRED_REJECTED) {
+                diagnostics.record("resource-pack.required-rejected", "client-session",
+                        "A client disconnected after a REQUIRED pack offer without accepting it",
+                        DiagnosticCollector.Severity.WARNING);
+            }
+        });
     }
 
     public synchronized MappingPlan ensureStaticPlanFrozen() {
@@ -178,6 +184,14 @@ public final class RebornRuntime {
         MappingPlan finalPlan = proposed;
 
         if (config.enabled()) {
+            var sanitizedComponents = PolymerRegistrySanitizer.registerServerOnlyDataComponentTypes();
+            if (!sanitizedComponents.isEmpty()) {
+                diagnostics.record("registry.data-component.sanitized", "minecraft:data_component_type",
+                        "Registered " + sanitizedComponents.size()
+                                + " custom data-component type(s) as server-only; unsupported values are "
+                                + "filtered from vanilla-client stacks",
+                        DiagnosticCollector.Severity.INFO);
+            }
             var sanitizedBlockEntities = PolymerRegistrySanitizer.registerServerOnlyBlockEntityTypes();
             if (!sanitizedBlockEntities.isEmpty()) {
                 diagnostics.record("registry.block-entity.sanitized", "minecraft:block_entity_type",

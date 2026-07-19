@@ -5,6 +5,7 @@ import eu.pb4.polymer.core.api.block.PolymerBlockUtils;
 import eu.pb4.polymer.core.api.block.PolymerBlock;
 import eu.pb4.polymer.core.api.entity.PolymerEntityUtils;
 import eu.pb4.polymer.core.api.other.PolymerMenuUtils;
+import eu.pb4.polymer.core.api.other.PolymerComponent;
 import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
 import io.github.polymcreborn.api.ContentType;
 import io.github.polymcreborn.api.MappingDecision;
@@ -35,6 +36,27 @@ public final class PolymerRegistrySanitizer {
             var type = BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(id);
             if (!PolymerBlockUtils.isPolymerBlockEntityType(type)) {
                 PolymerBlockUtils.registerBlockEntity(type);
+                registered.add(id);
+            }
+        });
+        return List.copyOf(registered);
+    }
+
+    /**
+     * Marks every non-vanilla data-component type as server-only and filters it
+     * from stacks sent to clients that do not understand it. The real component
+     * remains attached to the authoritative server stack. This must run before
+     * Fabric constructs its login registry-sync payload.
+     */
+    public static List<Identifier> registerServerOnlyDataComponentTypes() {
+        var registered = new ArrayList<Identifier>();
+        BuiltInRegistries.DATA_COMPONENT_TYPE.keySet().stream().sorted().forEach(id -> {
+            if (id.getNamespace().equals(Identifier.DEFAULT_NAMESPACE)) {
+                return;
+            }
+            var type = BuiltInRegistries.DATA_COMPONENT_TYPE.getValue(id);
+            if (!PolymerComponent.isPolymerComponent(type)) {
+                PolymerComponent.registerDataComponent(type);
                 registered.add(id);
             }
         });

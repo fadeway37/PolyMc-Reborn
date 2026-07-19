@@ -59,6 +59,26 @@ class DiagnosticPolicyLoaderTest {
     }
 
     @Test
+    void matchesStructuredPackAndMappingContext() throws Exception {
+        Path file = directory.resolve("diagnostics-policy.json");
+        Files.writeString(file, """
+                {"schema_version":1,"rules":[{"id":"declined-pack","code":"resource-pack.*",
+                "registry_id":"client-*","mod_id":"*","content_type":"item",
+                "provider_id":"adapter:*","adapter_id":"*","mapping_status":"explicit",
+                "client_profile":"vanilla","pack_status":"declined","decision_id":"item:*",
+                "effective_severity":"WARNING","reason":"safe degradation",
+                "operator_note":"expected for this group","known_issue":true}]}
+                """);
+        var policy = new DiagnosticPolicyLoader().parse(file);
+        var context = new DiagnosticContext("client-session", "example", "ITEM", "adapter:example",
+                "", "EXPLICIT", "VANILLA", "DECLINED", "item:example:test", "network-session");
+
+        assertEquals(DiagnosticCollector.Severity.WARNING,
+                policy.apply("resource-pack.state", context,
+                        DiagnosticCollector.Severity.INFO).severity());
+    }
+
+    @Test
     void rejectsRegexCharactersInsteadOfExecutingThem() throws Exception {
         Path file = directory.resolve("diagnostics-policy.json");
         Files.writeString(file, """

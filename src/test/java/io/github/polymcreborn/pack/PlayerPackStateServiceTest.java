@@ -43,6 +43,31 @@ class PlayerPackStateServiceTest {
     }
 
     @Test
+    void requiredDeclineHasAnExplicitFailClosedState() {
+        var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 1);
+        UUID player = UUID.randomUUID();
+        service.offered(player);
+
+        assertEquals(PlayerPackStateService.State.REQUIRED_REJECTED,
+                service.response(player, ServerboundResourcePackPacket.Action.DECLINED));
+        assertEquals(PlayerPackStateService.State.REQUIRED_REJECTED, service.state(player));
+        assertEquals(1, service.stats().declined());
+        assertEquals(1, service.stats().requiredRejected());
+    }
+
+    @Test
+    void requiredOfferClosedBeforeAResponseIsRecordedAsRejected() {
+        var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 1);
+        UUID player = UUID.randomUUID();
+        service.offered(player);
+
+        assertEquals(PlayerPackStateService.State.REQUIRED_REJECTED,
+                service.disconnected(player));
+        assertEquals(PlayerPackStateService.State.UNKNOWN, service.state(player));
+        assertEquals(1, service.stats().requiredRejected());
+    }
+
+    @Test
     void capacityIsBoundedAndReported() {
         var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 1);
         service.offered(UUID.randomUUID());

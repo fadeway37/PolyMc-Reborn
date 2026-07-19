@@ -7,6 +7,13 @@ import io.github.polymcreborn.api.DiagnosticCollector;
 public record Diagnostic(
         String diagnosticCode,
         String registryId,
+        String modId,
+        String contentType,
+        String providerId,
+        String adapterId,
+        String mappingStatus,
+        String clientProfile,
+        String packStatus,
         String message,
         DiagnosticCollector.Severity originalSeverity,
         DiagnosticCollector.Severity effectiveSeverity,
@@ -15,7 +22,8 @@ public record Diagnostic(
         String policyReason,
         String operatorNote,
         boolean knownIssue,
-        String lifecycleStage) implements Comparable<Diagnostic> {
+        String lifecycleStage,
+        String decisionId) implements Comparable<Diagnostic> {
 
     public String code() {
         return diagnosticCode;

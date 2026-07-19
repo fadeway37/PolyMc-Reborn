@@ -19,7 +19,11 @@ import java.util.Set;
 /** Strict decoder for diagnostics-policy.json. */
 public final class DiagnosticPolicyLoader {
     private static final Set<String> ROOT = Set.of("schema_version", "rules");
-    private static final Set<String> RULE = Set.of("id", "code", "registry_id", "effective_severity",
+    private static final Set<String> RULE = Set.of("id", "code", "registry_id", "mod_id",
+            "content_type", "provider_id", "adapter_id", "mapping_status", "client_profile",
+            "pack_status", "decision_id", "effective_severity", "reason", "operator_note",
+            "known_issue");
+    private static final Set<String> REQUIRED_RULE = Set.of("id", "code", "effective_severity",
             "reason", "operator_note", "known_issue");
     private static final byte[] DEFAULT = ("{\n  \"schema_version\": 1,\n  \"rules\": []\n}\n")
             .getBytes(StandardCharsets.UTF_8);
@@ -59,7 +63,7 @@ public final class DiagnosticPolicyLoader {
                 }
                 JsonObject rule = elementRule.getAsJsonObject();
                 ConfigManager.rejectUnknown(file, path, rule, RULE);
-                ConfigManager.requireFields(file, path, rule, RULE);
+                ConfigManager.requireFields(file, path, rule, REQUIRED_RULE);
                 String id = string(file, path + ".id", rule, "id");
                 if (!id.matches("[a-z0-9][a-z0-9._-]{0,63}") || !ids.add(id)) {
                     throw new ConfigurationException(file, path + ".id", "Rule id is invalid or duplicated");
@@ -79,7 +83,11 @@ public final class DiagnosticPolicyLoader {
                 }
                 rules.add(new DiagnosticPolicy.Rule(id,
                         SafeGlob.compile(string(file, path + ".code", rule, "code")),
-                        SafeGlob.compile(string(file, path + ".registry_id", rule, "registry_id")),
+                        glob(file, path, rule, "registry_id"), glob(file, path, rule, "mod_id"),
+                        glob(file, path, rule, "content_type"), glob(file, path, rule, "provider_id"),
+                        glob(file, path, rule, "adapter_id"), glob(file, path, rule, "mapping_status"),
+                        glob(file, path, rule, "client_profile"), glob(file, path, rule, "pack_status"),
+                        glob(file, path, rule, "decision_id"),
                         severity, string(file, path + ".reason", rule, "reason"),
                         string(file, path + ".operator_note", rule, "operator_note"),
                         rule.get("known_issue").getAsBoolean()));
@@ -99,5 +107,11 @@ public final class DiagnosticPolicyLoader {
             throw new ConfigurationException(file, path, "Expected a string");
         }
         return object.get(field).getAsString();
+    }
+
+    private static SafeGlob glob(Path file, String path, JsonObject object, String field) {
+        return object.has(field)
+                ? SafeGlob.compile(string(file, path + "." + field, object, field))
+                : SafeGlob.compile("*");
     }
 }
