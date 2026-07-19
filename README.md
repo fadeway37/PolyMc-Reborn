@@ -190,10 +190,12 @@ release. On 2026-07-18 the local `runClientPlaytest`,
 `runProductionClientPlaytest`, and `runPlaytest` commands each completed
 successfully; the retained final evidence reports 53/53 checks, 35/35 client
 steps, and 17/17 screenshots. GitHub Actions Client Playtest run
-[`29642433900`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433900)
+[`29642877439`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642877439)
 and standard CI run
-[`29642433896`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433896)
-both completed successfully; both downloaded artifacts were inspected. See
+[`29642877438`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642877438)
+both completed successfully for final commit `e15714e0`; both downloaded
+artifacts were inspected. The earlier documented pair belongs to predecessor
+commit `5188dcfc`; see [baseline-audit-0.3.md](docs/baseline-audit-0.3.md). See
 [testing.md](docs/testing.md) and [client-playtest.md](docs/client-playtest.md).
 
 The distributable JAR and sources/Javadoc JARs are written to `build/libs/`.
