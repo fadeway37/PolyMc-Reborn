@@ -42,6 +42,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.withType(Javadoc).configureEach {
 	options.encoding = 'UTF-8'
 	options.addStringOption('Xdoclint:none', '-quiet')
+	options.addBooleanOption('notimestamp', true)
 }
 
 tasks.withType(Test).configureEach {

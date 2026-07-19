@@ -59,6 +59,9 @@ jobs:
       - name: Run unit tests explicitly
         run: ./gradlew --no-daemon --stacktrace test
 
+      - name: Verify standalone API and independent consumer
+        run: ./gradlew --no-daemon --stacktrace checkApiSignature publishApiToTestRepository buildApiConsumer
+
       - name: Run Fabric GameTests
         run: timeout --signal=TERM --kill-after=30s 15m ./gradlew --no-daemon --stacktrace runGameTest
 
@@ -70,6 +73,9 @@ jobs:
 
       - name: Inspect distributable JAR
         run: bash scripts/ci/check-release-jar.sh
+
+      - name: Assemble and inspect Beta supply-chain artifacts
+        run: ./gradlew --no-daemon --stacktrace assembleBetaArtifacts verifyReleaseArtifacts
 
       - name: Verify build did not modify tracked inputs
         run: bash scripts/ci/check-repository.sh --working-tree
@@ -83,9 +89,8 @@ jobs:
           compression-level: 0
           path: |
             build/libs/*.jar
-            !build/libs/*-dev.jar
-            !build/libs/*-sources.jar
-            !build/libs/*-javadoc.jar
+            api/build/libs/*.jar
+            build/release/**
 
       - name: Upload failure diagnostics
         if: failure()

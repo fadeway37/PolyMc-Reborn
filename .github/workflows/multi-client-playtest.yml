@@ -1,0 +1,48 @@
+name: Production Multi-Client Playtest
+
+on:
+  push:
+    branches: ['reborn/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: multi-client-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  multi-client:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.vfs.watch=false
+      LIBGL_ALWAYS_SOFTWARE: 'true'
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with: {distribution: temurin, java-version: '25'}
+      - uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - name: Install headless client libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes xvfb xauth libasound2t64 libgl1 libgl1-mesa-dri libglx-mesa0 libopenal1 libx11-6 libx11-xcb1 libxcursor1 libxext6 libxi6 libxinerama1 libxkbcommon0 libxrandr2 libxrender1 libxtst6 libxxf86vm1
+      - name: Run two-client and pack-policy gates
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' timeout --signal=TERM --kill-after=30s 50m ./gradlew --no-daemon --stacktrace runProductionMultiClientPlaytest runPackPolicyPlaytest
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: multi-client-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            build/playtest/multi-client/**
+            build/playtest/pack-policy/**
+            !**/world/**
+            !**/*.jar
+            !**/usercache.json
