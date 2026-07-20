@@ -3,7 +3,7 @@
 The published coordinate is:
 
 ```text
-io.github.polymcreborn:polymc-reborn-api:0.4.0-rc.1+26.1.2
+io.github.polymcreborn:polymc-reborn-api:0.4.0-rc.2+26.1.2
 ```
 
 It targets Java 25 and official Minecraft 26.1.2 names. It does not contain a
@@ -24,7 +24,7 @@ Polymer backend, commands, Mixins, client code, test fixtures, or caches.
   releases.
 
 The immutable compatibility baseline is `api/signatures/0.3.0-beta.1.txt`; the
-exact RC signature is `api/signatures/0.4.0-rc.1.txt`. Run:
+exact RC signature is `api/signatures/0.4.0-rc.2.txt`. Run:
 
 ```text
 ./gradlew :api:build

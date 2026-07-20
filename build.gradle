@@ -755,7 +755,28 @@ dependencyLocking {
 publishing {
 	publications {
 		mavenJava(MavenPublication) {
+			artifactId = project.archives_base_name
 			from components.java
+			pom {
+				name = 'PolyMc Reborn'
+				description = 'Server-side Fabric compatibility layer for supported modded content'
+				url = 'https://github.com/fadeway37/PolyMc-Reborn'
+				licenses {
+					license {
+						name = 'GNU Lesser General Public License v3.0 or later'
+						url = 'https://www.gnu.org/licenses/lgpl-3.0.html'
+					}
+				}
+				scm {
+					connection = 'scm:git:https://github.com/fadeway37/PolyMc-Reborn.git'
+					developerConnection = 'scm:git:ssh://git@github.com/fadeway37/PolyMc-Reborn.git'
+					url = 'https://github.com/fadeway37/PolyMc-Reborn'
+				}
+				issueManagement {
+					system = 'GitHub'
+					url = 'https://github.com/fadeway37/PolyMc-Reborn/issues'
+				}
+			}
 		}
 	}
 }
@@ -904,8 +925,8 @@ tasks.register('generateReleaseChecksums') {
 			tasks.named('javadocJar', Jar).get().archiveFile.get().asFile,
 			apiJarFile.get().asFile, apiSourcesJarFile.get().asFile, apiJavadocJarFile.get().asFile,
 			sbomFile.get().asFile, provenanceFile.get().asFile, buildManifestFile.get().asFile,
-			file('api/signatures/0.4.0-rc.1.txt'), file('LICENSE'), file('NOTICE.md'),
-			file('THIRD_PARTY_NOTICES.md'), file('docs/0.4-rc-release-notes.md')]
+			file('api/signatures/0.4.0-rc.2.txt'), file('LICENSE'), file('NOTICE.md'),
+			file('THIRD_PARTY_NOTICES.md'), file('docs/releases/0.4.0-rc.2.md')]
 		files.sort { it.name }
 		def output = checksumsFile.get().asFile.toPath()
 		java.nio.file.Files.createDirectories(output.parent)
@@ -934,11 +955,11 @@ tasks.register('assembleRcArtifacts', Copy) {
 	from buildManifestFile
 	from checksumsFile
 	from checksums512File
-	from file('api/signatures/0.4.0-rc.1.txt')
+	from file('api/signatures/0.4.0-rc.2.txt')
 	from file('LICENSE')
 	from file('NOTICE.md')
 	from file('THIRD_PARTY_NOTICES.md')
-	from file('docs/0.4-rc-release-notes.md')
+	from file('docs/releases/0.4.0-rc.2.md')
 	into releaseDirectory
 	outputs.upToDateWhen { false }
 	doFirst {
@@ -953,8 +974,8 @@ tasks.register('assembleRcArtifacts', Copy) {
 			apiJavadocJarFile.get().asFile.name, sbomFile.get().asFile.name,
 			provenanceFile.get().asFile.name, buildManifestFile.get().asFile.name,
 			checksumsFile.get().asFile.name, checksums512File.get().asFile.name,
-			'0.4.0-rc.1.txt', 'LICENSE', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md',
-			'0.4-rc-release-notes.md'
+			'0.4.0-rc.2.txt', 'LICENSE', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md',
+			'0.4.0-rc.2.md'
 		].toSorted()
 		def actual = releaseDirectory.get().asFile.listFiles().findAll { it.isFile() }
 			.collect { it.name }.toSorted()

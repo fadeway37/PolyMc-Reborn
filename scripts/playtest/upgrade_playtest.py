@@ -24,7 +24,7 @@ UPGRADE_OUTPUT = BUILD / "playtest" / "upgrade"
 EXPANSION_OUTPUT = BUILD / "playtest" / "modset-expansion"
 BASE_COMMIT = "bfe99049ffeb9da60a700a32282102278e6c3bba"
 BASE_VERSION = "0.3.0-beta.1+26.1.2"
-CURRENT_VERSION = "0.4.0-rc.1+26.1.2"
+CURRENT_VERSION = "0.4.0-rc.2+26.1.2"
 
 
 def reset(path: Path) -> None:

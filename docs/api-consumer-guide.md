@@ -6,7 +6,7 @@ runtime:
 
 ```groovy
 dependencies {
-    compileOnly 'io.github.polymcreborn:polymc-reborn-api:0.4.0-rc.1+26.1.2'
+    compileOnly 'io.github.polymcreborn:polymc-reborn-api:0.4.0-rc.2+26.1.2'
 }
 ```
 

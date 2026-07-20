@@ -3,7 +3,7 @@
 PolyMc Reborn 0.4 RC keeps two different records on purpose:
 
 - `api/signatures/0.3.0-beta.1.txt` is the immutable compatibility input.
-- `api/signatures/0.4.0-rc.1.txt` is the exact current public signature.
+- `api/signatures/0.4.0-rc.2.txt` is the exact current public signature.
 
 `:api:checkApiSignature` compares generated RC byte-level descriptors with the
 RC file. `:api:checkApiCompatibility` independently classifies additions and
