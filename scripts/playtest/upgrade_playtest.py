@@ -101,6 +101,26 @@ def wait_for_file(path: Path, process: subprocess.Popen[str], timeout: float) ->
     raise RuntimeError(f"timed out waiting for {path.name}")
 
 
+def write_server_bootstrap(port: int) -> None:
+    """Restore files that Loom's first production-server installation may replace."""
+    SERVER.mkdir(parents=True, exist_ok=True)
+    (SERVER / "eula.txt").write_text("eula=true\n", encoding="utf-8")
+    (SERVER / "server.properties").write_text(
+        f"online-mode=false\nserver-ip=127.0.0.1\nserver-port={port}\n"
+        "generate-structures=false\nlevel-seed=PolyMc-Reborn-upgrade-playtest\n"
+        "spawn-protection=0\nview-distance=5\nsimulation-distance=5\nmax-tick-time=0\n",
+        encoding="utf-8",
+    )
+
+
+def cold_bootstrap_retry_allowed(log: Path, return_code: int, ready_observed: bool) -> bool:
+    """Recognize only Loom's bounded first-install EULA exit, never a general failure."""
+    if return_code != 0 or ready_observed or not log.is_file():
+        return False
+    text = log.read_text(encoding="utf-8", errors="replace")
+    return "You need to agree to the EULA in order to run the server" in text
+
+
 def run_upgrade_client(mode: str, port: int, ready: dict[str, object]) -> dict[str, object]:
     report = WORK / f"{mode}-client"
     report.mkdir(parents=True, exist_ok=True)
@@ -135,28 +155,44 @@ def server_leg(reborn_jar: Path, mode: str, expanded: bool, client: bool) -> tup
             f"-PupgradePackPort={pack_port}",
             "runUpgradeFixtureServer"]
     server_log = WORK / f"{mode}-server.log"
-    with server_log.open("w", encoding="utf-8", newline="\n") as stream:
-        process = subprocess.Popen(args, cwd=ROOT, text=True, stdout=stream,
-                                   stderr=subprocess.STDOUT)
-        client_state: dict[str, object] | None = None
-        failure: BaseException | None = None
-        try:
-            wait_for_file(ready_report, process, 8 * 60)
-            ready = json.loads(ready_report.read_text(encoding="utf-8"))
-            if client:
-                client_state = run_upgrade_client(mode, port, ready)
-        except BaseException as exception:
-            failure = exception
-        finally:
-            stop_file.touch()
+    client_state: dict[str, object] | None = None
+    for attempt in range(2):
+        write_server_bootstrap(port)
+        stop_file.unlink(missing_ok=True)
+        ready_report.unlink(missing_ok=True)
+        if attempt:
+            with server_log.open("a", encoding="utf-8", newline="\n") as stream:
+                stream.write("\n[PolyMc Reborn harness] Retrying once after the Loom cold "
+                             "production-server installation replaced bootstrap files.\n")
+        with server_log.open("a" if attempt else "w", encoding="utf-8", newline="\n") as stream:
+            process = subprocess.Popen(args, cwd=ROOT, text=True, stdout=stream,
+                                       stderr=subprocess.STDOUT)
+            failure: BaseException | None = None
+            ready_observed = False
             try:
-                return_code = process.wait(timeout=4 * 60)
-            except subprocess.TimeoutExpired:
-                process.terminate()
-                process.wait(timeout=30)
-                raise RuntimeError(f"upgrade server required forced termination for {mode}")
-        if failure is not None:
-            raise failure
+                wait_for_file(ready_report, process, 8 * 60)
+                ready_observed = True
+                ready = json.loads(ready_report.read_text(encoding="utf-8"))
+                if client:
+                    client_state = run_upgrade_client(mode, port, ready)
+            except BaseException as exception:
+                failure = exception
+            finally:
+                stop_file.touch()
+                try:
+                    return_code = process.wait(timeout=4 * 60)
+                except subprocess.TimeoutExpired:
+                    process.terminate()
+                    process.wait(timeout=30)
+                    raise RuntimeError(f"upgrade server required forced termination for {mode}")
+        if failure is None:
+            break
+        if attempt == 0 and cold_bootstrap_retry_allowed(
+                server_log, return_code, ready_observed):
+            continue
+        raise failure
+    else:
+        raise RuntimeError(f"upgrade server exhausted its bounded cold-start retry for {mode}")
     if return_code != 0:
         raise RuntimeError(f"upgrade server exited with {return_code} for {mode}")
     state = json.loads(report.read_text(encoding="utf-8"))
@@ -253,10 +289,7 @@ def materialize_evidence(output: Path, suite: str, selected: list[dict[str, obje
 def main() -> int:
     reset(WORK)
     reset(SERVER)
-    (SERVER / "eula.txt").write_text("eula=true\n", encoding="utf-8")
-    (SERVER / "server.properties").write_text(
-        "online-mode=false\nserver-port=0\ngenerate-structures=false\n"
-        "level-seed=PolyMc-Reborn-upgrade-playtest\n", encoding="utf-8")
+    write_server_bootstrap(0)
     policy = SERVER / "config" / "polymc-reborn" / "diagnostics-policy.json"
     policy.parent.mkdir(parents=True, exist_ok=True)
     policy.write_text(json.dumps({

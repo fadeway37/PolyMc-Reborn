@@ -38,6 +38,9 @@
   iteration fails before its operation assertions can be materialized.
 - Validate repeated resource-pack sessions against server-confirmed application
   counts and content hashes without assuming platform-specific cache-file reuse.
+- Make the upgrade gate survive Loom's one-time cold production-server install:
+  only the explicit pre-readiness EULA exit can restore bootstrap files and retry
+  once; every unrelated exit still fails closed.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.

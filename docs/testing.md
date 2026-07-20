@@ -198,6 +198,13 @@ Mods, short Soak, and long Soak evidence have separate children under `build/pla
 Each gate uses structured summaries, process exits, loaded Mod lists, hashes,
 redaction metadata, and manifests; harness source alone is not evidence.
 
+On a pristine runner, Loom may install the production-server distribution after
+the upgrade harness creates `eula.txt` and replace that bootstrap directory. The
+upgrade harness recognizes only the resulting successful pre-readiness EULA exit,
+restores the bounded local configuration, and retries once. A non-zero exit, an
+exit after fixture readiness, an unrelated clean exit, or a second EULA exit is a
+hard failure and remains in the sanitized server log.
+
 ## P1 test status
 
 The pure zero-mod vanilla-client smoke and runtime creative reverse-mapping
