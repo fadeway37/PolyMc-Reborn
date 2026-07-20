@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.0-rc.2+26.1.2
+
+### Changed
+
+- Moved active development from the original GitHub fork to an independent
+  repository with `main` as the default branch; the former fork and its hosted
+  history remain preserved in `PolyMc-Reborn-Archive`.
+- Reworked the README into a long-term installation, capability, compatibility,
+  security, contribution, history, and documentation entry point.
+- Updated repository templates, workflow branch targets, canonical project
+  URLs, Maven metadata, release artifact names, API signature metadata, SBOM,
+  build-manifest, and provenance subjects for RC2.
+- Added public-surface checks for new branch, pull request, commit, release, and
+  documentation metadata without rewriting legitimate historical commits.
+- Preserved the hash-locked 0.3 binary Consumer gate after repository migration
+  by pinning fallback-build metadata to the audited 0.3 commit.
+
+### Compatibility and security
+
+- Production Java, Mixins, Access Wideners, provider ordering, mapping schema,
+  mapping algorithm `reborn-2`, packet behavior, GUI/entity/item/block mapping
+  behavior, configuration defaults, and creative safety boundaries are
+  unchanged from RC1.
+- GitHub-hosted release provenance is rebuilt in the independent repository;
+  RC1 provenance remains historical evidence and is not reused as RC2 proof.
+
 ## 0.4.0-rc.1+26.1.2 development
 
 ### Changed

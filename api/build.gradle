@@ -135,6 +135,15 @@ publishing {
 						url = 'https://www.gnu.org/licenses/lgpl-3.0.html'
 					}
 				}
+				scm {
+					connection = 'scm:git:https://github.com/fadeway37/PolyMc-Reborn.git'
+					developerConnection = 'scm:git:ssh://git@github.com/fadeway37/PolyMc-Reborn.git'
+					url = 'https://github.com/fadeway37/PolyMc-Reborn'
+				}
+				issueManagement {
+					system = 'GitHub'
+					url = 'https://github.com/fadeway37/PolyMc-Reborn/issues'
+				}
 			}
 		}
 	}
@@ -148,11 +157,11 @@ publishing {
 
 def generatedSignature = layout.buildDirectory.file('api-signatures/current.txt')
 def betaSignatureBaseline = layout.projectDirectory.file('signatures/0.3.0-beta.1.txt')
-def rcSignatureBaseline = layout.projectDirectory.file('signatures/0.4.0-rc.1.txt')
+def rcSignatureBaseline = layout.projectDirectory.file('signatures/0.4.0-rc.2.txt')
 def compatibilityReport = layout.buildDirectory.file(
-	'reports/api-compatibility/0.3.0-beta.1-to-0.4.0-rc.1.json')
+	'reports/api-compatibility/0.3.0-beta.1-to-0.4.0-rc.2.json')
 def compatibilityMarkdown = layout.buildDirectory.file(
-	'reports/api-compatibility/0.3.0-beta.1-to-0.4.0-rc.1.md')
+	'reports/api-compatibility/0.3.0-beta.1-to-0.4.0-rc.2.md')
 
 tasks.register('generateApiSignature', JavaExec) {
 	group = 'verification'
@@ -253,7 +262,7 @@ tasks.register('updateApiSignatureBaseline', Copy) {
 	dependsOn tasks.named('generateApiSignature')
 	from generatedSignature
 	into layout.projectDirectory.dir('signatures')
-	rename { '0.4.0-rc.1.txt' }
+	rename { '0.4.0-rc.2.txt' }
 }
 
 tasks.named('checkApiSignature') {

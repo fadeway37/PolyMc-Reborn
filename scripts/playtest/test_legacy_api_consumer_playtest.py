@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import copy
+import os
 import unittest
+from unittest.mock import patch
 
 import legacy_api_consumer_playtest as legacy
 
@@ -48,6 +50,12 @@ class LegacyApiConsumerInputTest(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "digest"):
             legacy.validate_actions_artifact(metadata)
+
+    def test_source_reproduction_pins_the_audited_git_identity(self) -> None:
+        with patch.dict(os.environ, {"GITHUB_SHA": "0" * 40}):
+            environment = legacy.audited_build_environment()
+
+        self.assertEqual(legacy.BASE_COMMIT, environment["GITHUB_SHA"])
 
 
 if __name__ == "__main__":

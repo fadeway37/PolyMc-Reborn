@@ -3,9 +3,11 @@ name: CI
 on:
   push:
     branches:
-      - master
-      - 'reborn/**'
+      - main
+      - 'release/**'
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -17,7 +19,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build, test, and server safety
+    name: CI
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -51,7 +53,9 @@ jobs:
         run: java -version
 
       - name: Run repository policy checks
-        run: bash scripts/ci/check-repository.sh
+        run: |
+          bash .github/scripts/check-public-surface.sh
+          bash scripts/ci/check-repository.sh
 
       - name: Clean build
         run: ./gradlew --no-daemon --stacktrace clean build
@@ -104,12 +108,78 @@ jobs:
             build/run/gameTest/logs/**
             build/server-smoke/logs/**
 
+  repository-hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify repository and public surfaces
+        run: |
+          bash .github/scripts/check-public-surface.sh
+          bash scripts/ci/check-repository.sh
+          bash scripts/ci/check-repository.sh --working-tree
+
+  api-signature:
+    name: API signature
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.vfs.watch=false
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Eclipse Temurin 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - name: Set up Gradle dependency cache
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - name: Verify accepted and stable API signatures
+        run: ./gradlew --no-daemon --stacktrace checkApiSignature checkApiCompatibility
+
+  dedicated-server-smoke:
+    name: Dedicated server smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.vfs.watch=false
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Eclipse Temurin 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - name: Set up Gradle dependency cache
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+      - name: Run and inspect dedicated-server smoke
+        run: |
+          timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --stacktrace runDedicatedServerSmoke
+          bash scripts/ci/check-server-smoke.sh
+
   external-mod-matrix:
     name: P0 real external-mod matrix
-    if: github.ref == 'refs/heads/reborn/0.4.0-rc+26.1.2'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     uses: ./.github/workflows/external-mod-matrix.yml
 
   cross-platform-reproducibility:
     name: P0 cross-platform archive reproducibility
-    if: github.ref == 'refs/heads/reborn/0.4.0-rc+26.1.2'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     uses: ./.github/workflows/reproducibility.yml

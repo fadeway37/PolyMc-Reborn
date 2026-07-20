@@ -1,44 +1,65 @@
-# RC release process
+# Release process
 
-Development occurs on `reborn/0.4.0-rc+26.1.2`. Run every command in
-`AGENTS.md`, inspect structured evidence/screenshots, dependency locks, both
-release JARs, SBOM and checksums, then push the branch normally.
+Release candidates start from the current `main` branch and use
+`release/<version>` until their pull request is merged. Ordinary development
+never targets the historical Archive or `TheEpicBlock/PolyMc`.
 
-GitHub registers manual workflows only after their definition exists on the
-default branch. The RC workflow is therefore introduced through the dedicated
-`codex/register-rc-release-workflow` branch and a default-branch PR whose diff
-contains only `.github/workflows/release-rc.yml`. Product source remains on the
-RC branch. The workflow is then dispatched on the exact product ref and checks
-that `GITHUB_SHA`, `release_ref`, and the checked-out commit all agree.
+## Candidate preparation
 
-`release-rc.yml` accepts `release_ref`, exact `expected_version`, and a boolean
-`create_draft_release` that defaults false. It runs the full build/API/server,
-legacy and RC Consumers, single/multi-client, pack policy, three-Mod matrix,
-upgrade/expansion, Linux short/long Soak, reproducibility, SBOM, checksum, and
-release-content gates. Its second job creates official GitHub Artifact
-Attestations, independently verifies five subjects with `gh`, and requires a
-one-byte-tampered JAR to fail verification.
+1. Confirm a clean worktree and the intended baseline commit.
+2. Update project, API, Fabric/POM, workflow, SBOM, build-manifest, checksum,
+   signature-header, changelog, and release-note version metadata together.
+3. Prove that runtime Java, Mixins, Access Wideners, mapping schema/algorithm,
+   stable API descriptors, and behavioral defaults have the expected delta.
+4. Run all applicable local commands in `AGENTS.md` and `docs/testing.md`.
+5. Inspect the main/API archives, Fabric metadata, manifests, SBOM, checksum
+   files, dependency locks, and tracked-input state.
+6. Push the release branch and open a pull request against `main`.
 
-The 0.3 binary Consumer obtains its immutable API input through read-only
-access to the audited 0.3 workflow artifact. If retention has expired, it
-reproduces the API from a detached worktree at the exact audited commit and
-still requires the published byte hash; the unpublished 0.3 Draft is never
-modified and no write-capable token is granted to the gate job.
+The candidate pull request records scope, compatibility impact, tests actually
+run, documentation changes, and security boundaries. Full logs, private paths,
+worlds, downloaded third-party mod JARs, and local evidence remain outside the
+repository.
 
-Because later client harnesses intentionally reset their bounded evidence root,
-the release job uploads each Consumer, single-client, multi/pack-policy,
-external-Mod, upgrade/expansion, short-Soak, and long-Soak bundle immediately
-after its gate. This preserves failure and success evidence without weakening
-the nested cleanup contract.
+## Hosted gates
 
-The first successful dispatch uses `create_draft_release=false` so hosted
-artifacts and attestation evidence can be inspected. Only after Windows Soak,
-all other P0 workflows, downloaded evidence, and attestation checks pass may a
-dispatch use `true`. That path creates the exact annotated tag and a Draft
-Pre-release; it never publishes publicly. Any failed or missing P0 means no tag
-and no draft.
+Standard CI, the production client playtest, production multi-client playtest,
+external-mod matrix, cross-platform reproducibility, short soak, and long soak
+must execute in the independent repository on the exact candidate. A workflow
+conclusion alone is insufficient: download its artifacts and validate commit,
+repository, reports, JUnit totals, scenario counts, loaded-mod lists,
+screenshots, process exits, cleanup state, archive hashes, and content
+allow-lists.
 
-The draft allow-list contains main/API binaries, sources, Javadocs, SBOM,
-SHA-256/SHA-512 lists, API signature, release notes, build manifest, licenses,
-notices, and the real attestation verification record. It excludes worlds,
-screenshots, test drivers/fixtures, third-party Mod JARs, caches, and secrets.
+The manual `.github/workflows/release-rc.yml` workflow accepts an exact
+`release_ref`, an exact `expected_version`, and `create_draft_release`. Its gate
+job runs the build/API/server, legacy and current API consumers, single- and
+multi-client tests, pack policy, external matrix, upgrade/expansion, Linux
+short/long soak, reproducibility, SBOM, checksums, and bounded artifact audit.
+
+Run the first final-candidate dispatch with `create_draft_release=false`. The
+second job creates GitHub-hosted provenance for the main Mod JAR, API JAR,
+CycloneDX SBOM, `SHA256SUMS`, and `SHA512SUMS`; verifies every subject against
+the current repository; and requires a one-byte-tampered JAR to fail. Download
+and inspect the final attested artifact set.
+
+## Merge and finalization
+
+After all P0 evidence passes:
+
+1. Merge the candidate pull request using the repository's linear-history
+   policy and delete its remote head branch.
+2. Confirm that `main` is clean and points to the reviewed candidate commit.
+3. Re-run the release gate on that exact `main` commit if the merge strategy
+   changed the commit identity.
+4. Create the exact annotated release tag on final `main`.
+5. Create a Draft Pre-release with the bounded main/API binaries, sources,
+   Javadocs, SBOM, checksum manifests, API signature, release notes, licenses,
+   notices, build metadata, and provenance-verification record.
+6. Verify every uploaded asset size and digest. Keep the release Draft and
+   Pre-release; do not publish a stable release from this process.
+
+Only after the independent repository, final artifacts, and provenance are
+verified may the historical repository be switched to GitHub's read-only
+archive state. Never delete or rewrite its historical releases, tags, pull
+requests, branches, or upstream fork relationship.

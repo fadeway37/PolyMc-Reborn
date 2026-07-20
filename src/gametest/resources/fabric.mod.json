@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "polymc-reborn-gametest",
-  "version": "0.4.0-rc.1+26.1.2",
+  "version": "0.4.0-rc.2+26.1.2",
   "name": "PolyMc Reborn GameTest Fixtures",
   "environment": "server",
   "entrypoints": {
@@ -22,7 +22,7 @@
   "depends": {
     "fabricloader": ">=0.19.3",
     "minecraft": "=26.1.2",
-    "polymc-reborn": "=0.4.0-rc.1+26.1.2",
+    "polymc-reborn": "=0.4.0-rc.2+26.1.2",
     "fabric-api": ">=0.155.2+26.1.2",
     "polymer-core": "=0.16.5+26.1.2",
     "polymer-virtual-entity": "=0.16.5+26.1.2"

@@ -3,12 +3,11 @@ name: Production Client Playtest
 on:
   push:
     branches:
-      - master
-      - 'reborn/**'
+      - main
+      - 'release/**'
   pull_request:
     branches:
-      - master
-      - 'reborn/**'
+      - main
   workflow_dispatch:
 
 permissions:
@@ -71,7 +70,9 @@ jobs:
         run: java -version
 
       - name: Run repository policy checks
-        run: bash scripts/ci/check-repository.sh
+        run: |
+          bash .github/scripts/check-public-surface.sh
+          bash scripts/ci/check-repository.sh
 
       - name: Run playtest evidence negative self-tests
         run: python3 -m unittest discover -s scripts/playtest -p 'test_aggregate_evidence.py' -v
