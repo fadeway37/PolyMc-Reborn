@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-- A Git clone with full history and both `origin` (the PolyMc-Reborn fork) and
-  `upstream` (TheEpicBlock/PolyMc).
+- A Git clone with full history and `origin` pointing to the independent
+  PolyMc-Reborn repository. The optional read-only `archive` and `upstream`
+  remotes preserve historical and upstream context.
 - Java 25 available locally, or a Gradle JVM capable of starting the wrapper so
   the Foojay resolver can provision a Java 25 toolchain.
 - Network access to Fabric Maven, Maven Central/Gradle Plugin Portal, and the
@@ -29,7 +30,7 @@ loom_version=1.17.16
 fabric_api_version=0.155.2+26.1.2
 polymer_version=0.16.5+26.1.2
 junit_version=5.13.4
-mod_version=0.4.0-rc.1+26.1.2
+mod_version=0.4.0-rc.2+26.1.2
 ```
 
 The Gradle wrapper is 9.5.1. Dependencies must remain exact; do not introduce
@@ -146,8 +147,8 @@ and temporary research clones are not tracked.
 
 ## Git workflow
 
-Work on `reborn/0.4.0-rc+26.1.2`, not the upstream default branch. Keep `upstream`
+Create topic and release branches from `main`. Keep `archive` and `upstream`
 read-only and never open a Reborn pull request against TheEpicBlock/PolyMc.
-Use focused commits whose messages explain the purpose. Push the development
-branch only after the build is in a reasonably reliable state and report any
-integration task that was skipped or failed.
+Use focused commits whose messages explain the purpose. Push a branch only
+after the build is in a reasonably reliable state and report any integration
+task that was skipped or failed.

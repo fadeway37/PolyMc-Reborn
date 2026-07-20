@@ -6,17 +6,17 @@ inventory input. Treat it as security-sensitive server infrastructure.
 
 ## Supported versions
 
-Only the latest commit on `reborn/0.4.0-rc+26.1.2` and the most recent
-published release line receive security fixes. Preserved 0.1/0.2/0.3 branches
-are audit baselines, not the active development line. No
-release currently promises support for Minecraft versions other than exactly
-26.1.2.
+Only the latest commit on `main` and the most recent release line receive
+security fixes. Historical 0.1/0.2/0.3/RC1 references in the Archive are audit
+records, not active support branches. No release currently promises support
+for Minecraft versions other than exactly 26.1.2.
 
 ## Reporting a vulnerability
 
-Use GitHub's private security-advisory mechanism for the PolyMc-Reborn
-repository if it is enabled. Otherwise contact the repository owner privately
-before opening a public issue. Include the affected commit/version, impact,
+Use the active repository's private
+[security-advisory form](https://github.com/fadeway37/PolyMc-Reborn/security/advisories/new).
+If private reporting is temporarily unavailable, contact the repository owner
+privately before opening a public issue. Include the affected commit/version, impact,
 minimal reproduction, and whether exploitation requires operator-controlled
 configuration, a malicious mod JAR, or an untrusted client.
 
@@ -52,5 +52,5 @@ Reborn cannot sandbox an installed mod and should not be described as doing so.
 Use `/pmcr support bundle` when possible. It creates a bounded local whitelist
 archive and never uploads it; review its manifest/redaction report before
 sharing. Security/corruption/signature/path diagnostics cannot be downgraded by
-display policy. Creative reverse mapping and packet fallback remain
-fail-closed/disabled in the 0.4 RC.
+display policy. Creative reverse mapping and packet fallback remain fail-closed
+or disabled in the 0.4 RC line.

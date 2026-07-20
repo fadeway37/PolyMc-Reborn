@@ -15,10 +15,11 @@ contributions are small, reproducible, and honest about fidelity limits.
 
 ## Development workflow
 
-Create a topic branch from the current maintained development branch (for the
-0.4 RC, `reborn/0.4.0-rc+26.1.2`). Keep commits focused: bootstrap,
-planning/API, backend behavior, persistence/resources, diagnostics/legacy,
-tests, and docs should remain reviewable independently when practical.
+Create a focused topic branch from `main`. Release-candidate preparation uses
+`release/<version>`; ordinary changes should use a short purpose-based prefix
+such as `fix/`, `feat/`, `docs/`, or `ci/`. Keep planning/API, backend behavior,
+persistence/resources, diagnostics/legacy, tests, and documentation reviewable
+independently when practical.
 
 Run:
 
@@ -30,6 +31,7 @@ java -version
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
 ./gradlew runProductionClientPlaytest
+./gradlew runProductionMultiClientPlaytest
 git diff --check
 ```
 
@@ -70,3 +72,10 @@ notes, and an intentional baseline review. Pack, GUI, entity, persistence, or
 diagnostics behavior changes require their applicable production evidence gate,
 not only a unit test. Release claims also require inspected hosted evidence;
 green Workflow status alone is insufficient.
+
+Open PolyMc Reborn pull requests against this repository's `main` branch.
+Keep the historical `archive` and upstream remotes read-only; never open a
+Reborn pull request against `TheEpicBlock/PolyMc`. Pull request descriptions
+must state compatibility impact, exact tests actually run, documentation
+changes, and relevant security boundaries without including private paths or
+full production logs.
