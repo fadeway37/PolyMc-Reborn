@@ -11,10 +11,26 @@ $expectedEvidenceDirectory = [System.IO.Path]::GetFullPath((Join-Path $projectRo
 if ($inputDirectory -ne $expectedInputDirectory -or $evidenceDirectory -ne $expectedEvidenceDirectory) {
     throw 'Refusing to prepare playtest paths outside the fixed build directories'
 }
-foreach ($directory in @($inputDirectory, $evidenceDirectory)) {
-    if (Test-Path -LiteralPath $directory) {
-        Remove-Item -LiteralPath $directory -Recurse -Force
+
+function Remove-BoundedDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $Path) {
+                Remove-Item -LiteralPath $Path -Recurse -Force
+            }
+            return
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 20) {
+                throw "Playtest directory remained occupied after bounded cleanup: $Path ($($_.Exception.Message))"
+            }
+            Start-Sleep -Milliseconds 250
+        }
     }
+}
+
+foreach ($directory in @($inputDirectory, $evidenceDirectory)) {
+    Remove-BoundedDirectory -Path $directory
 }
 New-Item -ItemType Directory -Path $inputDirectory -Force | Out-Null
 $orchestratorLog = Join-Path $inputDirectory 'orchestrator.log'
@@ -168,6 +184,9 @@ try {
         "-PplaytestReportDir=$inputDirectory",
         'runProductionServerPlaytest'
     )
+    if ($env:POLYMC_REBORN_SOAK_MODE) {
+        $serverArguments = @("-PplaytestSoakMode=$($env:POLYMC_REBORN_SOAK_MODE)") + $serverArguments
+    }
     if ($env:POLYMC_REBORN_EXTERNAL_MOD_JAR) {
         $serverArguments = @(
             "-PplaytestExternalModJar=$($env:POLYMC_REBORN_EXTERNAL_MOD_JAR)",
@@ -229,6 +248,9 @@ try {
         "-PplaytestPackSha1=$packSha1",
         ':playtest:client-driver:runIsolatedProductionClientDriver'
     )
+    if ($env:POLYMC_REBORN_SOAK_MODE) {
+        $clientArguments = @("-PplaytestSoakMode=$($env:POLYMC_REBORN_SOAK_MODE)") + $clientArguments
+    }
     if ($env:POLYMC_REBORN_EXTERNAL_MODE) {
         $clientArguments = @("-PplaytestExternalMode=$($env:POLYMC_REBORN_EXTERNAL_MODE)") + $clientArguments
     }
@@ -311,6 +333,12 @@ finally {
         $message = "Production server cleanup failed: $($_.Exception.Message)"
         $orchestrationFailures.Add($message)
         Write-OrchestratorLog $message
+    }
+    if ($clientProcess) {
+        $clientProcess.Dispose()
+    }
+    if ($serverProcess) {
+        $serverProcess.Dispose()
     }
 }
 

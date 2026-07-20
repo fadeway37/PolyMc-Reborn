@@ -321,23 +321,26 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         "support_bundle_valid",
     )
     failed = [field for field in expected_booleans if value.get(field) is not True]
+    long_soak = value.get("soak_mode") == "long"
     expected_counts = {
-        "join_count": 2,
-        "disconnect_count": 2,
-        "gui_open_count": 3,
-        "gui_close_count": 3,
+        "join_count": 3 if long_soak else 2,
+        "disconnect_count": 3 if long_soak else 2,
+        "gui_open_count": 28 if long_soak else 3,
+        "gui_close_count": 28 if long_soak else 3,
         "entity_use_count": 1,
         "entity_attack_count": 1,
         "entity_interaction_callbacks": 2,
-        "admin_command_count": 17,
-        "resource_pack_push_count": 2,
-        "resource_pack_request_count": 2,
+        "admin_command_count": 22 if long_soak else 18,
+        "mapping_dry_run_count": 3 if long_soak else 1,
+        "support_bundle_generation_count": 3 if long_soak else 1,
+        "resource_pack_push_count": 3 if long_soak else 2,
+        "resource_pack_request_count": 3 if long_soak else 2,
         "tool_damage": 3 if value.get("external_mode") == "block" else 2,
         "food_remaining": 3,
         "basic_item_remaining": 1,
         "property_gui_open_count": 2,
         "property_completion_count": 1,
-        "resource_pack_applied_count": 2,
+        "resource_pack_applied_count": 3 if long_soak else 2,
         "resource_pack_declined_count": 0,
         "resource_pack_failed_count": 0,
     }
@@ -355,6 +358,22 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
     for field, expected in expected_values.items():
         if value.get(field) != expected:
             failed.append(f"{field}={expected!r}")
+    stress_counts = {
+        "soak_gui_cycles": 25 if long_soak else 0,
+        "soak_rejected_transactions": 25 if long_soak else 0,
+        "soak_entity_spawns": 50 if long_soak else 0,
+        "soak_entity_despawns": 50 if long_soak else 0,
+        "soak_tracking_cycles": 10 if long_soak else 0,
+        "dimension_change_count": 20 if long_soak else 0,
+    }
+    for field, expected in stress_counts.items():
+        if value.get(field) != expected:
+            failed.append(f"{field}={expected}")
+    if long_soak:
+        for field in ("transaction_average_millis", "transaction_max_millis"):
+            observed = value.get(field)
+            if not isinstance(observed, (int, float)) or isinstance(observed, bool) or observed < 0:
+                failed.append(f"{field}>=0")
     for field, minimum in {
         "property_tick_count": 100,
         "entity_passenger_packets": 2,

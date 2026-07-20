@@ -101,6 +101,36 @@ class SoakPlaytestTest(unittest.TestCase):
         self.assertIn(b'failures="1"', output)
         self.assertIn(b"child process exited abnormally", output)
 
+    def test_resource_trend_ignores_warmup_and_normal_jvm_noise(self) -> None:
+        iterations = []
+        for heap in (900, 1200, 1000, 1010, 990, 1020):
+            iterations.append({"resources": {
+                "heap_used_bytes": heap,
+                "rss_bytes": heap * 2,
+                "thread_count": 40,
+                "open_file_count": 80,
+                "cache_size": 12,
+            }})
+
+        trends = soak._resource_trends(iterations)
+
+        self.assertTrue(trends["passed"])
+        self.assertEqual(2, trends["warmup_iterations"])
+
+    def test_resource_trend_rejects_sustained_unbounded_cache_growth(self) -> None:
+        iterations = [{"resources": {
+            "heap_used_bytes": 1000,
+            "rss_bytes": -1,
+            "thread_count": 20,
+            "open_file_count": -1,
+            "cache_size": cache,
+        }} for cache in (1, 2, 3, 4, 5, 6)]
+
+        trends = soak._resource_trends(iterations)
+
+        self.assertFalse(trends["passed"])
+        self.assertTrue(trends["metrics"]["cache_size"]["leak_detected"])
+
 
 if __name__ == "__main__":
     unittest.main()

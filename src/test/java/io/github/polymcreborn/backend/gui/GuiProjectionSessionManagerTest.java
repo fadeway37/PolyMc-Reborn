@@ -78,4 +78,21 @@ class GuiProjectionSessionManagerTest {
         assertEquals(active, manager.snapshot().getFirst());
         assertTrue(manager.close(active));
     }
+
+    @Test
+    void abnormalDisconnectCleansOnlyThatPlayerAndDuplicateCleanupIsSafe() {
+        var manager = new GuiProjectionSessionManager(4);
+        UUID crashedPlayer = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID healthyPlayer = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        var crashed = manager.open(crashedPlayer, 1, ADAPTER);
+        var healthy = manager.open(healthyPlayer, 1, ADAPTER);
+
+        assertEquals(1, manager.disconnect(crashedPlayer));
+        assertEquals(1, manager.activeCount());
+        assertFalse(manager.close(crashed));
+        assertEquals(0, manager.disconnect(crashedPlayer));
+        assertEquals(1, manager.activeCount());
+        assertTrue(manager.close(healthy));
+        assertEquals(0, manager.activeCount());
+    }
 }

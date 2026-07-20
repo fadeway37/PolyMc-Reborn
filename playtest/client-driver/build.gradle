@@ -37,6 +37,7 @@ processResources {
 def isolatedClientRunRoot = layout.buildDirectory.dir('run')
 def playtestClientId = providers.gradleProperty('playtestClientId').orElse('single')
 def playtestScenario = providers.gradleProperty('playtestScenario').orElse('single')
+def playtestSoakMode = providers.gradleProperty('playtestSoakMode').orElse('none')
 def isolatedClientRunDirectory = playtestClientId.map { clientId ->
 	if (!(clientId ==~ /[a-z0-9-]{1,24}/)) {
 		throw new GradleException('playtestClientId must contain only lowercase letters, digits, or hyphens')
@@ -76,6 +77,7 @@ tasks.register('runIsolatedProductionClientDriver', net.fabricmc.loom.task.prod.
 	jvmArgs.add('-Dfabric.client.gametest.modid=polymc-reborn-client-driver')
 	jvmArgs.add(playtestClientId.map { '-Dpolymc-reborn.playtest.clientId=' + it })
 	jvmArgs.add(playtestScenario.map { '-Dpolymc-reborn.playtest.scenario=' + it })
+	jvmArgs.add(playtestSoakMode.map { '-Dpolymc-reborn.playtest.soakMode=' + it })
 	jvmArgs.add(providers.gradleProperty('playtestCoordinatorDir')
 		.map { '-Dpolymc-reborn.playtest.coordinatorDir=' + new File(it).absolutePath }
 		.orElse('-Dpolymc-reborn.playtest.coordinatorDir=missing'))

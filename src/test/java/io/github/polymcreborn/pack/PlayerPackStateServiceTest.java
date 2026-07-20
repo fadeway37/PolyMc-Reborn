@@ -123,4 +123,28 @@ class PlayerPackStateServiceTest {
         assertEquals(0, service.stats().declined());
         assertEquals(0, service.stats().failed());
     }
+
+    @Test
+    void interruptedDownloadCleansOnlyItsConnectionAndDoesNotAffectAnotherPlayer() {
+        var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 2);
+        UUID interrupted = UUID.randomUUID();
+        UUID healthy = UUID.randomUUID();
+        UUID interruptedPack = UUID.randomUUID();
+        UUID healthyPack = UUID.randomUUID();
+        service.offered(interrupted, interruptedPack);
+        service.offered(healthy, healthyPack);
+
+        assertEquals(PlayerPackStateService.State.FAILED,
+                service.response(interrupted, interruptedPack,
+                        ServerboundResourcePackPacket.Action.FAILED_DOWNLOAD));
+        assertEquals(PlayerPackStateService.State.APPLIED,
+                service.response(healthy, healthyPack,
+                        ServerboundResourcePackPacket.Action.SUCCESSFULLY_LOADED));
+        assertEquals(PlayerPackStateService.State.FAILED, service.disconnected(interrupted));
+        assertEquals(PlayerPackStateService.State.UNKNOWN, service.state(interrupted));
+        assertEquals(PlayerPackStateService.State.APPLIED, service.state(healthy));
+        assertEquals(1, service.stats().activePlayers());
+        assertEquals(1, service.stats().failed());
+        assertEquals(1, service.stats().applied());
+    }
 }

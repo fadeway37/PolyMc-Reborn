@@ -7,16 +7,21 @@ import eu.pb4.polymer.core.api.entity.PolymerEntityUtils;
 import eu.pb4.polymer.core.api.other.PolymerMenuUtils;
 import eu.pb4.polymer.core.api.other.PolymerComponent;
 import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
+import eu.pb4.polymer.rsm.api.RegistrySyncUtils;
 import io.github.polymcreborn.api.ContentType;
 import io.github.polymcreborn.api.MappingDecision;
 import io.github.polymcreborn.api.MappingStatus;
 import io.github.polymcreborn.mapping.MappingPlan;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Blocks;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Hides custom block-entity type ids from vanilla registry synchronization.
@@ -61,6 +66,70 @@ public final class PolymerRegistrySanitizer {
             }
         });
         return List.copyOf(registered);
+    }
+
+    /**
+     * Removes every remaining non-vanilla static registry entry from Fabric's
+     * vanilla-client registry view. Polymer-specific item, block, entity, menu,
+     * component, and block-entity registration runs first; this final pass only
+     * marks entries which no backend has already marked server-only.
+     *
+     * <p>The entries remain present and authoritative in every server registry.
+     * Registry Sync Manipulator filters only Fabric's login payload. This is
+     * necessary for auxiliary content such as custom recipe serializers,
+     * particles, sounds, and statistics that a server-only content mod may
+     * register but a vanilla client cannot decode.</p>
+     */
+    public static RegistrySanitization registerServerOnlyStaticEntries() {
+        var entriesByRegistry = new TreeMap<Identifier, List<Identifier>>();
+        BuiltInRegistries.REGISTRY.keySet().stream().sorted().forEach(registryId -> {
+            var registry = BuiltInRegistries.REGISTRY.getValue(registryId);
+            var hidden = registerServerOnlyEntries(registry);
+            if (!hidden.isEmpty()) {
+                entriesByRegistry.put(registryId, hidden);
+            }
+        });
+        return new RegistrySanitization(entriesByRegistry);
+    }
+
+    private static <T> List<Identifier> registerServerOnlyEntries(Registry<T> registry) {
+        var registered = new ArrayList<Identifier>();
+        registry.keySet().stream().sorted().forEach(id -> {
+            if (isVanillaNamespace(id)) {
+                return;
+            }
+            if (!RegistrySyncUtils.isServerEntry(registry, id)) {
+                RegistrySyncUtils.setServerEntry(registry, id);
+            }
+            registered.add(id);
+        });
+        return List.copyOf(registered);
+    }
+
+    static boolean isVanillaNamespace(Identifier id) {
+        return id.getNamespace().equals(Identifier.DEFAULT_NAMESPACE)
+                || id.getNamespace().equals("brigadier");
+    }
+
+    /** Stable evidence describing all entries hidden from vanilla registry sync. */
+    public record RegistrySanitization(Map<Identifier, List<Identifier>> entriesByRegistry) {
+        public RegistrySanitization {
+            var copy = new TreeMap<Identifier, List<Identifier>>();
+            entriesByRegistry.forEach((registry, entries) ->
+                    copy.put(registry, entries.stream().sorted().toList()));
+            entriesByRegistry = Collections.unmodifiableMap(copy);
+        }
+
+        public int totalEntries() {
+            return entriesByRegistry.values().stream().mapToInt(List::size).sum();
+        }
+
+        public java.util.Set<String> hiddenIdentifiers() {
+            var identifiers = new java.util.TreeSet<String>();
+            entriesByRegistry.values().forEach(entries -> entries.forEach(id ->
+                    identifiers.add(id.toString())));
+            return Collections.unmodifiableSet(identifiers);
+        }
     }
 
     /**

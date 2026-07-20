@@ -14,10 +14,9 @@ public final class RegistryFreezeHook {
     }
 
     public static void beforeFreeze(Registry<?> registry) {
-        if (registry != BuiltInRegistries.ITEM && registry != BuiltInRegistries.BLOCK
-                && registry != BuiltInRegistries.ENTITY_TYPE && registry != BuiltInRegistries.MENU) {
-            return;
-        }
+        // Fabric freezes built-in registries sequentially after Mod initialization.
+        // Planning must run at the first boundary so Registry Sync Manipulator can
+        // mark auxiliary entries before any earlier registry becomes immutable.
         if (FIRED.compareAndSet(false, true)) {
             PolyMcReborn.LOGGER.debug("Registering static compatibility overlays before registry freeze");
             PolyMcReborn.runtime().ensureStaticPlanFrozen();

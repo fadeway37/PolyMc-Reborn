@@ -51,6 +51,30 @@
       "mode": "block",
       "item_id": "many_more_ores_and_crafts:adamantite_block",
       "block_id": "many_more_ores_and_crafts:adamantite_block"
+    },
+    {
+      "project_id": "7vxePowz",
+      "project_name": "Farmer's Delight Refabricated",
+      "mod_id": "farmersdelight",
+      "source_url": "https://github.com/MehVahdJukaar/FarmersDelightRefabricated",
+      "download_url": "https://cdn.modrinth.com/data/7vxePowz/versions/5UrcSJDx/FarmersDelight-26.1-3.6.7%2Brefabricated.jar",
+      "exact_version": "26.1-3.6.7+refabricated",
+      "version_id": "5UrcSJDx",
+      "loader": "fabric",
+      "minecraft_version": "26.1.2",
+      "license": "MIT",
+      "source_commit": "86ec999a067d68670ecbd4faa79463f67de0b689",
+      "artifact_file": "FarmersDelight-26.1-3.6.7+refabricated.jar",
+      "artifact_size": 3336950,
+      "sha256": "25adee6361b37f1e559373bf6aedc90fa62b2da8ab084e3dee53f037ffcac636",
+      "sha512": "cd59248d774ab13bcb0c521db55a168da92743c01283f6441e757578edeec719b9afed520b55362a1b491735db4526094e60c8c8ad6db7778acc9a4b80cc268c",
+      "dependencies": ["fabric-api=0.155.2+26.1.2"],
+      "server_only_install": true,
+      "client_install_forbidden": true,
+      "scenarios": ["server-start", "client-join", "semantic-food-consume", "reconnect"],
+      "expected_classification": "FULL_FOR_TESTED_SCOPE",
+      "mode": "food",
+      "item_id": "farmersdelight:tomato"
     }
   ]
 }

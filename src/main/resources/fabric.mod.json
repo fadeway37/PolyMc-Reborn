@@ -34,7 +34,8 @@
     "polymer-core": "=${polymer_version}",
     "polymer-blocks": "=${polymer_version}",
     "polymer-resource-pack": "=${polymer_version}",
-    "polymer-virtual-entity": "=${polymer_version}"
+    "polymer-virtual-entity": "=${polymer_version}",
+    "polymer-registry-sync-manipulator": "=${polymer_version}"
   },
   "breaks": {
     "polymc-extra": "*"

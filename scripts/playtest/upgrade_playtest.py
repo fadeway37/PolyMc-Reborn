@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Build 0.2 from the audited commit and run real 0.2 -> 0.3 mapping upgrades."""
+"""Build the audited 0.3 Beta and verify an in-place 0.3 -> 0.4 RC upgrade."""
 
 from __future__ import annotations
 
@@ -22,7 +22,9 @@ WORK = BUILD / "run" / "upgrade-work"
 SERVER = BUILD / "run" / "upgrade-server"
 UPGRADE_OUTPUT = BUILD / "playtest" / "upgrade"
 EXPANSION_OUTPUT = BUILD / "playtest" / "modset-expansion"
-BASE_COMMIT = "e15714e0cb922bb4551442a63b3ad192534dde45"
+BASE_COMMIT = "bfe99049ffeb9da60a700a32282102278e6c3bba"
+BASE_VERSION = "0.3.0-beta.1+26.1.2"
+CURRENT_VERSION = "0.4.0-rc.1+26.1.2"
 
 
 def reset(path: Path) -> None:
@@ -102,7 +104,7 @@ def wait_for_file(path: Path, process: subprocess.Popen[str], timeout: float) ->
 def run_upgrade_client(mode: str, port: int, ready: dict[str, object]) -> dict[str, object]:
     report = WORK / f"{mode}-client"
     report.mkdir(parents=True, exist_ok=True)
-    client_id = mode.replace("mod-set-", "mod-").replace("upgrade-0.3", "upgrade-current")
+    client_id = mode.replace("mod-set-", "mod-").replace("upgrade-0.4-rc", "upgrade-current")
     client_id = client_id.replace(".", "-")
     args = [wrapper(ROOT), "--no-daemon", "--console=plain",
             f"-PplaytestClientId={client_id}", f"-PplaytestScenario=upgrade-{mode}",
@@ -255,6 +257,20 @@ def main() -> int:
     (SERVER / "server.properties").write_text(
         "online-mode=false\nserver-port=0\ngenerate-structures=false\n"
         "level-seed=PolyMc-Reborn-upgrade-playtest\n", encoding="utf-8")
+    policy = SERVER / "config" / "polymc-reborn" / "diagnostics-policy.json"
+    policy.parent.mkdir(parents=True, exist_ok=True)
+    policy.write_text(json.dumps({
+        "schema_version": 1,
+        "rules": [{
+            "id": "upgrade-policy",
+            "code": "resource.*",
+            "registry_id": "*",
+            "effective_severity": "WARNING",
+            "reason": "persisted RC upgrade fixture policy",
+            "operator_note": "must survive 0.3 to 0.4 RC",
+            "known_issue": True,
+        }],
+    }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     baseline_source = WORK / "baseline-source"
     baseline_source.mkdir()
     failures: list[str] = []
@@ -262,19 +278,19 @@ def main() -> int:
     try:
         exact = subprocess.check_output(["git", "rev-parse", BASE_COMMIT], cwd=ROOT, text=True).strip()
         if exact != BASE_COMMIT:
-            raise RuntimeError(f"audited 0.2 commit mismatch: {exact}")
+            raise RuntimeError(f"audited 0.3 commit mismatch: {exact}")
         extract_baseline(baseline_source)
         run([wrapper(baseline_source), "--no-daemon", "--console=plain", "jar"],
             baseline_source, WORK / "baseline-build.log")
-        baseline_jar = release_jar(baseline_source, "0.2.0-alpha.1+26.1.2")
+        baseline_jar = release_jar(baseline_source, BASE_VERSION)
         run([wrapper(ROOT), "--no-daemon", "--console=plain", "jar", "upgradeFixtureJar"],
             ROOT, WORK / "current-build.log")
-        current_jar = release_jar(ROOT, "0.3.0-beta.1+26.1.2")
+        current_jar = release_jar(ROOT, CURRENT_VERSION)
 
         baseline_raw, baseline, baseline_state, baseline_client = server_leg(
-            baseline_jar, "baseline-0.2", False, True)
+            baseline_jar, "baseline-0.3", False, True)
         upgrade_raw, upgraded, upgrade_state, upgrade_client = server_leg(
-            current_jar, "upgrade-0.3", False, True)
+            current_jar, "upgrade-0.4-rc", False, True)
         expansion_raw, expanded, expanded_state, expanded_client = server_leg(
             current_jar, "mod-set-expanded", True, True)
         removed_raw, removed, removed_state, _ = server_leg(
@@ -297,7 +313,7 @@ def main() -> int:
             {"id": "baseline-content", "passed": len(baseline_assignments) >= 3,
              "detail": f"fixture assignments={len(baseline_assignments)}"},
             {"id": "upgrade-key-set", "passed": baseline_assignments.keys() == upgraded_assignments.keys(),
-             "detail": "0.2 and 0.3 discovered the same original fixture keys"},
+             "detail": "0.3 Beta and 0.4 RC discovered the same original fixture keys"},
             {"id": "upgrade-allocations-preserved", "passed": baseline_assignments == upgraded_assignments,
              "detail": "strategy and client carrier stayed unchanged"},
             {"id": "upgrade-world-state", "passed": baseline_state["world_state"] == upgrade_state["world_state"],
@@ -308,9 +324,49 @@ def main() -> int:
                 == "polymc-reborn-upgrade-fixture:stable_item"
                 and baseline_state["player_item_count"] == upgrade_state["player_item_count"] == 7),
              "detail": f"item={upgrade_state['player_item']}, count={upgrade_state['player_item_count']}"},
+            {"id": "upgrade-property-gui-state", "passed": (
+                baseline_state["property_gui_item"] == upgrade_state["property_gui_item"]
+                == "polymc-reborn-upgrade-fixture:stable_item"
+                and baseline_state["property_gui_item_count"]
+                == upgrade_state["property_gui_item_count"] == 7
+                and baseline_state["property_gui_progress"]
+                == upgrade_state["property_gui_progress"] == 37),
+             "detail": (f"item={upgrade_state['property_gui_item']}, "
+                        f"count={upgrade_state['property_gui_item_count']}, "
+                        f"progress={upgrade_state['property_gui_progress']}/100")},
+            {"id": "upgrade-persistent-entity-state", "passed": (
+                baseline_state["persistent_entity_count"]
+                == upgrade_state["persistent_entity_count"] == 1
+                and baseline_state["persistent_entity_value"]
+                == upgrade_state["persistent_entity_value"] == 73
+                and baseline_state["persistent_entity_name"]
+                == upgrade_state["persistent_entity_name"] == "Upgrade Persistent Entity"
+                and baseline_state["persistent_entity_uuid"]
+                == upgrade_state["persistent_entity_uuid"]
+                and baseline_state["persistent_entity_uuid"] != "missing"),
+             "detail": (f"count={upgrade_state['persistent_entity_count']}, "
+                        f"value={upgrade_state['persistent_entity_value']}, "
+                        f"name={upgrade_state['persistent_entity_name']}, "
+                        f"uuid={upgrade_state['persistent_entity_uuid']}")},
+            {"id": "upgrade-client-projections", "passed": (
+                baseline_client is not None and upgrade_client is not None
+                and all(any(step.get("id") == expected and step.get("passed") is True
+                            for step in client.get("steps", []))
+                        for client in (baseline_client, upgrade_client)
+                        for expected in ("upgrade-property-gui", "upgrade-persistent-entity"))),
+             "detail": "both real clients observed the persisted property GUI and entity surrogate"},
             {"id": "upgrade-player-data", "passed": (
                 int(baseline_state["player_data_bytes"]) > 0 and int(upgrade_state["player_data_bytes"]) > 0),
              "detail": "persistent player NBT exists after both clean client sessions"},
+            {"id": "upgrade-diagnostic-policy", "passed": (
+                int(baseline_state["diagnostic_policy_bytes"]) > 0
+                and baseline_state["diagnostic_policy_sha256"]
+                == upgrade_state["diagnostic_policy_sha256"]),
+             "detail": "the strict diagnostics-policy.json remained byte-identical and readable"},
+            {"id": "upgrade-resource-pack-stability", "passed": (
+                baseline_state["resource_pack_sha256"] == upgrade_state["resource_pack_sha256"]),
+             "detail": (f"0.3={baseline_state['resource_pack_sha256']}; "
+                        f"0.4-rc={upgrade_state['resource_pack_sha256']}")},
             {"id": "upgrade-resource-pack-client", "passed": (
                 baseline_client is not None and upgrade_client is not None
                 and baseline_client.get("result") == upgrade_client.get("result") == "passed"),
@@ -318,16 +374,18 @@ def main() -> int:
             {"id": "upgrade-production-jars", "passed": (
                 baseline_state["reborn_jar_sha256"] == hashlib.sha256(baseline_jar.read_bytes()).hexdigest()
                 and upgrade_state["reborn_jar_sha256"] == hashlib.sha256(current_jar.read_bytes()).hexdigest()),
-             "detail": (f"0.2={baseline_state['reborn_jar_sha256']}; "
-                        f"0.3={upgrade_state['reborn_jar_sha256']}")},
+             "detail": (f"0.3={baseline_state['reborn_jar_sha256']}; "
+                        f"0.4-rc={upgrade_state['reborn_jar_sha256']}")},
             {"id": "upgrade-loaded-versions", "passed": (
-                "polymc-reborn=0.2.0-alpha.1+26.1.2" in str(baseline_state["mod_list"])
-                and "polymc-reborn=0.3.0-beta.1+26.1.2" in str(upgrade_state["mod_list"])
-                and "polymc-reborn=0.3.0-beta.1+26.1.2" not in str(baseline_state["mod_list"])),
-             "detail": "Fabric Loader reports exact 0.2 then exact 0.3 Reborn containers"},
+                f"polymc-reborn={BASE_VERSION}" in str(baseline_state["mod_list"])
+                and f"polymc-reborn={CURRENT_VERSION}" in str(upgrade_state["mod_list"])
+                and f"polymc-reborn={CURRENT_VERSION}" not in str(baseline_state["mod_list"])),
+             "detail": "Fabric Loader reports exact 0.3 Beta then exact 0.4 RC containers"},
             {"id": "upgrade-schema-unchanged", "passed": (
-                json.loads(baseline_raw)["schema_version"] == json.loads(upgrade_raw)["schema_version"] == 1),
-             "detail": "schema_version=1; no migration was claimed or required"},
+                json.loads(baseline_raw)["schema_version"] == json.loads(upgrade_raw)["schema_version"] == 1
+                and json.loads(baseline_raw)["mapping_algorithm_version"]
+                == json.loads(upgrade_raw)["mapping_algorithm_version"] == "reborn-2"),
+             "detail": "schema_version=1 and algorithm=reborn-2; no migration was claimed"},
             {"id": "mod-set-preserves-old", "passed": all(expanded_assignments.get(key) == value
                     for key, value in upgraded_assignments.items()),
              "detail": "all pre-expansion allocations remain identical"},
@@ -366,7 +424,10 @@ def main() -> int:
                                        encoding="utf-8")
     upgrade_ids = {"audited-base-commit", "baseline-content", "upgrade-key-set",
                    "upgrade-allocations-preserved", "upgrade-world-state", "upgrade-player-inventory",
+                   "upgrade-property-gui-state", "upgrade-persistent-entity-state",
+                   "upgrade-client-projections",
                    "upgrade-player-data", "upgrade-resource-pack-client", "upgrade-production-jars",
+                   "upgrade-diagnostic-policy", "upgrade-resource-pack-stability",
                    "upgrade-loaded-versions", "upgrade-schema-unchanged",
                    "mapping-document-remains-present"}
     expansion_ids = {"mod-set-preserves-old", "mod-set-adds-content",
@@ -374,16 +435,17 @@ def main() -> int:
                      "expanded-readd-assignments", "expanded-readd-bytes", "expanded-client-evidence"}
     materialize_evidence(UPGRADE_OUTPUT, "upgrade-playtest",
                          [entry for entry in checks if entry["id"] in upgrade_ids], failures,
-                         ["baseline-build.log", "current-build.log", "baseline-0.2-server.log",
-                          "baseline-0.2-client.log", "upgrade-0.3-server.log", "upgrade-0.3-client.log"],
-                         ["baseline-0.2-mappings-v1.json", "upgrade-0.3-mappings-v1.json",
-                          "baseline-0.2-state.json", "upgrade-0.3-state.json"])
+                         ["baseline-build.log", "current-build.log", "baseline-0.3-server.log",
+                          "baseline-0.3-client.log", "upgrade-0.4-rc-server.log",
+                          "upgrade-0.4-rc-client.log"],
+                         ["baseline-0.3-mappings-v1.json", "upgrade-0.4-rc-mappings-v1.json",
+                          "baseline-0.3-state.json", "upgrade-0.4-rc-state.json"])
     materialize_evidence(EXPANSION_OUTPUT, "modset-expansion-playtest",
                          [entry for entry in checks if entry["id"] in expansion_ids], failures,
                          ["mod-set-expanded-server.log", "mod-set-expanded-client.log",
                           "mod-set-removed-server.log", "mod-set-readded-server.log",
                           "mod-set-readded-client.log"],
-                         ["upgrade-0.3-mappings-v1.json", "mod-set-expanded-mappings-v1.json",
+                         ["upgrade-0.4-rc-mappings-v1.json", "mod-set-expanded-mappings-v1.json",
                           "mod-set-removed-mappings-v1.json", "mod-set-readded-mappings-v1.json",
                           "mod-set-expanded-state.json", "mod-set-removed-state.json",
                           "mod-set-readded-state.json", "mod-set-removed-mapping-diff.json"])

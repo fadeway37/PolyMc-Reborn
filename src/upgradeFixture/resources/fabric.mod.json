@@ -5,7 +5,8 @@
   "name": "PolyMc Reborn Upgrade Fixture",
   "environment": "server",
   "entrypoints": {
-    "main": ["io.github.polymcreborn.upgradefixture.UpgradeFixture"]
+    "main": ["io.github.polymcreborn.upgradefixture.UpgradeFixture"],
+    "polymc-reborn": ["io.github.polymcreborn.upgradefixture.UpgradeFixture"]
   },
   "depends": {
     "fabricloader": ">=0.19.3",

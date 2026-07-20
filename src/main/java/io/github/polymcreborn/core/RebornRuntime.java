@@ -9,6 +9,7 @@ import io.github.polymcreborn.backend.NoOpPacketFallbackBackend;
 import io.github.polymcreborn.backend.PacketFallbackBackend;
 import io.github.polymcreborn.backend.gui.GuiProjectionService;
 import io.github.polymcreborn.backend.polymer.MinecraftContentScanner;
+import io.github.polymcreborn.backend.polymer.DynamicRegistrySanitizer;
 import io.github.polymcreborn.backend.polymer.PolymerCompatibilityBackend;
 import io.github.polymcreborn.backend.polymer.PolymerRegistrySanitizer;
 import io.github.polymcreborn.backend.polymer.entity.PolymerEntityProjectionBackend;
@@ -229,6 +230,20 @@ public final class RebornRuntime {
             finalPlan = backend.apply(proposed, PolyMcReborn.VERSION);
             finalPlan = PolymerRegistrySanitizer.quarantineUnsupportedBlocks(finalPlan);
             finalPlan = PolymerRegistrySanitizer.quarantineUnsupportedEntityAndMenuTypes(finalPlan);
+            var registrySanitization = PolymerRegistrySanitizer.registerServerOnlyStaticEntries();
+            DynamicRegistrySanitizer.configure(registrySanitization.hiddenIdentifiers(), diagnostics);
+            if (registrySanitization.totalEntries() > 0) {
+                diagnostics.record("registry.static.sanitized", "minecraft:root",
+                        "Confirmed " + registrySanitization.totalEntries()
+                                + " custom static registry entry(s) as server-only across "
+                                + registrySanitization.entriesByRegistry().size() + " registries",
+                        DiagnosticCollector.Severity.INFO);
+                registrySanitization.entriesByRegistry().forEach((registry, entries) -> diagnostics.record(
+                        "registry.static.sanitized.detail", registry.toString(),
+                        "Confirmed " + entries.size() + " custom entry(s) as server-only: "
+                                + entries,
+                        DiagnosticCollector.Severity.INFO));
+            }
             new MappingDiffReportWriter().write(configManager.reportsDirectory(), backend.startupDiff());
         } else {
             finalPlan = proposed.replaceDecisions(proposed.orderedDecisions().stream()

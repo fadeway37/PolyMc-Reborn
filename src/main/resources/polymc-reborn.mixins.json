@@ -4,6 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "MappedRegistryFreezeMixin",
+    "RegistrySynchronizationMixin",
+    "RecipeBookPacketMixin",
     "ResourcePackResponseMixin",
     "SystemReportMixin"
   ],

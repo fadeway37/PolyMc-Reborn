@@ -13,7 +13,10 @@ base {
 sourceSets.main.java.srcDir project(':api').layout.projectDirectory.dir('src/main/java')
 sourceSets {
 	upgradeFixture {
-		compileClasspath += sourceSets.main.compileClasspath
+		// Compile the persistent adapter fixture against the current public surface, but package
+		// only fixture classes. Each runtime leg supplies either the audited 0.3 JAR or the RC JAR,
+		// so a binary linkage regression still fails on the real baseline server.
+		compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
 		runtimeClasspath += sourceSets.main.runtimeClasspath
 	}
 	upgradeExpansionFixture {
@@ -75,12 +78,14 @@ dependencies {
 	implementation "eu.pb4:polymer-blocks:${polymer_version}"
 	implementation "eu.pb4:polymer-resource-pack:${polymer_version}"
 	implementation "eu.pb4:polymer-virtual-entity:${polymer_version}"
+	implementation "eu.pb4:polymer-reg-sync-manipulator:${polymer_version}"
 
 	productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 	productionRuntimeMods "eu.pb4:polymer-core:${polymer_version}"
 	productionRuntimeMods "eu.pb4:polymer-blocks:${polymer_version}"
 	productionRuntimeMods "eu.pb4:polymer-resource-pack:${polymer_version}"
 	productionRuntimeMods "eu.pb4:polymer-virtual-entity:${polymer_version}"
+	productionRuntimeMods "eu.pb4:polymer-reg-sync-manipulator:${polymer_version}"
 
 	testImplementation platform("org.junit:junit-bom:${junit_version}")
 	testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -115,6 +120,7 @@ def playtestExternalMode = providers.gradleProperty('playtestExternalMode').orEl
 def playtestExternalModId = providers.gradleProperty('playtestExternalModId').orElse('none')
 def playtestExternalItemId = providers.gradleProperty('playtestExternalItemId').orElse('none')
 def playtestExternalBlockId = providers.gradleProperty('playtestExternalBlockId').orElse('none')
+def playtestSoakMode = providers.gradleProperty('playtestSoakMode').orElse('none')
 def playtestServerRunRoot = layout.buildDirectory.dir('run')
 def playtestServerDirectory = layout.buildDirectory.dir('run/client-playtest-server')
 def playtestReportDirectory = providers.gradleProperty('playtestReportDir')
@@ -288,7 +294,7 @@ tasks.register('prepareUpgradeFixtureServer') {
 
 tasks.register('runUpgradeFixtureServer', net.fabricmc.loom.task.prod.ServerProductionRunTask) {
 	group = 'verification'
-	description = 'Internal production-server leg for 0.2-to-0.3 mapping upgrade evidence.'
+	description = 'Internal production-server leg for 0.3-Beta-to-0.4-RC upgrade evidence.'
 	dependsOn tasks.named('upgradeFixtureJar'), tasks.named('prepareUpgradeFixtureServer')
 	mods.setFrom(configurations.productionRuntimeMods, upgradeRebornJar.map { file(it) },
 		tasks.named('upgradeFixtureJar').flatMap { it.archiveFile })
@@ -402,6 +408,7 @@ tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.Server
 	jvmArgs.add(playtestExternalModId.map { '-Dpolymc-reborn.playtest.externalModId=' + it })
 	jvmArgs.add(playtestExternalItemId.map { '-Dpolymc-reborn.playtest.externalItemId=' + it })
 	jvmArgs.add(playtestExternalBlockId.map { '-Dpolymc-reborn.playtest.externalBlockId=' + it })
+	jvmArgs.add(playtestSoakMode.map { '-Dpolymc-reborn.playtest.soakMode=' + it })
 	doFirst {
 		def expectedReleaseJar = productionReleaseJar.get().asFile.canonicalFile
 		def matchingReleaseJars = mods.files.findAll { candidate ->
@@ -523,7 +530,7 @@ tasks.register('runPackPolicyPlaytest', Exec) {
 def upgradePlaytestSummary = layout.buildDirectory.file('playtest/upgrade/summary.json')
 tasks.register('runUpgradeAndModSetPlaytest', Exec) {
 	group = 'verification'
-	description = 'Builds audited 0.2 and runs real upgrade plus mod-set expansion server legs.'
+	description = 'Builds audited 0.3 Beta and runs the real RC upgrade plus mod-set expansion legs.'
 	outputs.file(upgradePlaytestSummary)
 	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
 		commandLine 'python', file('scripts/playtest/upgrade_playtest.py').absolutePath
@@ -534,7 +541,13 @@ tasks.register('runUpgradeAndModSetPlaytest', Exec) {
 
 tasks.register('runUpgradePlaytest') {
 	group = 'verification'
-	description = 'Runs the audited 0.2-to-0.3 mapping upgrade playtest.'
+	description = 'Compatibility alias for the audited 0.3-Beta-to-0.4-RC upgrade playtest.'
+	dependsOn tasks.named('runUpgradeAndModSetPlaytest')
+}
+
+tasks.register('runRcUpgradePlaytest') {
+	group = 'verification'
+	description = 'Runs the audited 0.3-Beta-to-0.4-RC in-place upgrade playtest.'
 	dependsOn tasks.named('runUpgradeAndModSetPlaytest')
 }
 
@@ -552,6 +565,41 @@ tasks.register('runSoakPlaytest', Exec) {
 		commandLine 'python', file('scripts/playtest/soak_playtest.py').absolutePath
 	} else {
 		commandLine 'python3', file('scripts/playtest/soak_playtest.py').absolutePath
+	}
+}
+
+tasks.register('runWindowsSoakPlaytest') {
+	group = 'verification'
+	description = 'Windows-only alias for the five-iteration production short soak.'
+	dependsOn tasks.named('runSoakPlaytest')
+	doFirst {
+		if (!org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+			throw new GradleException('runWindowsSoakPlaytest requires Windows')
+		}
+	}
+}
+
+tasks.register('runLinuxSoakPlaytest') {
+	group = 'verification'
+	description = 'Linux-only alias for the five-iteration production short soak.'
+	dependsOn tasks.named('runSoakPlaytest')
+	doFirst {
+		if (!org.gradle.internal.os.OperatingSystem.current().isLinux()) {
+			throw new GradleException('runLinuxSoakPlaytest requires Linux')
+		}
+	}
+}
+
+tasks.register('runLongSoakPlaytest', Exec) {
+	group = 'verification'
+	description = 'Runs ten complete production iterations with bounded GUI/entity/tracking stress.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/soak_playtest.py').absolutePath,
+			'--mode', 'long', '--iterations', '10'
+	} else {
+		commandLine 'python3', file('scripts/playtest/soak_playtest.py').absolutePath,
+			'--mode', 'long', '--iterations', '10'
 	}
 }
 
@@ -786,7 +834,7 @@ tasks.register('generateSbom') {
 
 tasks.register('generateProvenance') {
 	group = 'release'
-	description = 'Writes path-free local build provenance for the Beta artifacts.'
+	description = 'Writes a path-free local build manifest; GitHub attestation is generated only in CI.'
 	dependsOn tasks.named('jar'), ':api:jar'
 	outputs.files(provenanceFile, buildManifestFile)
 	doLast {
@@ -856,8 +904,8 @@ tasks.register('generateReleaseChecksums') {
 			tasks.named('javadocJar', Jar).get().archiveFile.get().asFile,
 			apiJarFile.get().asFile, apiSourcesJarFile.get().asFile, apiJavadocJarFile.get().asFile,
 			sbomFile.get().asFile, provenanceFile.get().asFile, buildManifestFile.get().asFile,
-			file('api/signatures/0.3.0-beta.1.txt'), file('LICENSE'), file('NOTICE.md'),
-			file('THIRD_PARTY_NOTICES.md'), file('docs/0.3-release-notes.md')]
+			file('api/signatures/0.4.0-rc.1.txt'), file('LICENSE'), file('NOTICE.md'),
+			file('THIRD_PARTY_NOTICES.md'), file('docs/0.4-rc-release-notes.md')]
 		files.sort { it.name }
 		def output = checksumsFile.get().asFile.toPath()
 		java.nio.file.Files.createDirectories(output.parent)
@@ -871,9 +919,9 @@ tasks.register('generateReleaseChecksums') {
 	}
 }
 
-tasks.register('assembleBetaArtifacts', Copy) {
+tasks.register('assembleRcArtifacts', Copy) {
 	group = 'release'
-	description = 'Assembles the bounded Beta artifact set without publishing it.'
+	description = 'Assembles the bounded RC artifact set without publishing it.'
 	dependsOn tasks.named('generateReleaseChecksums')
 	from productionReleaseJar
 	from tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
@@ -886,11 +934,11 @@ tasks.register('assembleBetaArtifacts', Copy) {
 	from buildManifestFile
 	from checksumsFile
 	from checksums512File
-	from file('api/signatures/0.3.0-beta.1.txt')
+	from file('api/signatures/0.4.0-rc.1.txt')
 	from file('LICENSE')
 	from file('NOTICE.md')
 	from file('THIRD_PARTY_NOTICES.md')
-	from file('docs/0.3-release-notes.md')
+	from file('docs/0.4-rc-release-notes.md')
 	into releaseDirectory
 	outputs.upToDateWhen { false }
 	doFirst {
@@ -905,20 +953,26 @@ tasks.register('assembleBetaArtifacts', Copy) {
 			apiJavadocJarFile.get().asFile.name, sbomFile.get().asFile.name,
 			provenanceFile.get().asFile.name, buildManifestFile.get().asFile.name,
 			checksumsFile.get().asFile.name, checksums512File.get().asFile.name,
-			'0.3.0-beta.1.txt', 'LICENSE', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md',
-			'0.3-release-notes.md'
+			'0.4.0-rc.1.txt', 'LICENSE', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md',
+			'0.4-rc-release-notes.md'
 		].toSorted()
 		def actual = releaseDirectory.get().asFile.listFiles().findAll { it.isFile() }
 			.collect { it.name }.toSorted()
 		if (actual != expected) {
-			throw new GradleException('Beta artifact set differs from the exact allow-list: ' + actual)
+			throw new GradleException('RC artifact set differs from the exact allow-list: ' + actual)
 		}
 		def empty = releaseDirectory.get().asFile.listFiles().findAll { it.isFile() && it.length() == 0 }
 			.collect { it.name }
 		if (!empty.isEmpty()) {
-			throw new GradleException('Beta artifact set contains empty files: ' + empty)
+			throw new GradleException('RC artifact set contains empty files: ' + empty)
 		}
 	}
+}
+
+tasks.register('assembleBetaArtifacts') {
+	group = 'release'
+	description = 'Deprecated compatibility alias for assembleRcArtifacts.'
+	dependsOn tasks.named('assembleRcArtifacts')
 }
 
 tasks.register('verifyReproducibleArchives', Exec) {

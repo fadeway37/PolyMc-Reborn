@@ -2,6 +2,7 @@
 package io.github.polymcreborn.gametest;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** Cross-component observations written by the server-only production playtest fixture. */
 public final class PlaytestProbe {
@@ -21,6 +22,16 @@ public final class PlaytestProbe {
     public static final AtomicInteger MAX_TOOL_DAMAGE = new AtomicInteger();
     public static final AtomicInteger FOOD_REMAINING = new AtomicInteger(-1);
     public static final AtomicInteger BASIC_ITEM_REMAINING = new AtomicInteger(-1);
+    public static final AtomicInteger SOAK_GUI_CYCLES = new AtomicInteger();
+    public static final AtomicInteger SOAK_REJECTED_TRANSACTIONS = new AtomicInteger();
+    public static final AtomicInteger SOAK_ENTITY_SPAWNS = new AtomicInteger();
+    public static final AtomicInteger SOAK_ENTITY_DESPAWNS = new AtomicInteger();
+    public static final AtomicInteger SOAK_TRACKING_CYCLES = new AtomicInteger();
+    public static final AtomicInteger SUPPORT_BUNDLE_GENERATIONS = new AtomicInteger();
+    public static final AtomicInteger MAPPING_DRY_RUNS = new AtomicInteger();
+    public static final AtomicLong REJECTED_TRANSACTION_TOTAL_NANOS = new AtomicLong();
+    public static final AtomicLong REJECTED_TRANSACTION_MAX_NANOS = new AtomicLong();
+    public static final AtomicLong SERVER_TICKS = new AtomicLong();
     public static volatile boolean placedBlockObserved;
     public static volatile boolean brokenBlockObserved;
     public static volatile boolean simpleBlockPlacedObserved;

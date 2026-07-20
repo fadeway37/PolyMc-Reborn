@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -28,7 +29,7 @@ def download(entry: dict[str, object]) -> Path:
     if expected_size <= 0 or expected_size > MAX_BYTES:
         raise RuntimeError(f"unsafe locked size for {entry['mod_id']}")
     request = urllib.request.Request(str(entry["download_url"]), headers={
-        "User-Agent": "PolyMc-Reborn/0.3 external-matrix"
+    "User-Agent": "PolyMc-Reborn/0.4-rc external-matrix"
     })
     with urllib.request.urlopen(request, timeout=30) as response:
         declared = response.headers.get("Content-Length")
@@ -151,7 +152,9 @@ def run_entry(entry: dict[str, object], jar: Path) -> dict[str, object]:
             "simple_block_placed": bool(server.get("external_block_placed", False)),
             "simple_block_broken": bool(server.get("external_block_broken", False)),
             "server_logic_executed": bool(server.get("external_item_equipped", False)
+                                           or server.get("external_food_consumed", False)
                                            or server.get("external_block_placed", False)),
+            "semantic_food_consumed": bool(server.get("external_food_consumed", False)),
             "reconnect_stable": int(server.get("join_count", 0)) == 2,
             "mapping_stable": bool(server.get("mapping_store_stable", False)),
             "unsupported_content_isolated": "NOT_TESTED",
@@ -171,13 +174,23 @@ def run_entry(entry: dict[str, object], jar: Path) -> dict[str, object]:
     return result
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mod-id", help="run one locked entry for focused diagnosis")
+    arguments = parser.parse_args(argv)
     document = json.loads(LOCK.read_text(encoding="utf-8"))
     if document.get("schema_version") != 1 or document.get("minecraft_version") != "26.1.2":
         raise RuntimeError("unsupported external-mod lock schema or Minecraft version")
     entries = document.get("entries")
-    if not isinstance(entries, list) or len(entries) < 2:
-        raise RuntimeError("external matrix requires at least two locked entries")
+    if not isinstance(entries, list) or len(entries) != 3:
+        raise RuntimeError("RC external matrix requires exactly three locked entries")
+    mod_ids = [str(entry.get("mod_id", "")) for entry in entries]
+    if len(set(mod_ids)) != 3 or any(not mod_id for mod_id in mod_ids):
+        raise RuntimeError("external matrix Mod IDs must be three unique non-empty values")
+    if arguments.mod_id is not None:
+        entries = [entry for entry in entries if entry.get("mod_id") == arguments.mod_id]
+        if not entries:
+            raise RuntimeError(f"unknown locked external Mod ID: {arguments.mod_id}")
     DOWNLOADS.mkdir(parents=True, exist_ok=True)
     for directory in (STAGING, OUTPUT):
         if directory.exists():

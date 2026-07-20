@@ -198,14 +198,52 @@ def _operation_checks(server: dict[str, Any], orchestration: dict[str, Any]) -> 
         "mapped-item-pickup": server.get("item_pickup_observed") is True,
         "disconnect": int(server.get("disconnect_count", 0)) >= 2,
         "reconnect": int(server.get("join_count", 0)) >= 2,
-        "mapping-dry-run": int(server.get("admin_command_count", 0)) >= 17,
-        "support-bundle": server.get("support_bundle_valid") is True,
+        "mapping-dry-run": int(server.get("mapping_dry_run_count", 0)) >= 1,
+        "support-bundle": server.get("support_bundle_valid") is True
+        and int(server.get("support_bundle_generation_count", 0)) >= 1,
         "client-clean-exit": client_process.get("exit_code") == 0
         and client_process.get("forced_termination") is False,
         "server-clean-exit": server_process.get("exit_code") == 0
         and server_process.get("clean_shutdown") is True
         and server_process.get("forced_termination") is False,
     }
+
+
+def _resource_trends(iterations: list[dict[str, Any]]) -> dict[str, Any]:
+    """Detect only sustained post-warmup growth, not ordinary JVM noise."""
+    fields = {
+        "heap_used_bytes": 256 * 1024 * 1024,
+        "rss_bytes": 256 * 1024 * 1024,
+        "thread_count": 32,
+        "open_file_count": 64,
+        "cache_size": 0,
+    }
+    output: dict[str, Any] = {"schema_version": 1, "warmup_iterations": 2, "metrics": {}}
+    for field, allowance in fields.items():
+        values = [int(item["resources"].get(field, -1)) for item in iterations]
+        supported = [value for value in values if value >= 0]
+        post_warmup = supported[2:] if len(supported) > 2 else supported
+        delta = post_warmup[-1] - post_warmup[0] if len(post_warmup) >= 2 else 0
+        monotonic = len(post_warmup) >= 3 and all(
+            right >= left for left, right in zip(post_warmup, post_warmup[1:])
+        )
+        leaking = monotonic and delta > allowance
+        output["metrics"][field] = {
+            "supported": len(supported) == len(values),
+            "values": values,
+            "post_warmup_delta": delta,
+            "monotonic_non_decreasing": monotonic,
+            "allowance": allowance,
+            "leak_detected": leaking,
+        }
+    output["passed"] = not any(
+        metric["leak_detected"] for metric in output["metrics"].values()
+    )
+    output["rationale"] = (
+        "Only monotonic post-warmup growth beyond a JVM-noise allowance fails; "
+        "unsupported platform metrics remain explicitly -1."
+    )
+    return output
 
 
 def _iteration_markdown(value: dict[str, Any]) -> str:
@@ -243,7 +281,9 @@ def _aggregate_markdown(value: dict[str, Any]) -> str:
         f"- Resource-pack SHA-256: `{value.get('pack_sha256')}`",
         f"- Final GUI sessions: `{value['final_resources']['gui_sessions']}`",
         f"- Final entity projections: `{value['final_resources']['entity_projections']}`",
+        f"- Final interaction proxies: `{value['final_resources']['interaction_proxies']}`",
         f"- Final pack sessions: `{value['final_resources']['pack_sessions']}`",
+        f"- Operation totals: `{json.dumps(value.get('operation_totals', {}), sort_keys=True)}`",
         "",
         "## Failures",
         "",
@@ -377,10 +417,40 @@ def run(iteration_count: int, mode: str) -> int:
             "schema_version": 1,
             "gui_sessions": int(server.get("gui_active_sessions", -1)),
             "entity_projections": int(server.get("entity_projection_sessions", -1)),
+            "interaction_proxies": int(server.get("active_interaction_proxies", -1)),
             "pack_sessions": int(server.get("resource_pack_active_sessions", -1)),
             "support_bundle_entries": int(server.get("support_bundle_entries", 0)),
             "mapping_dry_run_observed": operations["mapping-dry-run"],
+            "gui_cycles": int(server.get("soak_gui_cycles", 0)),
+            "rejected_transactions": int(server.get("soak_rejected_transactions", 0)),
+            "entity_spawns": int(server.get("soak_entity_spawns", 0)),
+            "entity_despawns": int(server.get("soak_entity_despawns", 0)),
+            "tracking_cycles": int(server.get("soak_tracking_cycles", 0)),
+            "reconnect_cycles": max(0, int(server.get("join_count", 0)) - 1),
+            "pack_sessions_completed": int(server.get("resource_pack_applied_count", 0)),
+            "support_bundles": int(server.get("support_bundle_generation_count", 0)),
+            "mapping_dry_runs": int(server.get("mapping_dry_run_count", 0)),
+            "server_ticks": int(server.get("server_ticks", 0)),
+            "heap_used_bytes": int(server.get("jvm_heap_used_bytes", -1)),
+            "rss_bytes": int(server.get("jvm_rss_bytes", -1)),
+            "thread_count": int(server.get("jvm_thread_count", -1)),
+            "open_file_count": int(server.get("jvm_open_file_count", -1)),
+            "cache_size": int(server.get("mapping_cache_size", -1)),
+            "gc_count": int(server.get("jvm_gc_count", -1)),
+            "transaction_average_millis": float(server.get("transaction_average_millis", 0.0)),
+            "transaction_max_millis": float(server.get("transaction_max_millis", 0.0)),
         }
+        long_stress_valid = mode != "long" or (
+            resources["gui_cycles"] == 25
+            and resources["rejected_transactions"] == 25
+            and resources["entity_spawns"] == 50
+            and resources["entity_despawns"] == 50
+            and resources["tracking_cycles"] == 10
+            and resources["reconnect_cycles"] == 2
+            and resources["pack_sessions_completed"] == 3
+            and resources["support_bundles"] == 3
+            and resources["mapping_dry_runs"] == 3
+        )
         stable = (
             production_summary.get("result") == "passed"
             and scenario_count >= 39
@@ -392,7 +462,9 @@ def run(iteration_count: int, mode: str) -> int:
             and not cleanup["forced_cleanup"]
             and resources["gui_sessions"] == 0
             and resources["entity_projections"] == 0
+            and resources["interaction_proxies"] == 0
             and resources["pack_sessions"] == 0
+            and long_stress_valid
             and mapping_hash != ""
             and pack_hash != ""
             and baseline_mapping in (None, mapping_hash)
@@ -437,8 +509,35 @@ def run(iteration_count: int, mode: str) -> int:
 
     passed = len(iterations) == iteration_count and not failures
     final_resources = iterations[-1]["resources"] if iterations else {
-        "gui_sessions": -1, "entity_projections": -1, "pack_sessions": -1,
+        "gui_sessions": -1, "entity_projections": -1,
+        "interaction_proxies": -1, "pack_sessions": -1,
     }
+    totals = {
+        field: sum(int(item["resources"].get(field, 0)) for item in iterations)
+        for field in (
+            "gui_cycles", "rejected_transactions", "entity_spawns", "entity_despawns",
+            "tracking_cycles", "reconnect_cycles", "pack_sessions_completed",
+            "support_bundles", "mapping_dry_runs", "server_ticks",
+        )
+    }
+    trends = _resource_trends(iterations)
+    long_thresholds = {
+        "iterations": len(iterations) >= 10,
+        "gui_cycles": totals["gui_cycles"] >= 250,
+        "rejected_transactions": totals["rejected_transactions"] >= 250,
+        "entity_spawns": totals["entity_spawns"] >= 500,
+        "entity_despawns": totals["entity_despawns"] >= 500,
+        "tracking_cycles": totals["tracking_cycles"] >= 100,
+        "reconnect_cycles": totals["reconnect_cycles"] >= 20,
+        "pack_sessions": totals["pack_sessions_completed"] >= 10,
+        "support_bundles": totals["support_bundles"] >= 25,
+        "mapping_dry_runs": totals["mapping_dry_runs"] >= 25,
+        "server_ticks": totals["server_ticks"] >= 10_000,
+        "resource_trends": trends["passed"],
+    }
+    if mode == "long" and not all(long_thresholds.values()):
+        failures.append("long-soak operation or resource-trend threshold was not satisfied")
+        passed = False
     aggregate = {
         "schema_version": 2,
         "suite": "rc-soak",
@@ -450,6 +549,8 @@ def run(iteration_count: int, mode: str) -> int:
         "connection_lifecycles": len(iterations) * 2,
         "client_scenarios": sum(int(item["client_scenarios"]) for item in iterations),
         "operation_assertions": sum(int(item["operation_assertions"]) for item in iterations),
+        "operation_totals": totals,
+        "long_thresholds": long_thresholds if mode == "long" else {},
         "duration_seconds": round(time.monotonic() - started, 3),
         "mapping_sha256": baseline_mapping,
         "pack_sha256": baseline_pack,
@@ -465,6 +566,7 @@ def run(iteration_count: int, mode: str) -> int:
         } for item in iterations],
     }
     _write_json(final_run / "summary.json", aggregate)
+    _write_json(final_run / "resource-trends.json", trends)
     _write_text(final_run / "summary.md", _aggregate_markdown(aggregate))
     (final_run / "junit.xml").write_bytes(_aggregate_junit(iterations, failures))
 

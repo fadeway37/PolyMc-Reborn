@@ -72,6 +72,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
     private String externalMode;
     private String clientId;
     private String scenario;
+    private String soakMode;
     private Path coordinatorDirectory;
     private Instant lastStepBoundary = Instant.now();
 
@@ -85,6 +86,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
         clientId = System.getProperty("polymc-reborn.playtest.clientId", "single");
         scenario = System.getProperty("polymc-reborn.playtest.scenario", "single");
+        soakMode = System.getProperty("polymc-reborn.playtest.soakMode", "none");
         reportDirectory = Path.of(requiredProperty("polymc-reborn.playtest.reportDir"))
                 .toAbsolutePath().normalize();
         screenshotsDirectory = reportDirectory.resolve("screenshots");
@@ -121,6 +123,9 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             exercisePropertyGui(context);
             exerciseEntity(context);
             exerciseExternalContent(context);
+            if ("long".equals(soakMode)) {
+                exerciseLongSoak(context);
+            }
 
             inventoryBeforeReconnect = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
             openProjectedGui(context);
@@ -136,6 +141,18 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             }
             screenshot(context, "17-reconnected");
             pass("reconnect", "A new network session joined, reapplied the same resource pack and preserved inventory");
+            if ("long".equals(soakMode)) {
+                disconnect(context);
+                connect(context);
+                acceptAndWaitForPack(context, "second long-soak reconnection", false);
+                String inventoryAfterSecondReconnect = context.computeOnClient(
+                        RebornClientPlaytest::inventoryFingerprint);
+                if (!inventoryBeforeReconnect.equals(inventoryAfterSecondReconnect)) {
+                    throw new AssertionError("Player inventory changed across the second long-soak reconnect");
+                }
+                pass("long-soak-second-reconnect",
+                        "A second disconnect/reconnect cycle preserved the authoritative inventory and pack");
+            }
         } catch (Throwable throwable) {
             failure = throwable;
             fail("playtest", throwable.getClass().getSimpleName() + ": " + safeMessage(throwable));
@@ -173,6 +190,35 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         screenshot(context, "04-upgrade-persisted-item");
         pass("upgrade-player-inventory",
                 "The isolated client received a non-empty persisted hotbar stack: " + inventory);
+
+        openProjectedGui(context);
+        context.waitFor(client -> client.player.containerMenu instanceof FurnaceMenu, 200);
+        context.computeOnClient(client -> {
+            FurnaceMenu menu = (FurnaceMenu) client.player.containerMenu;
+            if (menu.slots.get(0).getItem().getCount() != 7
+                    || menu.getBurnProgress() < 0.30F || menu.getBurnProgress() > 0.45F) {
+                throw new AssertionError("Persisted property GUI content/progress did not survive the upgrade leg");
+            }
+            return true;
+        });
+        screenshot(context, "05-upgrade-property-gui");
+        pass("upgrade-property-gui",
+                "The explicit read-only furnace projection exposed seven persisted items and bounded progress");
+        context.getInput().pressKey(options -> options.keyInventory);
+        context.waitFor(client -> !(client.screen instanceof AbstractContainerScreen<?>), 100);
+
+        context.waitFor(client -> {
+            for (Entity entity : client.level.entitiesForRendering()) {
+                if (entity.getType() == EntityType.ARMOR_STAND && entity.getCustomName() != null
+                        && entity.getCustomName().getString().equals("Upgrade Persistent Entity")) {
+                    return true;
+                }
+            }
+            return false;
+        }, 400);
+        screenshot(context, "06-upgrade-persistent-entity");
+        pass("upgrade-persistent-entity",
+                "The saved real custom entity returned through its explicit vanilla surrogate projection");
         disconnect(context);
         pass("upgrade-disconnect", "Upgrade client disconnected normally after applying the server pack");
     }
@@ -917,6 +963,55 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         pass("entity-use-attack", "Use and attack input targeted the tracked vanilla surrogate entity");
     }
 
+    private void exerciseLongSoak(ClientGameTestContext context) {
+        for (int cycle = 0; cycle < 25; cycle++) {
+            openProjectedGui(context);
+            sendFixtureCommand(context, "polymcreborn-playtest reject-transaction");
+            context.waitTicks(2);
+            context.computeOnClient(client -> {
+                if (!(client.screen instanceof AbstractContainerScreen<?>)
+                        || !client.player.containerMenu.getCarried().isEmpty()) {
+                    throw new AssertionError("Rejected transaction did not retain a clean projected screen");
+                }
+                return true;
+            });
+            context.getInput().pressKey(options -> options.keyInventory);
+            context.waitFor(client -> !(client.screen instanceof AbstractContainerScreen<?>), 100);
+        }
+
+        for (int cycle = 0; cycle < 50; cycle++) {
+            sendFixtureCommand(context, "polymcreborn-playtest projection-spawn");
+            context.waitFor(client -> surrogateCount(client) == 2, 200);
+            sendFixtureCommand(context, "polymcreborn-playtest projection-despawn");
+            context.waitFor(client -> surrogateCount(client) == 1, 200);
+        }
+
+        var overworld = context.computeOnClient(client -> client.level.dimension());
+        for (int cycle = 0; cycle < 10; cycle++) {
+            sendFixtureCommand(context, "polymcreborn-playtest dimension-cycle");
+            context.waitFor(client -> client.level != null && !client.level.dimension().equals(overworld), 400);
+            sendFixtureCommand(context, "polymcreborn-playtest dimension-cycle");
+            context.waitFor(client -> client.level != null && client.level.dimension().equals(overworld)
+                    && surrogateCount(client) == 1, 400);
+        }
+        pass("long-soak-stress",
+                "Completed 25 GUI reject/resync cycles, 50 projection cycles and 10 tracking cycles");
+    }
+
+    private static int surrogateCount(net.minecraft.client.Minecraft client) {
+        int count = 0;
+        for (Entity entity : client.level.entitiesForRendering()) {
+            if (entity.getType() == EntityType.ARMOR_STAND) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static void sendFixtureCommand(ClientGameTestContext context, String command) {
+        context.runOnClient(client -> client.player.connection.sendCommand(command));
+    }
+
     private void exercisePropertyGui(ClientGameTestContext context) {
         context.getInput().pressKey(options -> options.keyHotbarSlots[6]);
         context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 6, 100);
@@ -995,6 +1090,30 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             pass("external-content", "Equipped one real third-party armor item through vanilla use input");
             return;
         }
+        if ("food".equals(externalMode)) {
+            int before = context.computeOnClient(client -> {
+                var stack = client.player.getInventory().getSelectedItem();
+                if (stack.get(net.minecraft.core.component.DataComponents.CONSUMABLE) == null) {
+                    throw new AssertionError("Third-party food did not receive a semantic consumable carrier");
+                }
+                return stack.getCount();
+            });
+            context.getInput().lookAt(0.0F, -70.0F);
+            context.getInput().holdKey(options -> options.keyUse);
+            try {
+                context.waitFor(client -> client.player.getInventory().getSelectedItem().getCount() < before, 400);
+            } finally {
+                context.getInput().releaseKey(options -> options.keyUse);
+            }
+            int after = context.computeOnClient(client ->
+                    client.player.getInventory().getSelectedItem().getCount());
+            if (after != before - 1) {
+                throw new AssertionError("Third-party food consumption changed the stack by " + (before - after));
+            }
+            screenshot(context, "18-external-content");
+            pass("external-content", "Consumed one real third-party food item through vanilla use input");
+            return;
+        }
         if (!"block".equals(externalMode)) {
             throw new IllegalArgumentException("Unknown external playtest mode " + externalMode);
         }
@@ -1054,8 +1173,21 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         context.getInput().pressKey(options -> options.keyHotbarSlots[0]);
         context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 0, 100);
         context.getInput().lookAt(0.0F, -70.0F);
-        context.getInput().pressKey(options -> options.keyUse);
-        context.waitFor(client -> client.screen instanceof AbstractContainerScreen<?>, 200);
+        // A dimension transition rebuilds the client interaction manager. The first input frame
+        // after the level becomes visible can therefore be ignored even though the player and
+        // chunks already satisfy the readiness predicate. Keep issuing the same real bound-key
+        // input within one bounded timeout; success still requires the server-created projected
+        // menu to arrive, so this cannot turn a failed projection into a false positive.
+        for (int attempt = 0; attempt < 40; attempt++) {
+            context.getInput().pressKey(options -> options.keyUse);
+            context.waitTicks(5);
+            boolean opened = context.computeOnClient(
+                    client -> client.screen instanceof AbstractContainerScreen<?>);
+            if (opened) {
+                return;
+            }
+        }
+        throw new AssertionError("Timed out opening the server-created projected GUI after bounded real-input retries");
     }
 
     private void assertGuiInventoryIntegrity(ClientGameTestContext context) {
@@ -1464,6 +1596,43 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     "Inventory/component fingerprint is unchanged and exactly one surrogate returns",
                     "disconnect_count=2; GUI session cleanup completes; mapping and pack hashes stay stable", 1200,
                     "Finalizer disconnects the second connection cleanly", List.of(), "frozen MappingPlan unchanged");
+            case "long-soak-stress" -> new ScenarioSpec(
+                    "A real isolated client is connected to the long-soak production server",
+                    "Repeat projected GUI reject/resync, entity spawn/despawn and dimension tracking operations",
+                    "Every bounded cycle reaches its visible terminal state without ghost stacks or duplicate surrogates",
+                    "25 GUI cycles, 25 rejected transactions, 50 entity cycles and 10 tracking cycles are recorded",
+                    4000, "Every cycle closes or removes the state it created", List.of(
+                    "polymc-reborn-gametest:fixture_menu", "polymc-reborn-gametest:fixture_entity"),
+                    "EXPLICIT projections; invalid GUI claims reject and fully resync");
+            case "long-soak-second-reconnect" -> new ScenarioSpec(
+                    "The first reconnect completed and the frozen mapping/pack hashes are retained",
+                    "Disconnect and reconnect a second time, then accept the same required pack",
+                    "Inventory and pack remain stable across the second live network lifecycle",
+                    "join/disconnect and resource-pack terminal counts each reach three", 1200,
+                    "Finalizer disconnects the third connection", List.of(), "frozen MappingPlan unchanged");
+            case "upgrade-player-inventory" -> new ScenarioSpec(
+                    "The same offline player data is loaded by the current upgrade leg",
+                    "Inspect the live hotbar after applying the exact generated pack",
+                    "The persisted mapped stack is present with its complete inventory fingerprint",
+                    "The server reports seven real polymc-reborn-upgrade-fixture:stable_item items", 400,
+                    "The upgrade leg disconnects normally", List.of(
+                    "polymc-reborn-upgrade-fixture:stable_item"), "Persisted frozen item mapping");
+            case "upgrade-property-gui" -> new ScenarioSpec(
+                    "A saved world container backs an explicitly registered property adapter",
+                    "Use the persisted custom item and inspect the server-created vanilla furnace projection",
+                    "Seven mapped items and progress 37/100 are visible without mutating the container",
+                    "The report retains the exact custom item, count, and property value", 400,
+                    "Close the read-only projected menu", List.of(
+                    "polymc-reborn-upgrade-fixture:persistent_property_menu"),
+                    "EXPLICIT persisted furnace property projection");
+            case "upgrade-persistent-entity" -> new ScenarioSpec(
+                    "The baseline world contains one saved real custom entity with value 73",
+                    "Observe the explicitly registered armor-stand surrogate after the upgrade",
+                    "Exactly the named persistent surrogate becomes renderable",
+                    "The server report retains one real entity, its name, and saved value", 400,
+                    "Normal disconnect removes the connection-scoped projection", List.of(
+                    "polymc-reborn-upgrade-fixture:persistent_entity"),
+                    "EXPLICIT persisted vanilla-surrogate projection");
             case "cleanup" -> new ScenarioSpec("Test finalizer runs", "Request a normal client disconnect",
                     "TitleScreen is reached", "Orchestrator requests a normal dedicated-server stop", 400,
                     "No live client connection remains", List.of(), "not-applicable");

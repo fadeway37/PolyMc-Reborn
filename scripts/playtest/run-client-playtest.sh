@@ -220,6 +220,9 @@ if [[ "${#orchestration_failure_messages[@]}" -eq 0 ]]; then
     "-PplaytestPackPort=$pack_port"
     "-PplaytestReportDir=$input_dir"
   )
+  if [[ -n "${POLYMC_REBORN_SOAK_MODE:-}" ]]; then
+    server_gradle_args+=("-PplaytestSoakMode=$POLYMC_REBORN_SOAK_MODE")
+  fi
   if [[ -n "${POLYMC_REBORN_EXTERNAL_MOD_JAR:-}" ]]; then
     server_gradle_args+=(
       "-PplaytestExternalModJar=$POLYMC_REBORN_EXTERNAL_MOD_JAR"
@@ -328,6 +331,9 @@ PY
       "-PplaytestPackSha256=$pack_sha256"
       "-PplaytestPackSha1=$pack_sha1"
     )
+    if [[ -n "${POLYMC_REBORN_SOAK_MODE:-}" ]]; then
+      client_gradle_args+=("-PplaytestSoakMode=$POLYMC_REBORN_SOAK_MODE")
+    fi
     if [[ -n "${POLYMC_REBORN_EXTERNAL_MODE:-}" ]]; then
       client_gradle_args+=("-PplaytestExternalMode=$POLYMC_REBORN_EXTERNAL_MODE")
     fi

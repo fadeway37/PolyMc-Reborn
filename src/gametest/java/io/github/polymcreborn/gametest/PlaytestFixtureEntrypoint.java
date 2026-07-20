@@ -6,6 +6,8 @@ import com.sun.net.httpserver.HttpServer;
 import io.github.polymcreborn.config.AtomicFiles;
 import io.github.polymcreborn.core.PolyMcReborn;
 import io.github.polymcreborn.api.ContentType;
+import io.github.polymcreborn.api.gui.GuiClickTransaction;
+import io.github.polymcreborn.backend.gui.ProjectedContainerMenu;
 import io.github.polymcreborn.pack.ResourcePackPolicy;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
@@ -20,8 +22,10 @@ import net.minecraft.network.protocol.common.ClientboundResourcePackPushPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.players.NameAndId;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -38,10 +42,13 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.lang.management.ManagementFactory;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -64,10 +71,12 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
     private static boolean externalBlockPlaced;
     private static boolean externalBlockBroken;
     private static boolean externalItemEquipped;
+    private static boolean externalFoodConsumed;
     private static String resourcePackSha256 = "missing";
     private static String resourcePackSha1 = "missing";
     private static String initialMappingSha256 = "missing";
     private static final java.util.Set<UUID> INITIALIZED_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, FixtureContent.FixtureEntity> SOAK_ENTITIES = new ConcurrentHashMap<>();
     private static final List<String> COMMANDS = List.of(
             "pmcr about",
             "pmcr scan",
@@ -85,6 +94,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             "pmcr diagnostics list polymc-reborn",
             "pmcr support bundle",
             "pmcr support bundle status",
+            "pmcr mappings dry-run",
             "pmcr stats");
 
     @Override
@@ -98,6 +108,18 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                         .then(Commands.literal("dimension-cycle")
                                 .requires(source -> source.getEntity() instanceof ServerPlayer)
                                 .executes(context -> cycleDimension(
+                                        context.getSource().getPlayerOrException())))
+                        .then(Commands.literal("reject-transaction")
+                                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                                .executes(context -> rejectTransaction(
+                                        context.getSource().getPlayerOrException())))
+                        .then(Commands.literal("projection-spawn")
+                                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                                .executes(context -> spawnSoakProjection(
+                                        context.getSource().getPlayerOrException())))
+                        .then(Commands.literal("projection-despawn")
+                                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                                .executes(context -> despawnSoakProjection(
                                         context.getSource().getPlayerOrException())))));
         stopFile = controlledPath("polymc-reborn.playtest.stopFile", "stop.request");
         readyFile = controlledPath("polymc-reborn.playtest.readyFile", "server-ready.json");
@@ -108,6 +130,11 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> join(handler.player));
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             observeInventory(handler.player);
+            var soakEntity = SOAK_ENTITIES.remove(handler.player.getUUID());
+            if (soakEntity != null) {
+                soakEntity.discard();
+                PlaytestProbe.SOAK_ENTITY_DESPAWNS.incrementAndGet();
+            }
             PlaytestProbe.DISCONNECT_COUNT.incrementAndGet();
         });
         ServerTickEvents.END_SERVER_TICK.register(PlaytestFixtureEntrypoint::tick);
@@ -162,24 +189,39 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
 
     private static void executeAdminCommands(MinecraftServer server) {
         for (String command : COMMANDS) {
-            var callbackInvoked = new AtomicBoolean();
-            var commandSucceeded = new AtomicBoolean();
-            var resultValue = new AtomicInteger(Integer.MIN_VALUE);
-            var source = server.createCommandSourceStack().withCallback((success, value) -> {
-                callbackInvoked.set(true);
-                commandSucceeded.set(success);
-                resultValue.set(value);
-            });
-            var parsed = server.getCommands().getDispatcher().parse(command, source);
-            if (parsed.getReader().canRead()) {
-                throw new IllegalStateException("Playtest admin command did not parse completely: " + command);
+            executeAdminCommand(server, command);
+        }
+        if ("long".equals(System.getProperty("polymc-reborn.playtest.soakMode", "none"))) {
+            for (int repeat = 0; repeat < 2; repeat++) {
+                executeAdminCommand(server, "pmcr support bundle");
+                executeAdminCommand(server, "pmcr mappings dry-run");
             }
-            server.getCommands().performPrefixedCommand(source, command);
-            if (!callbackInvoked.get() || !commandSucceeded.get()) {
-                throw new IllegalStateException("Playtest admin command failed: " + command
-                        + " (callback=" + callbackInvoked.get() + ", value=" + resultValue.get() + ")");
-            }
-            PlaytestProbe.COMMAND_COUNT.incrementAndGet();
+        }
+    }
+
+    private static void executeAdminCommand(MinecraftServer server, String command) {
+        var callbackInvoked = new AtomicBoolean();
+        var commandSucceeded = new AtomicBoolean();
+        var resultValue = new AtomicInteger(Integer.MIN_VALUE);
+        var source = server.createCommandSourceStack().withCallback((success, value) -> {
+            callbackInvoked.set(true);
+            commandSucceeded.set(success);
+            resultValue.set(value);
+        });
+        var parsed = server.getCommands().getDispatcher().parse(command, source);
+        if (parsed.getReader().canRead()) {
+            throw new IllegalStateException("Playtest admin command did not parse completely: " + command);
+        }
+        server.getCommands().performPrefixedCommand(source, command);
+        if (!callbackInvoked.get() || !commandSucceeded.get()) {
+            throw new IllegalStateException("Playtest admin command failed: " + command
+                    + " (callback=" + callbackInvoked.get() + ", value=" + resultValue.get() + ")");
+        }
+        PlaytestProbe.COMMAND_COUNT.incrementAndGet();
+        if ("pmcr support bundle".equals(command)) {
+            PlaytestProbe.SUPPORT_BUNDLE_GENERATIONS.incrementAndGet();
+        } else if ("pmcr mappings dry-run".equals(command)) {
+            PlaytestProbe.MAPPING_DRY_RUNS.incrementAndGet();
         }
     }
 
@@ -245,11 +287,70 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             return 0;
         }
         PlaytestProbe.DIMENSION_CHANGE_COUNT.incrementAndGet();
+        if (target.dimension() == Level.OVERWORLD) {
+            PlaytestProbe.SOAK_TRACKING_CYCLES.incrementAndGet();
+        }
+        return 1;
+    }
+
+    private static int rejectTransaction(ServerPlayer player) {
+        if (!(player.containerMenu instanceof ProjectedContainerMenu menu)) {
+            return 0;
+        }
+        long sequence = PlaytestProbe.SOAK_REJECTED_TRANSACTIONS.get() + 1L;
+        var claim = new GuiClickTransaction(menu.containerId, menu.getStateId() + 1,
+                sequence, Map.of(), ItemStack.EMPTY);
+        long started = System.nanoTime();
+        var result = menu.transact(claim, 0, 0, ContainerInput.PICKUP, player);
+        long elapsed = System.nanoTime() - started;
+        if (!result.fullResyncRequired()) {
+            return 0;
+        }
+        PlaytestProbe.REJECTED_TRANSACTION_TOTAL_NANOS.addAndGet(elapsed);
+        PlaytestProbe.REJECTED_TRANSACTION_MAX_NANOS.accumulateAndGet(elapsed, Math::max);
+        PlaytestProbe.SOAK_REJECTED_TRANSACTIONS.incrementAndGet();
+        PlaytestProbe.SOAK_GUI_CYCLES.incrementAndGet();
+        return 1;
+    }
+
+    private static int spawnSoakProjection(ServerPlayer player) {
+        if (!"long".equals(System.getProperty("polymc-reborn.playtest.soakMode", "none"))
+                || SOAK_ENTITIES.containsKey(player.getUUID())) {
+            return 0;
+        }
+        ServerLevel level = (ServerLevel) player.level();
+        var entity = new FixtureContent.FixtureEntity(FixtureContent.ENTITY_TYPE, level);
+        entity.snapTo(player.getX() + 1.0D, player.getY(), player.getZ() + 1.0D);
+        entity.setCustomName(Component.literal("Projected Soak Entity"));
+        entity.setCustomNameVisible(false);
+        if (!level.addFreshEntity(entity)
+                || PolyMcReborn.runtime().entityProjectionBackend()
+                .sessionGeneration(entity.getUUID()).isEmpty()) {
+            entity.discard();
+            return 0;
+        }
+        SOAK_ENTITIES.put(player.getUUID(), entity);
+        PlaytestProbe.SOAK_ENTITY_SPAWNS.incrementAndGet();
+        return 1;
+    }
+
+    private static int despawnSoakProjection(ServerPlayer player) {
+        var entity = SOAK_ENTITIES.remove(player.getUUID());
+        if (entity == null) {
+            return 0;
+        }
+        entity.discard();
+        PlaytestProbe.SOAK_ENTITY_DESPAWNS.incrementAndGet();
         return 1;
     }
 
     private static void join(ServerPlayer player) {
         int joins = PlaytestProbe.JOIN_COUNT.incrementAndGet();
+        if ("long".equals(System.getProperty("polymc-reborn.playtest.soakMode", "none"))) {
+            // The local, disposable driver must issue hundreds of fixture-only commands without
+            // tripping vanilla chat-spam protection. This does not alter production permissions.
+            player.level().getServer().getPlayerList().op(new NameAndId(player.getGameProfile()));
+        }
         player.setGameMode(GameType.SURVIVAL);
         // Keep simultaneous clients on distinct sight lines to the projected
         // entity. Spawning them at the same coordinates makes the other real
@@ -323,6 +424,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
     }
 
     private static void tick(MinecraftServer server) {
+        PlaytestProbe.SERVER_TICKS.incrementAndGet();
         FixtureContent.tickPropertyMenus();
         var state = server.overworld().getBlockState(PLACE_TARGET);
         if (state.is(FixtureContent.STATEFUL_BLOCK)) {
@@ -356,6 +458,14 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(itemId);
             externalItemEquipped |= server.getPlayerList().getPlayers().stream()
                     .anyMatch(player -> player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(item));
+        } else if ("food".equals(externalMode)) {
+            var itemId = net.minecraft.resources.Identifier.parse(requiredProperty(
+                    "polymc-reborn.playtest.externalItemId"));
+            var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(itemId);
+            var players = server.getPlayerList().getPlayers();
+            externalFoodConsumed |= !players.isEmpty() && players.stream().allMatch(player ->
+                    java.util.stream.IntStream.range(0, player.getInventory().getContainerSize())
+                            .noneMatch(slot -> player.getInventory().getItem(slot).is(item)));
         }
         server.getPlayerList().getPlayers().forEach(PlaytestFixtureEntrypoint::observeInventory);
         if (Files.exists(stopFile)) {
@@ -424,9 +534,11 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             var packPolicy = PolyMcReborn.runtime().config().resourcePackPolicy();
             var packStats = PolyMcReborn.runtime().playerPackStates().stats();
             String playtestMode = System.getProperty("polymc-reborn.playtest.mode", "single");
+            String soakMode = System.getProperty("polymc-reborn.playtest.soakMode", "none");
+            boolean longSoak = "long".equals(soakMode);
             boolean multiClient = "multi".equals(playtestMode);
             int expectedPackPushes = packPolicy == ResourcePackPolicy.DISABLED ? 0 : multiClient ? 3
-                    : playtestMode.startsWith("pack-") ? 1 : 2;
+                    : playtestMode.startsWith("pack-") ? 1 : longSoak ? 3 : 2;
             SupportAudit supportAudit = auditSupportBundle();
             String externalMode = System.getProperty("polymc-reborn.playtest.externalMode", "none");
             String externalModId = System.getProperty("polymc-reborn.playtest.externalModId", "none");
@@ -435,19 +547,24 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             boolean externalContentPassed = switch (externalMode) {
                 case "armor" -> externalItemEquipped;
                 case "block" -> externalBlockPlaced && externalBlockBroken;
+                case "food" -> externalFoodConsumed;
                 case "none" -> true;
                 default -> false;
             };
             int expectedToolDamage = "block".equals(externalMode) ? 3 : 2;
-            boolean singlePassed = PlaytestProbe.JOIN_COUNT.get() == 2
-                    && PlaytestProbe.DISCONNECT_COUNT.get() == 2
+            int expectedSingleConnections = longSoak ? 3 : 2;
+            int expectedGuiCycles = longSoak ? 25 : 0;
+            int expectedGuiOpens = 3 + expectedGuiCycles;
+            int expectedAdminCommands = COMMANDS.size() + (longSoak ? 4 : 0);
+            boolean singlePassed = PlaytestProbe.JOIN_COUNT.get() == expectedSingleConnections
+                    && PlaytestProbe.DISCONNECT_COUNT.get() == expectedSingleConnections
                     && PlaytestProbe.placedBlockObserved
                     && PlaytestProbe.brokenBlockObserved
                     && PlaytestProbe.simpleBlockPlacedObserved
                     && PlaytestProbe.simpleBlockBrokenObserved
                     && PlaytestProbe.stateToggleObserved
-                    && PlaytestProbe.GUI_OPEN_COUNT.get() == 3
-                    && PlaytestProbe.GUI_CLOSE_COUNT.get() == 3
+                    && PlaytestProbe.GUI_OPEN_COUNT.get() == expectedGuiOpens
+                    && PlaytestProbe.GUI_CLOSE_COUNT.get() == expectedGuiOpens
                     && PlaytestProbe.guiInventoryIntegrity
                     && PlaytestProbe.PROPERTY_GUI_OPEN_COUNT.get() == 2
                     && PlaytestProbe.PROPERTY_TICK_COUNT.get() >= 100
@@ -463,7 +580,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     && basicItemRemaining == 1
                     && foodRemaining == 3
                     && toolDamage == expectedToolDamage
-                    && PlaytestProbe.COMMAND_COUNT.get() == COMMANDS.size()
+                    && PlaytestProbe.COMMAND_COUNT.get() == expectedAdminCommands
                     && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == expectedPackPushes
                     && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == expectedPackPushes
                     && guiSessions == 0
@@ -475,7 +592,15 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     && externalContentPassed
                     && productionJarValid
                     && mappingStable
-                    && packStable;
+                    && packStable
+                    && (!longSoak || (PlaytestProbe.SOAK_GUI_CYCLES.get() == 25
+                    && PlaytestProbe.SOAK_REJECTED_TRANSACTIONS.get() == 25
+                    && PlaytestProbe.SOAK_ENTITY_SPAWNS.get() == 50
+                    && PlaytestProbe.SOAK_ENTITY_DESPAWNS.get() == 50
+                    && PlaytestProbe.SOAK_TRACKING_CYCLES.get() == 10
+                    && PlaytestProbe.DIMENSION_CHANGE_COUNT.get() == 20
+                    && PlaytestProbe.SUPPORT_BUNDLE_GENERATIONS.get() == 3
+                    && PlaytestProbe.MAPPING_DRY_RUNS.get() == 3));
             boolean multiPassed = PlaytestProbe.JOIN_COUNT.get() == 3
                     && PlaytestProbe.DISCONNECT_COUNT.get() == 3
                     && PlaytestProbe.GUI_OPEN_COUNT.get() == 2
@@ -530,6 +655,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + "  \"schema_version\": 1,\n"
                     + "  \"result\": \"" + (passed ? "passed" : "failed") + "\",\n"
                     + "  \"playtest_mode\": \"" + jsonEscape(playtestMode) + "\",\n"
+                    + "  \"soak_mode\": \"" + jsonEscape(soakMode) + "\",\n"
                     + "  \"reason\": \"" + reason + "\",\n"
                     + "  \"completed_at\": \"" + Instant.now() + "\",\n"
                     + "  \"join_count\": " + PlaytestProbe.JOIN_COUNT.get() + ",\n"
@@ -569,12 +695,31 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + packStats.requiredRejected() + ",\n"
                     + "  \"resource_pack_failed_count\": " + packStats.failed() + ",\n"
                     + "  \"admin_command_count\": " + PlaytestProbe.COMMAND_COUNT.get() + ",\n"
+                    + "  \"mapping_dry_run_count\": " + PlaytestProbe.MAPPING_DRY_RUNS.get() + ",\n"
+                    + "  \"support_bundle_generation_count\": "
+                    + PlaytestProbe.SUPPORT_BUNDLE_GENERATIONS.get() + ",\n"
+                    + "  \"soak_gui_cycles\": " + PlaytestProbe.SOAK_GUI_CYCLES.get() + ",\n"
+                    + "  \"soak_rejected_transactions\": "
+                    + PlaytestProbe.SOAK_REJECTED_TRANSACTIONS.get() + ",\n"
+                    + "  \"soak_entity_spawns\": " + PlaytestProbe.SOAK_ENTITY_SPAWNS.get() + ",\n"
+                    + "  \"soak_entity_despawns\": " + PlaytestProbe.SOAK_ENTITY_DESPAWNS.get() + ",\n"
+                    + "  \"soak_tracking_cycles\": " + PlaytestProbe.SOAK_TRACKING_CYCLES.get() + ",\n"
+                    + "  \"server_ticks\": " + PlaytestProbe.SERVER_TICKS.get() + ",\n"
+                    + "  \"transaction_average_millis\": " + transactionAverageMillis() + ",\n"
+                    + "  \"transaction_max_millis\": " + transactionMaxMillis() + ",\n"
+                    + "  \"jvm_heap_used_bytes\": " + heapUsedBytes() + ",\n"
+                    + "  \"jvm_rss_bytes\": " + linuxRssBytes() + ",\n"
+                    + "  \"jvm_thread_count\": " + ManagementFactory.getThreadMXBean().getThreadCount() + ",\n"
+                    + "  \"jvm_open_file_count\": " + linuxOpenFileCount() + ",\n"
+                    + "  \"jvm_gc_count\": " + gcCount() + ",\n"
+                    + "  \"mapping_cache_size\": " + PolyMcReborn.runtime().plan().size() + ",\n"
                     + "  \"resource_pack_push_count\": "
                     + PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() + ",\n"
                     + "  \"resource_pack_request_count\": "
                     + PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() + ",\n"
                     + "  \"gui_active_sessions\": " + guiSessions + ",\n"
                     + "  \"entity_projection_sessions\": " + entitySessions + ",\n"
+                    + "  \"active_interaction_proxies\": " + entitySessions + ",\n"
                     + "  \"resource_pack_active_sessions\": " + packStats.activePlayers() + ",\n"
                     + "  \"api_consumer_loaded\": " + apiConsumerLoaded + ",\n"
                     + "  \"support_bundle_valid\": " + supportAudit.valid() + ",\n"
@@ -585,6 +730,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + "  \"external_mod_loaded\": " + externalLoaded + ",\n"
                     + "  \"external_content_passed\": " + externalContentPassed + ",\n"
                     + "  \"external_item_equipped\": " + externalItemEquipped + ",\n"
+                    + "  \"external_food_consumed\": " + externalFoodConsumed + ",\n"
                     + "  \"external_block_placed\": " + externalBlockPlaced + ",\n"
                     + "  \"external_block_broken\": " + externalBlockBroken + ",\n"
                     + "  \"production_jar_name\": \"" + jsonEscape(productionJarName) + "\",\n"
@@ -612,6 +758,56 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
             }
         }
         return -1;
+    }
+
+    private static double transactionAverageMillis() {
+        int count = PlaytestProbe.SOAK_REJECTED_TRANSACTIONS.get();
+        return count == 0 ? 0.0D
+                : PlaytestProbe.REJECTED_TRANSACTION_TOTAL_NANOS.get() / 1_000_000.0D / count;
+    }
+
+    private static double transactionMaxMillis() {
+        return PlaytestProbe.REJECTED_TRANSACTION_MAX_NANOS.get() / 1_000_000.0D;
+    }
+
+    private static long heapUsedBytes() {
+        Runtime runtime = Runtime.getRuntime();
+        return runtime.totalMemory() - runtime.freeMemory();
+    }
+
+    private static long gcCount() {
+        return ManagementFactory.getGarbageCollectorMXBeans().stream()
+                .mapToLong(bean -> Math.max(0L, bean.getCollectionCount())).sum();
+    }
+
+    private static long linuxRssBytes() {
+        Path status = Path.of("/proc/self/status");
+        if (!Files.isRegularFile(status)) {
+            return -1L;
+        }
+        try {
+            for (String line : Files.readAllLines(status, StandardCharsets.UTF_8)) {
+                if (line.startsWith("VmRSS:")) {
+                    String digits = line.substring("VmRSS:".length()).trim().split("\\s+")[0];
+                    return Long.parseLong(digits) * 1024L;
+                }
+            }
+        } catch (IOException | NumberFormatException ignored) {
+            return -1L;
+        }
+        return -1L;
+    }
+
+    private static long linuxOpenFileCount() {
+        Path descriptors = Path.of("/proc/self/fd");
+        if (!Files.isDirectory(descriptors)) {
+            return -1L;
+        }
+        try (var entries = Files.list(descriptors)) {
+            return entries.count();
+        } catch (IOException ignored) {
+            return -1L;
+        }
     }
 
     private static void observeInventory(ServerPlayer player) {
