@@ -766,6 +766,9 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
     private void exerciseDropAndPickup(ClientGameTestContext context) {
         context.getInput().pressKey(options -> options.keyHotbarSlots[0]);
         context.waitFor(client -> client.player.getInventory().getSelectedSlot() == 0, 100);
+        var arenaCheckpoint = context.computeOnClient(client -> client.player.position());
+        sendFixtureCommand(context, "polymcreborn-playtest arena-mark");
+        context.waitTicks(4);
         String before = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
         context.computeOnClient(client -> {
             var stack = client.player.getInventory().getSelectedItem();
@@ -775,39 +778,59 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
             return true;
         });
 
-        // Q is sent through the live key binding. Waiting before walking guarantees that the
-        // server observes at least one authoritative inventory-absent interval, including the
-        // vanilla owner pickup delay, instead of accepting a client-only slot animation.
+        // Q is sent through the live key binding. Waiting through the owner delay guarantees
+        // an authoritative inventory-absent interval. Automatic pickup at the player's feet is
+        // valid; only walk toward the live entity when it remains after that bounded interval.
         context.getInput().lookAt(0.0F, 80.0F);
         context.getInput().pressKey(options -> options.keyDrop);
         context.waitFor(client -> client.player.getInventory().getSelectedItem().isEmpty(), 200);
         context.waitFor(client -> droppedMappedItem(client) != null, 200);
         context.waitTicks(45);
-        float pickupYaw = context.computeOnClient(client -> {
-            ItemEntity dropped = droppedMappedItem(client);
-            if (dropped == null) {
-                throw new AssertionError("Dropped mapped item disappeared before pickup movement");
-            }
-            double dx = dropped.getX() - client.player.getX();
-            double dz = dropped.getZ() - client.player.getZ();
-            return (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+        boolean alreadyPickedUp = context.computeOnClient(client -> {
+            var stack = client.player.getInventory().getItem(0);
+            return stack.getCount() == 1
+                    && stack.getHoverName().getString().contains("PolyMc Reborn Fixture Item");
         });
-        context.getInput().lookAt(pickupYaw, 20.0F);
-        context.getInput().holdKey(options -> options.keyUp);
-        try {
-            context.waitFor(client -> {
-                var stack = client.player.getInventory().getItem(0);
-                return stack.getCount() == 1
-                        && stack.getHoverName().getString().contains("PolyMc Reborn Fixture Item");
-            }, 300);
-        } finally {
-            context.getInput().releaseKey(options -> options.keyUp);
+        if (!alreadyPickedUp) {
+            float pickupYaw = context.computeOnClient(client -> {
+                ItemEntity dropped = droppedMappedItem(client);
+                if (dropped == null) {
+                    throw new AssertionError("Dropped mapped item vanished without returning to inventory");
+                }
+                double dx = dropped.getX() - client.player.getX();
+                double dz = dropped.getZ() - client.player.getZ();
+                return (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+            });
+            context.getInput().lookAt(pickupYaw, 20.0F);
+            context.getInput().holdKey(options -> options.keyUp);
+            try {
+                context.waitFor(client -> {
+                    var stack = client.player.getInventory().getItem(0);
+                    if (stack.getCount() == 1
+                            && stack.getHoverName().getString().contains("PolyMc Reborn Fixture Item")) {
+                        return true;
+                    }
+                    ItemEntity dropped = droppedMappedItem(client);
+                    return dropped != null && client.player.distanceToSqr(dropped) <= 1.0D;
+                }, 200);
+            } finally {
+                context.getInput().releaseKey(options -> options.keyUp);
+            }
         }
+        context.waitFor(client -> {
+            var stack = client.player.getInventory().getItem(0);
+            return stack.getCount() == 1
+                    && stack.getHoverName().getString().contains("PolyMc Reborn Fixture Item");
+        }, 300);
 
         String after = context.computeOnClient(RebornClientPlaytest::inventoryFingerprint);
         if (!before.equals(after)) {
             throw new AssertionError("Dropped custom item did not return with the same inventory/component fingerprint");
         }
+        sendFixtureCommand(context, "polymcreborn-playtest arena-reset");
+        context.waitFor(client -> client.player.position().distanceToSqr(arenaCheckpoint) <= 0.01D,
+                200);
+        context.waitTicks(4);
         pass("item-drop-pickup",
                 "Pressed the bound drop key, observed the mapped item leave inventory and picked it up intact");
     }
@@ -1550,7 +1573,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     "HEURISTIC semantic-item-food via Polymer");
             case "item-drop-pickup" -> new ScenarioSpec(
                     "The mapped basic custom item is selected and the player is in the deterministic arena",
-                    "Look down, press the bound drop key, wait through the owner delay and walk to the live ItemEntity",
+                    "Checkpoint the arena, press the bound drop key, wait through the owner delay, approach the live ItemEntity only when needed, then restore the exact checkpoint",
                     "The selected slot becomes empty and the complete inventory/component fingerprint is restored",
                     "item_drop_observed/item_pickup_observed are true and basic_item_remaining=1",
                     600, "Drop is a one-shot key input; forward input is released after pickup",

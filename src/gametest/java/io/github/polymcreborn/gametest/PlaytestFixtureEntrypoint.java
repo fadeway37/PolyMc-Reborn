@@ -77,6 +77,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
     private static String initialMappingSha256 = "missing";
     private static final java.util.Set<UUID> INITIALIZED_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Map<UUID, FixtureContent.FixtureEntity> SOAK_ENTITIES = new ConcurrentHashMap<>();
+    private static final Map<UUID, ArenaCheckpoint> ARENA_CHECKPOINTS = new ConcurrentHashMap<>();
     private static final List<String> COMMANDS = List.of(
             "pmcr about",
             "pmcr scan",
@@ -109,6 +110,14 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                                 .requires(source -> source.getEntity() instanceof ServerPlayer)
                                 .executes(context -> cycleDimension(
                                         context.getSource().getPlayerOrException())))
+                        .then(Commands.literal("arena-reset")
+                                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                                .executes(context -> resetArena(
+                                        context.getSource().getPlayerOrException())))
+                        .then(Commands.literal("arena-mark")
+                                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                                .executes(context -> markArena(
+                                        context.getSource().getPlayerOrException())))
                         .then(Commands.literal("reject-transaction")
                                 .requires(source -> source.getEntity() instanceof ServerPlayer)
                                 .executes(context -> rejectTransaction(
@@ -135,6 +144,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                 soakEntity.discard();
                 PlaytestProbe.SOAK_ENTITY_DESPAWNS.incrementAndGet();
             }
+            ARENA_CHECKPOINTS.remove(handler.player.getUUID());
             PlaytestProbe.DISCONNECT_COUNT.incrementAndGet();
         });
         ServerTickEvents.END_SERVER_TICK.register(PlaytestFixtureEntrypoint::tick);
@@ -341,6 +351,23 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         }
         entity.discard();
         PlaytestProbe.SOAK_ENTITY_DESPAWNS.incrementAndGet();
+        return 1;
+    }
+
+    private static int resetArena(ServerPlayer player) {
+        ArenaCheckpoint checkpoint = ARENA_CHECKPOINTS.remove(player.getUUID());
+        if (checkpoint == null) {
+            return 0;
+        }
+        Vec3 position = checkpoint.position();
+        player.teleportTo(position.x(), position.y(), position.z());
+        player.forceSetRotation(checkpoint.yRot(), true, checkpoint.xRot(), true);
+        return 1;
+    }
+
+    private static int markArena(ServerPlayer player) {
+        ARENA_CHECKPOINTS.put(player.getUUID(),
+                new ArenaCheckpoint(player.position(), player.getYRot(), player.getXRot()));
         return 1;
     }
 
@@ -884,6 +911,9 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         } catch (IOException exception) {
             return new SupportAudit(false, "io-error", entries);
         }
+    }
+
+    private record ArenaCheckpoint(Vec3 position, float yRot, float xRot) {
     }
 
     private record SupportAudit(boolean valid, String sha256, int entries) {

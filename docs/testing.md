@@ -101,7 +101,10 @@ The scenario contract includes:
 - movement, camera rotation, and hotbar input;
 - semantic item use;
 - a real bound-key world drop and pickup with client fingerprint and independent
-  server inventory-transition assertions;
+  server inventory-transition assertions; automatic pickup after the owner delay
+  is valid, a still-live item is approached only when needed, and the test-only
+  server fixture restores the exact per-player arena checkpoint before the next
+  scenario;
 - placement, state change, and break of a mapped full cube;
 - projected-container click, shift-click, drag/hotbar/offhand paths and
   inventory-conservation checks;

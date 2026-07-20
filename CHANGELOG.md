@@ -41,6 +41,11 @@
 - Make the upgrade gate survive Loom's one-time cold production-server install:
   only the explicit pre-readiness EULA exit can restore bootstrap files and retry
   once; every unrelated exit still fails closed.
+- Remove item drop/pickup playtest races by accepting a real automatic pickup,
+  approaching a still-live item only when needed, and server-authoritatively
+  restoring an exact per-player arena checkpoint before the next scenario;
+  independent absence, pickup, and full component-fingerprint assertions remain
+  mandatory.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.
