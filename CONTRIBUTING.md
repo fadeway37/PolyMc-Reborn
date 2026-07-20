@@ -15,8 +15,8 @@ contributions are small, reproducible, and honest about fidelity limits.
 
 ## Development workflow
 
-Create a topic branch from the current maintained development branch (for 0.2,
-`reborn/0.2.0-alpha+26.1.2`). Keep commits focused: bootstrap,
+Create a topic branch from the current maintained development branch (for the
+0.4 RC, `reborn/0.4.0-rc+26.1.2`). Keep commits focused: bootstrap,
 planning/API, backend behavior, persistence/resources, diagnostics/legacy,
 tests, and docs should remain reviewable independently when practical.
 
@@ -26,8 +26,10 @@ Run:
 java -version
 ./gradlew clean build
 ./gradlew test
+./gradlew checkApiSignature
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
+./gradlew runProductionClientPlaytest
 git diff --check
 ```
 
@@ -63,6 +65,8 @@ By contributing, you agree that your contribution is licensed under
 `LGPL-3.0-or-later`.
 
 Public API changes additionally require `checkApiSignature`,
-`buildApiConsumer`, stability/migration notes, and an intentional baseline
-review. Pack, GUI, entity, persistence, or diagnostics behavior changes require
-their applicable production evidence gate, not only a unit test.
+`runLegacyApiConsumerPlaytest`, `runApiConsumerPlaytest`, stability/migration
+notes, and an intentional baseline review. Pack, GUI, entity, persistence, or
+diagnostics behavior changes require their applicable production evidence gate,
+not only a unit test. Release claims also require inspected hosted evidence;
+green Workflow status alone is insufficient.

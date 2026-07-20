@@ -36,7 +36,8 @@ The release Mod JAR is 393,559 bytes with SHA-256
 `1b57ce122a4a2c623a33a366c5c1956f459329b1e55f762e468f5b407a523441`.
 The standalone API JAR is 63,558 bytes with SHA-256
 `9649606f3381705e5b7548886c332002fc93c338ae1ac70cfd9aa523f0498fe3`.
-The API signature baseline has 351 lines.
+The API signature baseline has 351 non-empty lines (352 physical lines,
+including its blank metadata/declaration separator).
 
 Downloaded structured evidence was parsed and representative screenshots were
 visually inspected. It records:

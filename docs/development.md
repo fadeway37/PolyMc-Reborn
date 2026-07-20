@@ -29,7 +29,7 @@ loom_version=1.17.16
 fabric_api_version=0.155.2+26.1.2
 polymer_version=0.16.5+26.1.2
 junit_version=5.13.4
-mod_version=0.3.0-beta.1+26.1.2
+mod_version=0.4.0-rc.1+26.1.2
 ```
 
 The Gradle wrapper is 9.5.1. Dependencies must remain exact; do not introduce
@@ -44,12 +44,21 @@ Use `./gradlew` on Unix-like hosts and `gradlew.bat` on Windows.
 ```text
 ./gradlew clean build
 ./gradlew test
+./gradlew checkApiSignature
+./gradlew runLegacyApiConsumerPlaytest
+./gradlew runApiConsumerPlaytest
 ./gradlew runGameTest
 ./gradlew runDedicatedServerSmoke
 ./gradlew verifyPlaytestClientIsolation
 ./gradlew runClientPlaytest
 ./gradlew runProductionClientPlaytest
 ./gradlew runPlaytest
+./gradlew runProductionMultiClientPlaytest
+./gradlew runExternalModMatrix
+./gradlew runRcUpgradePlaytest
+./gradlew runWindowsSoakPlaytest
+./gradlew runLinuxSoakPlaytest
+./gradlew runLongSoakPlaytest
 ./gradlew dependencies
 ./gradlew dependencyInsight --dependency polymer-core
 ./gradlew javadoc sourcesJar
@@ -137,7 +146,7 @@ and temporary research clones are not tracked.
 
 ## Git workflow
 
-Work on `reborn/0.3.0-beta+26.1.2`, not the upstream default branch. Keep `upstream`
+Work on `reborn/0.4.0-rc+26.1.2`, not the upstream default branch. Keep `upstream`
 read-only and never open a Reborn pull request against TheEpicBlock/PolyMc.
 Use focused commits whose messages explain the purpose. Push the development
 branch only after the build is in a reasonably reliable state and report any

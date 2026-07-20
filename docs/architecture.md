@@ -74,6 +74,14 @@ their unsupported status and carry an explicit `polymer-quarantine` backend
 reason. The pass does not invent an entity surrogate or menu layout; it only
 prevents unknown registry entries from leaking to a vanilla client.
 
+For the vanilla-client registry view, the RC also marks non-vanilla entries in
+static built-in registries through Polymer Registry Sync Manipulator. A narrow
+dynamic-registry packing filter removes only entries whose encoded NBT contains
+an exact server-only static identifier, and a narrow recipe-book filter removes
+only displays with a server-only display/category type. These transforms leave
+the real server registries untouched and emit diagnostics; they do not cancel
+whole packets. See [ADR 0016](adr/0016-bounded-registry-sanitization.md).
+
 The separate `PacketFallbackBackend` remains experimental and disabled. Its
 no-op/audit boundary does not cancel arbitrary packets or disable registry
 validation.
@@ -206,11 +214,12 @@ not a pure zero-mod vanilla-client test. See
 [client-playtest.md](client-playtest.md) and
 [ADR 0004](adr/0004-client-playtest-architecture.md).
 
-## 0.3 Beta boundaries
+## 0.4 RC boundaries
 
 The public API is also published as `io.github.polymcreborn:polymc-reborn-api`
 without backend implementation classes. Furnace projection, explicit entity
 composition, pack state, diagnostic policy, and support bundling remain narrow
 services around the immutable plan. Two-client state is per player/connection;
-clients share no statics or private plan access. Upgrade testing runs audited
-0.2 and current JARs against one persistent store.
+clients share no statics or private plan access. Upgrade testing runs the exact
+audited 0.3 Beta and current RC JARs against one persistent store, then adds,
+removes, and re-adds an independent content fixture.

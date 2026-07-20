@@ -6,7 +6,7 @@ The persistent mapping store is operational server data:
 config/polymc-reborn/mappings-v1.json
 ```
 
-0.2 retains schema `1` and algorithm `reborn-2`. The existing `state` field now
+The 0.4 RC retains schema `1` and algorithm `reborn-2` from the 0.3 Beta. The existing `state` field now
 stores canonical per-state full-cube keys, so no cosmetic structural migration
 is required. Records sort by content type, registry ID, and state.
 
@@ -142,3 +142,12 @@ fails the affected mapping instead of silently allocating a new appearance.
 
 Rollback restores mapping records, not removed registry objects or mod assets.
 A backup that cannot validate against the current server still fails closed.
+
+## 0.3 Beta to 0.4 RC validation
+
+`runRcUpgradePlaytest` performs compatibility validation, not a migration. It
+runs the exact audited 0.3 Beta commit and then the RC over one world and
+configuration. The gate requires old keys, strategies, carriers, world blocks,
+player inventory, property-backed GUI contents, persistent entity UUID, and
+resource-pack hash to survive. Because schema and algorithm do not change, any
+silent empty regeneration or claimed schema migration is a failure.

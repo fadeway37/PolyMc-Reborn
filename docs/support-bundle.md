@@ -14,3 +14,9 @@ bundle fail closed.
 
 `/pmcr support bundle status` reports the most recent local size/hash/entry
 count without uploading it.
+
+Short and long soak iterations build and validate a bundle after gameplay.
+Interrupted or failed writes may leave only bounded temporary evidence and
+must never replace the last valid production ZIP. Reentrant cleanup probes
+rename/remove the evidence tree after every child process exits, so an open
+writer or leaked archive handle fails the iteration.

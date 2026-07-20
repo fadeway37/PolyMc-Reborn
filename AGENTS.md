@@ -58,7 +58,7 @@ tick, read files during packet conversion, or use reflection in packet paths.
 
 ## Interactive compatibility boundary
 
-The 0.2 APIs are deliberately narrow:
+The interactive APIs are deliberately narrow:
 
 - GUI projection means an explicit adapter to a standard vanilla 9xN container
   backed directly by the real server `Container`. Never infer an arbitrary menu
@@ -131,22 +131,26 @@ java -version
 ./gradlew runProductionClientPlaytest
 ./gradlew runPlaytest
 ./gradlew checkApiSignature
-./gradlew buildApiConsumer
+./gradlew runLegacyApiConsumerPlaytest
 ./gradlew runApiConsumerPlaytest
 ./gradlew runProductionMultiClientPlaytest
 ./gradlew runPackPolicyPlaytest
-./gradlew runUpgradePlaytest
+./gradlew runRcUpgradePlaytest
 ./gradlew runModSetExpansionPlaytest
 ./gradlew runExternalModMatrix
-./gradlew assembleBetaArtifacts verifyReleaseArtifacts verifyReproducibleArchives
+./gradlew runWindowsSoakPlaytest
+./gradlew runLinuxSoakPlaytest
+./gradlew runLongSoakPlaytest
+./gradlew assembleRcArtifacts verifyReleaseArtifacts verifyReproducibleArchives
 ./gradlew dependencies
 git diff --check
 ```
 
 Use `gradlew.bat` on Windows. Name the exact layer in reports: JUnit, server
 GameTest, dedicated-server smoke, isolated Client Driver Playtest, production
-Client Playtest, pure zero-mod vanilla smoke, or external-mod matrix. A layer
-passes only when its exact command succeeds and required evidence validates.
+Client Playtest, multi-client Playtest, external-Mod matrix, short Soak, long
+Soak, upgrade Playtest, pure zero-mod vanilla smoke, or Artifact Attestation.
+A layer passes only when its exact command succeeds and required evidence validates.
 
 The Client Driver Playtest runs a real Minecraft 26.1.2 client with minimal
 Fabric Client GameTest/resource modules and an automation driver. It is not a

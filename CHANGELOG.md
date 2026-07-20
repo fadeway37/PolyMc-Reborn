@@ -17,6 +17,20 @@
 - Added an immutable 0.4 RC API signature, a classified compatibility check
   against the 0.3 Beta signature, and a real-client gate that runs a Consumer
   compiled only against the published, hash-locked 0.3 API JAR on the RC.
+- Added Farmer's Delight Refabricated as a third hash-locked server-only
+  compatibility target and exercised its real food behavior from an isolated
+  vanilla-protocol client representation.
+- Static registry entries from server-only Mods are hidden through Polymer's
+  Registry Sync Manipulator. Dynamic registry and recipe-book records are
+  filtered only when they reference those exact hidden types; the real server
+  registrations and mechanics remain untouched.
+- Added a ten-iteration long-soak mode with real repeated GUI resync, entity
+  projection, tracking, reconnect, pack, support-bundle, and mapping-dry-run
+  operations plus bounded JVM/resource trend evidence.
+- Added a manually dispatched RC workflow that checks out an explicit
+  candidate ref, builds bounded artifacts, generates GitHub-hosted build
+  provenance with the official pinned attestation action, independently
+  verifies it, and rejects a one-byte-tampered negative sample.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.

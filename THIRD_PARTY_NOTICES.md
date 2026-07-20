@@ -15,11 +15,13 @@ tooling. Each project remains under its own copyright and license terms.
 | Polymer Blocks | `eu.pb4:polymer-blocks:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
 | Polymer Resource Pack | `eu.pb4:polymer-resource-pack:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
 | Polymer Virtual Entity | `eu.pb4:polymer-virtual-entity:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
+| Polymer Registry Sync Manipulator | `eu.pb4:polymer-reg-sync-manipulator:0.16.5+26.1.2` | LGPL-3.0; Patbox/polymer |
 
 Polymer modules are resolved from the Nucleoid Maven repository. Polymer
 AutoHost and Resource Pack Extras remain optional integration points.
-Networking and Registry Sync Manipulator are resolved transitively by the
-pinned Polymer modules. Virtual Entity is a direct 0.2 runtime dependency used
+Networking is resolved transitively by the pinned Polymer modules. Registry
+Sync Manipulator is a direct RC runtime dependency for the bounded static
+registry view, and Virtual Entity is a direct 0.2 runtime dependency used
 only by explicit entity projections. No Polymer module is vendored or shaded.
 Transitive modules remain governed by Polymer's published metadata and license.
 
@@ -46,6 +48,8 @@ notice in the same change.
 
 The ignored matrix may download exact server-test copies of Immersive Armors
 1.8.0+26.1.2 (GPL-3.0-only) and Many More Ores and Crafts 2.0.1 (MIT) from
-publisher-controlled Modrinth URLs. Hashes/source commits are locked in
+publisher-controlled Modrinth URLs. The RC matrix additionally tests Farmer's
+Delight Refabricated 26.1-3.6.7+refabricated (MIT) from its author-controlled
+Modrinth project and source commit. Hashes/source commits are locked in
 `playtest/external-mods.lock.json`. These JARs are not redistributed, shaded,
 included in evidence, or included in release artifacts.

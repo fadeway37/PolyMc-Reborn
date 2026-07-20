@@ -1,6 +1,6 @@
 # Safe standard-container GUI projection
 
-0.2 provides an explicit, bounded projection to vanilla generic containers. It
+PolyMc Reborn provides an explicit, bounded projection to vanilla generic containers. It
 is not a generic converter for arbitrary mod screens.
 
 ## Registration and authority
@@ -52,7 +52,7 @@ close/reopen, and inventory-integrity checks. GitHub Actions Client Playtest
 `29642433900` repeated the complete scenario successfully; see
 [testing.md](testing.md).
 
-| Capability | 0.2 implementation |
+| Capability | 0.4 RC implementation |
 | --- | --- |
 | explicit Java adapter | implemented |
 | vanilla generic 9x1 through 9x6 presentation | implemented API |
@@ -69,9 +69,15 @@ The existence of a row-count API does not mean every similarly sized menu is
 compatible. Adapters must document and test truthful transaction semantics.
 Runtime creative clone and global creative reverse-item mapping remain disabled.
 
-## 0.3 explicit property specialization
+## Explicit property specialization
 
 `GuiProjection.furnace` adds one reviewed specialization over the same
 server-authoritative session machinery. It accepts exactly three real slots and
 four bounded properties and presents a vanilla `FurnaceMenu`. No arbitrary
 menu is inferred. See [property-gui.md](property-gui.md).
+
+The RC upgrade fixture persists the three real slots in one barrel, exposes
+four real bounded properties, and verifies the same seven-item result and
+progress value across the exact 0.3 Beta-to-RC world restart. Abnormal client
+disconnect and duplicate-close tests require the session count to reach zero
+without affecting another player's session.

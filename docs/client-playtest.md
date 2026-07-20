@@ -118,11 +118,18 @@ Required screenshots are:
 11-gui-after-shift-click.png
 12-gui-after-hotbar-swap.png
 13-gui-reopened.png
+14-property-gui-start.png
+15-property-gui-progress.png
+16-property-gui-complete.png
 14-entity-spawned.png
 15-entity-moved.png
 16-entity-interacted.png
 17-reconnected.png
 ```
+
+External-Mod runs additionally require `18-external-content.png`. Reusing the
+numeric prefixes does not make screenshots interchangeable: the complete
+filename allow-list and image bytes are validated.
 
 Screenshots are review evidence, while semantic assertions remain authoritative
 under Xvfb/software rendering. Empty images, a wrong filename set, missing
@@ -150,10 +157,16 @@ standard CI run
 [`29642433896`](https://github.com/fadeway37/PolyMc-Reborn/actions/runs/29642433896)
 also passed and its distribution JAR was inspected.
 
-## 0.3 extensions and separate P1 layers
+## RC regression layers
 
 A pure zero-mod client smoke contains no Fabric and no driver; it is not
-implemented/run for 0.3. Multi-client, pack-policy, API-consumer, upgrade, and
-external-Mod runs use their own evidence roots and claims; none may be inferred
-from a single-client internal fixture run. Runtime creative reverse mapping
-also remains fail-closed and has no client attack-test result.
+implemented or claimed by the 0.4 RC. Multi-client, pack-policy, API-consumer,
+upgrade, external-Mod, short-soak, and long-soak runs use their own evidence
+roots and claims; none may be inferred from a single-client internal fixture
+run. Runtime creative reverse mapping also remains fail closed and has no
+online creative-slot result.
+
+The 2026-07-20 RC candidate run completed 57/57 aggregate checks and 41/41
+client steps, including the property GUI, richer entity composition, abnormal
+GUI disconnect cleanup, and all required screenshots. This local evidence is
+not a substitute for the final GitHub release-gate run.

@@ -1,5 +1,25 @@
 # Roadmap
 
+## 0.4 Stability and Release Candidate
+
+Implemented RC engineering scope:
+
+- cross-platform short/long Soak orchestration with per-iteration process,
+  port, file-handle, session, projection, hash, screenshot, and resource trends;
+- frozen 0.3 API signature plus unchanged 0.3 binary Consumer and RC-coordinate
+  Consumer production Playtests;
+- three exact external content Mods, including a real semantic-food scenario,
+  with content Mods absent from the isolated client;
+- bounded vanilla registry sanitation, abnormal cleanup tests, and an in-place
+  0.3-to-RC upgrade over persisted player/block/Property GUI/entity state;
+- official GitHub Artifact Attestation generation, positive verification, and
+  tampered-subject rejection in the manually registered RC workflow.
+
+These are release gates, not broader compatibility promises. A gate is complete
+only when its final candidate command/Workflow succeeds and retained evidence
+is inspected. Pure zero-Mod automation and creative reverse mapping remain
+`NOT_RUN`/fail-closed P1 work.
+
 ## 0.3 Real-World Compatibility Beta
 
 - standalone annotated/signature-checked API and external consumer;
@@ -9,8 +29,9 @@
 - diagnostic policy/support bundles and Beta supply-chain artifacts.
 
 Pure zero-Mod vanilla automation and authenticated creative reverse mapping are
-not complete; creative enablement fails startup. The bounded five-run soak is
-not the future full 10,000-tick/stress target.
+not complete; creative enablement fails startup. The 0.3 bounded Soak failed at
+the Windows orchestration layer and produced zero gameplay iterations; the RC
+replaces it with independently validated short and long gates.
 
 This roadmap separates implemented alpha scope from future work. An interface,
 fixture, or harness does not by itself prove a release claim.
@@ -68,15 +89,15 @@ These remain fail-closed. No incomplete runtime switch should imply support.
 - The per-player REQUIRED/OPTIONAL/DISABLED resource-pack policy remains
   presentation-only; it never alters the frozen mapping plan.
 
-## Candidate 0.4 / release-candidate direction
+## 0.4 stable direction after RC evidence
 
 - Design authenticated creative reverse mapping with replay/rate/component
   protection before enabling its packet path.
 - Run a legal zero-Mod client smoke with no Fabric or automation driver.
-- Expand the license-reviewed external matrix and gather downstream API
-  feedback without weakening feature-scoped claims.
-- Add hosted artifact attestations/signing after the manual Beta provenance
-  workflow has accumulated stable evidence.
+- Gather downstream API/compatibility feedback without weakening feature-scoped
+  claims; fix only release-blocking regressions during RC stabilization.
+- Promote no artifact unless its hosted attestation, checksums, bounded contents,
+  and downloaded evidence have been independently inspected.
 
 ## Permanent non-goals
 

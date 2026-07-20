@@ -11,6 +11,10 @@ removals as Stable, Experimental, Internal, or Legacy and fails on any removed
 Stable descriptor or unclassified removal. Its JSON and Markdown reports are
 written under `api/build/reports/api-compatibility/`.
 
+The audited files each contain 345 declaration lines. Their only textual
+difference is the expected `version=` metadata line; no public constructor,
+field, method, record component, annotation, or legacy descriptor changed.
+
 ## Binary Consumer gate
 
 `runLegacyApiConsumerPlaytest` performs these bounded steps:

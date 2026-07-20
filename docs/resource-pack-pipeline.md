@@ -143,7 +143,7 @@ downloads/applies the pack, the known fixture resource is visible after reload
 and reconnect, both process reports agree, and the orchestrator exits cleanly.
 Harness source or a server-only pack build is not evidence that those steps ran.
 
-## 0.3 per-player policy
+## Per-player policy
 
 `resource_pack_policy` is `REQUIRED`, `OPTIONAL`, or `DISABLED`. Packet-time
 lookups are O(1) against a bounded per-player map. REQUIRED may expose planned
@@ -151,3 +151,8 @@ resources because vanilla disconnects a decline; OPTIONAL exposes them only
 after `SUCCESSFULLY_LOADED`; DISABLED never does. Duplicate terminal responses
 are idempotent, responses are correlated to the current protocol pack UUID,
 stale UUIDs are ignored, and disconnect removes the live entry.
+
+The RC fault suite also interrupts one player's active download state and
+requires only that player's entry to be removed; another successfully loaded
+player remains usable. Server shutdown clears all pack sessions, and both short
+and long soak evidence require the final active count to be zero.

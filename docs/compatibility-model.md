@@ -47,7 +47,7 @@ confidence, degradation, complete ordered reason/candidate chain, resources,
 warnings, and failure reason. `/why` and machine reports preserve accepted and
 rejected candidates in stable order.
 
-## Content rules in 0.3 Beta
+## Content rules in the 0.4 RC
 
 ### Items
 
@@ -121,7 +121,7 @@ remap.
 
 ## Client profiles
 
-`VANILLA` is the only active 0.3 profile. `REBORN_COMPANION` and
+`VANILLA` is the only active 0.4 RC profile. `REBORN_COMPANION` and
 `TRUSTED_MODDED` are future API values. Unknown clients are vanilla; Fabric
 presence never enables raw registry passthrough. Any future trusted path must
 authenticate exact registry and mod fingerprints.

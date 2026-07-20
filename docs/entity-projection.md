@@ -1,6 +1,6 @@
 # Explicit virtual-entity projection
 
-Entity support in 0.2 is explicit, experimental, and deliberately narrow. A
+Entity support is explicit, experimental, and deliberately narrow. A
 custom type without a registered adapter remains `UNSUPPORTED`; Reborn never
 chooses a surrogate merely because it looks similar.
 
@@ -41,7 +41,7 @@ retained 2026-07-18 local Playtest passed both callbacks and the corresponding
 client screenshots; GitHub Actions Client Playtest `29642433900` repeated the
 complete scenario successfully.
 
-| Capability | 0.2 implementation |
+| Capability | 0.4 RC implementation |
 | --- | --- |
 | explicit registration and stable frozen lookup | implemented |
 | native Polymer preservation | implemented |
@@ -62,10 +62,17 @@ entity's interaction replay guard is also bounded to 1,024 keys.
 The surrogate is only a presentation and does not promise an identical hitbox
 or animation; adapters must document degradation.
 
-## 0.3 explicit composition
+## Explicit composition
 
 An adapter may declare one vanilla passenger and bounded vanilla equipment.
 Stacks are created only after component binding, and watcher packets are sent
 per live session. The production client asserts one parrot passenger and a
 golden helmet. Automatic surrogate/passenger/equipment choice, arbitrary
 metadata, and leashes remain unsupported.
+
+The RC upgrade fixture adds a persistent real custom entity with an explicit
+armor-stand projection. The five-leg upgrade gate forces its owning chunk,
+checks one stable UUID and server value across the exact 0.3 Beta-to-RC restart,
+and requires each real client to observe the surrogate. Duplicate cleanup is
+idempotent; stale generations and abnormal disconnects cannot invoke the real
+entity or leave an active projection.
