@@ -3,7 +3,7 @@
   "id": "polymc-reborn-api-consumer",
   "version": "${version}",
   "name": "PolyMc Reborn external API consumer fixture",
-  "description": "Server-only consumer compiled solely against the published Beta API coordinate.",
+  "description": "Server-only consumer compiled solely against the published RC API coordinate.",
   "environment": "server",
   "entrypoints": {
     "main": [
@@ -18,6 +18,6 @@
     "fabric-api": ">=0.155.2+26.1.2",
     "minecraft": "=26.1.2",
     "java": ">=25",
-    "polymc-reborn": "=0.3.0-beta.1+26.1.2"
+    "polymc-reborn": ">=0.3.0-beta.1+26.1.2 <=0.4.0-rc.1+26.1.2"
   }
 }

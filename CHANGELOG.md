@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0-rc.1+26.1.2 development
+
+### Changed
+
+- Began the Stability and Release Candidate phase from the audited final 0.3
+  Beta commit without changing Minecraft, mappings, or dependency versions.
+- Creative reverse mapping, packet fallback, and trusted-modded passthrough
+  remain fail closed or disabled.
+
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.
 

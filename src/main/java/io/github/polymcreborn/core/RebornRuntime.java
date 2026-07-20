@@ -100,12 +100,12 @@ public final class RebornRuntime {
         this.supportBundles = new SupportBundleService(this);
 
         if (config.creativeReverseMappingEnabled()) {
-            throw new IllegalStateException("creative_reverse_mapping_enabled=true is not available in 0.3 Beta: "
+            throw new IllegalStateException("creative_reverse_mapping_enabled=true is not available in 0.4 RC: "
                     + "unsigned Polymer reverse payloads are intentionally rejected");
         }
         if (config.packetFallbackEnabled()) {
             diagnostics.record("packet_fallback.unavailable", "polymc-reborn",
-                    "packet_fallback_enabled was requested, but the 0.3 Beta backend is a disabled no-op",
+                    "packet_fallback_enabled was requested, but the 0.4 RC backend is a disabled no-op",
                     DiagnosticCollector.Severity.WARNING);
         }
         registerProviders();
