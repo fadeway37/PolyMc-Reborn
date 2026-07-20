@@ -12,7 +12,7 @@ permissions:
 jobs:
   external-mods:
     runs-on: ubuntu-24.04
-    timeout-minutes: 65
+    timeout-minutes: 90
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.vfs.watch=false
       LIBGL_ALWAYS_SOFTWARE: 'true'

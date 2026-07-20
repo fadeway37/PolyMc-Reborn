@@ -1,0 +1,324 @@
+name: PolyMc Reborn RC release gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Commit SHA or the exact RC tag to build
+        required: true
+      expected_version:
+        description: Exact project version asserted before any gate runs
+        required: true
+        default: 0.4.0-rc.1+26.1.2
+      create_draft_release:
+        description: Create the annotated tag and draft prerelease after every gate passes
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  rc-gates:
+    name: RC P0 gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.vfs.watch=false
+      LIBGL_ALWAYS_SOFTWARE: 'true'
+      GALLIUM_DRIVER: llvmpipe
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the requested candidate
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate candidate identity and exact version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ inputs.expected_version }}' = '0.4.0-rc.1+26.1.2'
+          test "$(sed -n 's/^mod_version=//p' gradle.properties)" = '${{ inputs.expected_version }}'
+          resolved="$(git rev-parse '${{ inputs.release_ref }}^{commit}')"
+          test "$(git rev-parse HEAD)" = "$resolved"
+          test "$GITHUB_SHA" = "$resolved"
+          case '${{ inputs.release_ref }}' in
+            refs/tags/*|v*) test '${{ inputs.release_ref }}' = 'v0.4.0-rc.1+26.1.2' ;;
+          esac
+
+      - name: Set up Eclipse Temurin 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Configure Gradle cache
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Install headless client libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes xvfb xauth libasound2t64 libgl1 libgl1-mesa-dri libglx-mesa0 libopenal1 libx11-6 libx11-xcb1 libxcursor1 libxext6 libxi6 libxinerama1 libxkbcommon0 libxrandr2 libxrender1 libxtst6 libxxf86vm1
+
+      - name: Repository, build, unit, API, GameTest, and server gates
+        run: |
+          set -euo pipefail
+          java -version
+          bash scripts/ci/check-repository.sh
+          ./gradlew --no-daemon --stacktrace clean build test checkApiSignature
+          ./gradlew --no-daemon --stacktrace runGameTest runDedicatedServerSmoke
+          bash scripts/ci/check-server-smoke.sh
+          bash scripts/ci/check-release-jar.sh
+
+      - name: 0.3 binary Consumer production playtest
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runLegacyApiConsumerPlaytest
+
+      - name: Upload 0.3 binary Consumer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-legacy-consumer-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: build/playtest/legacy-api-consumer/**
+
+      - name: RC Maven-coordinate Consumer production playtest
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runApiConsumerPlaytest
+
+      - name: Upload RC Consumer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-api-consumer-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: build/playtest/api-consumer/**
+
+      - name: Single-client production playtest
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runProductionClientPlaytest
+
+      - name: Upload single-client evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-single-client-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/playtest/**
+            !build/playtest/**/world/**
+            !build/playtest/**/*.jar
+
+      - name: Multi-client and resource-pack policy production playtests
+        run: |
+          xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runProductionMultiClientPlaytest
+          xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runPackPolicyPlaytest
+
+      - name: Upload multi-client and pack-policy evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-multi-pack-policy-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/playtest/multi-client/**
+            build/playtest/pack-policy/**
+            !**/world/**
+            !**/*.jar
+
+      - name: Three-Mod external matrix
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runExternalModMatrix
+
+      - name: Upload three-Mod matrix evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-external-mods-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/playtest/external-mods/**
+            !**/world/**
+            !**/*.jar
+
+      - name: In-place RC upgrade and mod-set expansion
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runRcUpgradePlaytest runModSetExpansionPlaytest
+
+      - name: Upload upgrade and expansion evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-upgrade-expansion-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/playtest/upgrade/**
+            build/playtest/modset-expansion/**
+            !**/world/**
+            !**/*.jar
+
+      - name: Linux five-iteration short soak
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runLinuxSoakPlaytest
+
+      - name: Upload Linux short-soak evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-linux-short-soak-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/playtest/soak/**
+            !**/world/**
+            !**/*.jar
+
+      - name: Linux ten-iteration long soak
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' ./gradlew --no-daemon --stacktrace runLongSoakPlaytest
+
+      - name: Upload Linux long-soak evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-linux-long-soak-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/playtest/soak/**
+            !**/world/**
+            !**/*.jar
+
+      - name: Reproducibility and bounded RC artifacts
+        run: ./gradlew --no-daemon --stacktrace verifyReproducibleArchives generateSbom assembleRcArtifacts verifyReleaseArtifacts
+
+      - name: Verify checksums and final repository state
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd build/release && sha256sum --check SHA256SUMS)
+          (cd build/release && sha512sum --check SHA512SUMS)
+          bash scripts/ci/check-repository.sh --working-tree
+
+      - name: Upload sanitized RC gate evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-gates-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 21
+          path: |
+            build/release/**
+            build/playtest/**
+            build/reports/**
+            !**/world/**
+            !**/external-mods/*.jar
+            !**/*.jar.tmp
+
+      - name: Upload candidate artifact set for attestation
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-candidate-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 21
+          compression-level: 0
+          path: build/release/**
+
+  attest-and-draft:
+    name: Attest, independently verify, and optionally draft
+    needs: rc-gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the exact gated candidate
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Download exact gated artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: rc-candidate-${{ github.sha }}
+          path: build/release
+
+      - name: Generate GitHub build provenance attestations
+        id: attestation
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            build/release/polymc-reborn-0.4.0-rc.1+26.1.2.jar
+            build/release/polymc-reborn-api-0.4.0-rc.1+26.1.2.jar
+            build/release/polymc-reborn-0.4.0-rc.1+26.1.2-cyclonedx.json
+            build/release/SHA256SUMS
+            build/release/SHA512SUMS
+
+      - name: Verify positive and tampered negative attestations
+        shell: bash
+        run: |
+          set -euo pipefail
+          subjects=(
+            build/release/polymc-reborn-0.4.0-rc.1+26.1.2.jar
+            build/release/polymc-reborn-api-0.4.0-rc.1+26.1.2.jar
+            build/release/polymc-reborn-0.4.0-rc.1+26.1.2-cyclonedx.json
+            build/release/SHA256SUMS
+            build/release/SHA512SUMS
+          )
+          : > build/release/attestation-subjects.ndjson
+          for subject in "${subjects[@]}"; do
+            gh attestation verify "$subject" --repo "$GITHUB_REPOSITORY" --format json | jq -c '.' >> build/release/attestation-subjects.ndjson
+          done
+          cp "${subjects[0]}" "$RUNNER_TEMP/tampered.jar"
+          printf '\0' >> "$RUNNER_TEMP/tampered.jar"
+          if gh attestation verify "$RUNNER_TEMP/tampered.jar" --repo "$GITHUB_REPOSITORY" >"$RUNNER_TEMP/tampered.stdout" 2>"$RUNNER_TEMP/tampered.stderr"; then
+            echo 'tampered artifact unexpectedly verified' >&2
+            exit 1
+          fi
+          sed "s|$RUNNER_TEMP|<RUNNER_TEMP>|g" "$RUNNER_TEMP/tampered.stderr" > "$RUNNER_TEMP/tampered-sanitized.stderr"
+          python3 scripts/ci/write-attestation-record.py \
+            --verification build/release/attestation-subjects.ndjson \
+            --negative-stderr "$RUNNER_TEMP/tampered-sanitized.stderr" \
+            --output build/release/attestation-verification.json \
+            --repository "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" \
+            --bundle-url '${{ steps.attestation.outputs.attestation-url }}'
+          rm build/release/attestation-subjects.ndjson
+
+      - name: Upload final attested RC artifact set
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-attested-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          path: build/release/**
+
+      - name: Create annotated RC tag and draft prerelease
+        if: inputs.create_draft_release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag='v0.4.0-rc.1+26.1.2'
+          if git rev-parse "$tag^{commit}" >/dev/null 2>&1; then
+            test "$(git rev-parse "$tag^{commit}")" = "$(git rev-parse HEAD)"
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git tag -a "$tag" -m 'PolyMc Reborn 0.4.0 RC1 for Minecraft 26.1.2'
+            git push origin "$tag"
+          fi
+          gh release create "$tag" --draft --prerelease --verify-tag \
+            --title 'PolyMc Reborn 0.4.0 RC1 for Minecraft 26.1.2' \
+            --notes-file docs/0.4-rc-release-notes.md build/release/*

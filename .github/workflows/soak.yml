@@ -1,4 +1,4 @@
-name: Beta Soak
+name: RC Linux soak gates
 
 on:
   workflow_dispatch:
@@ -10,8 +10,13 @@ permissions:
 
 jobs:
   soak:
+    name: Linux ${{ matrix.mode }} soak
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [short, long]
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.vfs.watch=false
       LIBGL_ALWAYS_SOFTWARE: 'true'
@@ -21,17 +26,28 @@ jobs:
         with: {fetch-depth: 0, persist-credentials: false}
       - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with: {distribution: temurin, java-version: '25'}
+      - uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
       - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
       - name: Install headless client libraries
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends --yes xvfb xauth libasound2t64 libgl1 libgl1-mesa-dri libglx-mesa0 libopenal1 libx11-6 libx11-xcb1 libxcursor1 libxext6 libxi6 libxinerama1 libxkbcommon0 libxrandr2 libxrender1 libxtst6 libxxf86vm1
-      - name: Run bounded repeated production soak
-        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' timeout --signal=TERM --kill-after=30s 115m ./gradlew --no-daemon --stacktrace runSoakPlaytest
-      - if: always()
+      - name: Verify soak orchestrator failure and path handling
+        run: python3 -m unittest discover -s scripts/playtest -p 'test_soak_playtest.py' -v
+      - name: Run five complete Linux short iterations
+        if: matrix.mode == 'short'
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' timeout --signal=TERM --kill-after=30s 100m ./gradlew --no-daemon --stacktrace runLinuxSoakPlaytest
+      - name: Run ten complete Linux long iterations
+        if: matrix.mode == 'long'
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24 -nolisten tcp' timeout --signal=TERM --kill-after=30s 175m ./gradlew --no-daemon --stacktrace runLongSoakPlaytest
+      - name: Upload sanitized soak evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: soak-${{ github.sha }}
+          name: soak-${{ matrix.mode }}-${{ github.sha }}
           if-no-files-found: warn
-          retention-days: 7
-          path: build/playtest/soak/**
+          retention-days: 14
+          path: |
+            build/playtest/soak/**
+            !**/world/**
+            !**/*.jar

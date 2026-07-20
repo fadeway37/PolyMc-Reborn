@@ -74,7 +74,14 @@ jobs:
       - name: Run playtest evidence negative self-tests
         run: python3 -m unittest discover -s scripts/playtest -p 'test_aggregate_evidence.py' -v
 
-      - name: Run isolated production client playtest
+      - name: Run 0.3 binary consumer on the RC without recompilation
+        run: |
+          xvfb-run --auto-servernum \
+            --server-args='-screen 0 1920x1080x24 -nolisten tcp' \
+            timeout --signal=TERM --kill-after=30s 30m \
+            ./gradlew --no-daemon --console=plain --stacktrace runLegacyApiConsumerPlaytest
+
+      - name: Run RC Maven consumer and isolated production client playtest
         id: production_playtest
         shell: bash
         run: |
@@ -83,7 +90,7 @@ jobs:
             --server-args='-screen 0 1920x1080x24 -nolisten tcp' \
             timeout --signal=TERM --kill-after=30s 30m \
             ./gradlew --no-daemon --console=plain --stacktrace \
-            runProductionClientPlaytest
+            runApiConsumerPlaytest runProductionClientPlaytest
           launcher_exit_code=$?
           set -e
           mkdir -p build/run/client-playtest-evidence-input
@@ -247,6 +254,7 @@ jobs:
             build/playtest/**/*.png
             build/playtest/**/*.txt
             build/playtest/**/*.xml
+            build/playtest/legacy-api-consumer/**
             build/run/client-playtest-evidence-input/**/*.json
             build/run/client-playtest-evidence-input/**/*.log
             build/run/client-playtest-evidence-input/**/*.png

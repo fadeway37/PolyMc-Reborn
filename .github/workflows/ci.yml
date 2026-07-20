@@ -74,8 +74,8 @@ jobs:
       - name: Inspect distributable JAR
         run: bash scripts/ci/check-release-jar.sh
 
-      - name: Assemble and inspect Beta supply-chain artifacts
-        run: ./gradlew --no-daemon --stacktrace assembleBetaArtifacts verifyReleaseArtifacts
+      - name: Assemble and inspect RC supply-chain artifacts
+        run: ./gradlew --no-daemon --stacktrace assembleRcArtifacts verifyReleaseArtifacts
 
       - name: Verify build did not modify tracked inputs
         run: bash scripts/ci/check-repository.sh --working-tree
@@ -106,10 +106,10 @@ jobs:
 
   external-mod-matrix:
     name: P0 real external-mod matrix
-    if: github.ref == 'refs/heads/reborn/0.3.0-beta+26.1.2'
+    if: github.ref == 'refs/heads/reborn/0.4.0-rc+26.1.2'
     uses: ./.github/workflows/external-mod-matrix.yml
 
   cross-platform-reproducibility:
     name: P0 cross-platform archive reproducibility
-    if: github.ref == 'refs/heads/reborn/0.3.0-beta+26.1.2'
+    if: github.ref == 'refs/heads/reborn/0.4.0-rc+26.1.2'
     uses: ./.github/workflows/reproducibility.yml
