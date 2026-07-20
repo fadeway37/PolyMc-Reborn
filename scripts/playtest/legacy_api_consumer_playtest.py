@@ -25,7 +25,7 @@ RC_VERSION = "0.4.0-rc.2+26.1.2"
 API_NAME = f"polymc-reborn-api-{VERSION}.jar"
 API_SHA256 = "9649606f3381705e5b7548886c332002fc93c338ae1ac70cfd9aa523f0498fe3"
 TAG = "v0.3.0-beta.1+26.1.2"
-REPOSITORY_ID = "fadeway37/PolyMc-Reborn"
+REPOSITORY_ID = "fadeway37/PolyMc-Reborn-Archive"
 BASE_COMMIT = "bfe99049ffeb9da60a700a32282102278e6c3bba"
 ARTIFACT_ID = 8446985229
 ARTIFACT_RUN_ID = 29702813044
@@ -58,6 +58,13 @@ def run(
     result = subprocess.run(command, cwd=cwd, env=environment, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"command exited with {result.returncode}: {' '.join(command)}")
+
+
+def audited_build_environment() -> dict[str, str]:
+    """Return an environment whose embedded Git identity matches the audited input."""
+    environment = os.environ.copy()
+    environment["GITHUB_SHA"] = BASE_COMMIT
+    return environment
 
 
 def reset_generated_directory(path: Path) -> None:
@@ -150,7 +157,11 @@ def reproduce_from_audited_source(destination: Path) -> dict[str, object]:
             run(["git", "worktree", "add", "--detach", str(stage), BASE_COMMIT])
             added = True
             wrapper = stage / ("gradlew.bat" if os.name == "nt" else "gradlew")
-            run([str(wrapper), "--no-daemon", "--console=plain", ":api:jar"], cwd=stage)
+            run(
+                [str(wrapper), "--no-daemon", "--console=plain", ":api:jar"],
+                environment=audited_build_environment(),
+                cwd=stage,
+            )
             source = stage / "api" / "build" / "libs" / API_NAME
             if not source.is_file():
                 raise RuntimeError(f"audited source build did not produce {API_NAME}")

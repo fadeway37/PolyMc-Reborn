@@ -14,6 +14,8 @@
   build-manifest, and provenance subjects for RC2.
 - Added public-surface checks for new branch, pull request, commit, release, and
   documentation metadata without rewriting legitimate historical commits.
+- Preserved the hash-locked 0.3 binary Consumer gate after repository migration
+  by pinning fallback-build metadata to the audited 0.3 commit.
 
 ### Compatibility and security
 
