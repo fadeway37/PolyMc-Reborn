@@ -48,6 +48,8 @@ class EvidenceAggregatorTest(unittest.TestCase):
                 "resource_pack_expected_sha256": self.pack_sha256,
                 "resource_pack_expected_sha1": self.pack_sha1,
                 "resource_pack_bytes": 4096,
+                "resource_pack_accepted_sessions": 2,
+                "resource_pack_matching_files": 1,
                 "completed_at": "2026-07-18T00:00:00Z",
                 "local_debug_path": str(self.root / "private"),
                 "token": "json-secret",
@@ -476,6 +478,49 @@ class EvidenceAggregatorTest(unittest.TestCase):
         self.assertIn("server-observations", failed_ids)
         self.assertIn("resource-pack-hash-consistency", failed_ids)
         self.assertIn("operator-reports-contract", failed_ids)
+
+    def test_resource_pack_cache_allows_reuse_or_one_file_per_session(self) -> None:
+        for matching_files in (1, 3):
+            checks = []
+            aggregate_evidence._validate_resource_pack_hashes(
+                {"resource_pack_sha256": self.pack_sha256,
+                 "resource_pack_sha1": self.pack_sha1},
+                {"resource_pack_sha256": self.pack_sha256,
+                 "resource_pack_sha1": self.pack_sha1,
+                 "resource_pack_applied_count": 3},
+                {"resource_pack_sha256": self.pack_sha256,
+                 "resource_pack_sha1": self.pack_sha1,
+                 "resource_pack_expected_sha256": self.pack_sha256,
+                 "resource_pack_expected_sha1": self.pack_sha1,
+                 "resource_pack_bytes": 4096,
+                 "resource_pack_accepted_sessions": 3,
+                 "resource_pack_matching_files": matching_files},
+                checks,
+            )
+
+            cache = next(check for check in checks if check.check_id == "resource-pack-client-cache")
+            self.assertTrue(cache.passed, cache.detail)
+
+    def test_resource_pack_cache_rejects_more_files_than_sessions(self) -> None:
+        checks = []
+        aggregate_evidence._validate_resource_pack_hashes(
+            {"resource_pack_sha256": self.pack_sha256,
+             "resource_pack_sha1": self.pack_sha1},
+            {"resource_pack_sha256": self.pack_sha256,
+             "resource_pack_sha1": self.pack_sha1,
+             "resource_pack_applied_count": 3},
+            {"resource_pack_sha256": self.pack_sha256,
+             "resource_pack_sha1": self.pack_sha1,
+             "resource_pack_expected_sha256": self.pack_sha256,
+             "resource_pack_expected_sha1": self.pack_sha1,
+             "resource_pack_bytes": 4096,
+             "resource_pack_accepted_sessions": 3,
+             "resource_pack_matching_files": 4},
+            checks,
+        )
+
+        cache = next(check for check in checks if check.check_id == "resource-pack-client-cache")
+        self.assertFalse(cache.passed)
 
     def test_output_outside_standard_location_is_rejected(self) -> None:
         with self.assertRaises(aggregate_evidence.EvidenceError):

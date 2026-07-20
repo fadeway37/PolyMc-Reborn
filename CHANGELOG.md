@@ -36,6 +36,8 @@
   with a hash-identical build from the audited commit as the expiry fallback.
 - Preserve the complete sanitized nested client/server evidence when a Soak
   iteration fails before its operation assertions can be materialized.
+- Validate repeated resource-pack sessions against server-confirmed application
+  counts and content hashes without assuming platform-specific cache-file reuse.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.

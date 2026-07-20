@@ -470,6 +470,12 @@ def _validate_resource_pack_hashes(
     expected_client_sha1 = (client_state.get("resource_pack_expected_sha1")
                             if isinstance(client_state, dict) else None)
     client_pack_bytes = client_state.get("resource_pack_bytes") if isinstance(client_state, dict) else None
+    client_pack_sessions = (client_state.get("resource_pack_accepted_sessions")
+                            if isinstance(client_state, dict) else None)
+    client_pack_files = (client_state.get("resource_pack_matching_files")
+                         if isinstance(client_state, dict) else None)
+    server_pack_sessions = (server_state.get("resource_pack_applied_count")
+                            if isinstance(server_state, dict) else None)
     ready_sha256 = ready_sha256.casefold() if isinstance(ready_sha256, str) else None
     ready_sha1 = ready_sha1.casefold() if isinstance(ready_sha1, str) else None
     server_sha256 = server_sha256.casefold() if isinstance(server_sha256, str) else None
@@ -489,6 +495,27 @@ def _validate_resource_pack_hashes(
             "server readiness marker contains valid SHA-256 and SHA-1"
             if valid_sha256 and valid_sha1
             else "server readiness marker has missing or malformed resource-pack hashes",
+        )
+    )
+    cache_semantics_valid = (
+        isinstance(client_pack_sessions, int)
+        and not isinstance(client_pack_sessions, bool)
+        and isinstance(server_pack_sessions, int)
+        and not isinstance(server_pack_sessions, bool)
+        and client_pack_sessions == server_pack_sessions
+        and isinstance(client_pack_files, int)
+        and not isinstance(client_pack_files, bool)
+        and 1 <= client_pack_files <= client_pack_sessions
+    )
+    checks.append(
+        Check(
+            "resource-pack-client-cache",
+            cache_semantics_valid,
+            (f"client accepted {client_pack_sessions} pack session(s), server confirmed "
+             f"{server_pack_sessions}, and {client_pack_files} hash-matching cache file(s) remain")
+            if cache_semantics_valid
+            else (f"invalid pack cache/session evidence: client_sessions={client_pack_sessions!r}, "
+                  f"server_sessions={server_pack_sessions!r}, matching_files={client_pack_files!r}"),
         )
     )
     hashes_match = (

@@ -68,6 +68,8 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
     private String measuredResourcePackSha256 = "missing";
     private String measuredResourcePackSha1 = "missing";
     private long measuredResourcePackBytes;
+    private int acceptedResourcePackSessions;
+    private int measuredResourcePackFileCopies;
     private String inventoryBeforeReconnect;
     private String externalMode;
     private String clientId;
@@ -547,7 +549,8 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         context.waitFor(client -> client.getOverlay() == null && client.screen == null
                 && client.level != null && client.player != null, 1200);
         context.waitTicks(10);
-        measureDownloadedResourcePack(captureEvidence ? 1 : 2);
+        acceptedResourcePackSessions++;
+        measureDownloadedResourcePack(acceptedResourcePackSessions);
         if (captureEvidence) {
             screenshot(context, "03-resource-pack-applied");
         }
@@ -560,7 +563,7 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
         return scenario.startsWith("upgrade-") ? UPGRADE_PACK_PROBE : PACK_PROBE;
     }
 
-    private void measureDownloadedResourcePack(int expectedCopies) {
+    private void measureDownloadedResourcePack(int completedSessions) {
         Path downloads = Path.of("downloads").toAbsolutePath().normalize();
         if (!Files.isDirectory(downloads) || Files.isSymbolicLink(downloads)) {
             throw new AssertionError("Minecraft client download directory is missing or unsafe");
@@ -581,15 +584,16 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     .filter(pack -> pack.sha256().equals(expectedResourcePackSha256)
                             && pack.sha1().equals(expectedResourcePackSha1))
                     .toList();
-            if (matches.size() != expectedCopies) {
-                throw new AssertionError("Expected exactly " + expectedCopies
-                        + " downloaded resource-pack file(s) matching both server hashes, found "
-                        + matches.size());
+            if (matches.isEmpty() || matches.size() > completedSessions) {
+                throw new AssertionError("Expected between 1 and " + completedSessions
+                        + " downloaded resource-pack file(s) matching both server hashes after "
+                        + completedSessions + " accepted session(s), found " + matches.size());
             }
             var measured = matches.getFirst();
             measuredResourcePackSha256 = measured.sha256();
             measuredResourcePackSha1 = measured.sha1();
             measuredResourcePackBytes = measured.bytes();
+            measuredResourcePackFileCopies = matches.size();
         } catch (IOException exception) {
             throw new IllegalStateException("Could not inspect Minecraft's downloaded resource pack", exception);
         }
@@ -1435,6 +1439,10 @@ public final class RebornClientPlaytest implements FabricClientGameTest {
                     .append("  \"resource_pack_expected_sha1\": \"")
                     .append(escape(expectedResourcePackSha1)).append("\",\n")
                     .append("  \"resource_pack_bytes\": ").append(measuredResourcePackBytes).append(",\n")
+                    .append("  \"resource_pack_accepted_sessions\": ")
+                    .append(acceptedResourcePackSessions).append(",\n")
+                    .append("  \"resource_pack_matching_files\": ")
+                    .append(measuredResourcePackFileCopies).append(",\n")
                     .append("  \"completed_at\": \"").append(Instant.now()).append("\",\n")
                     .append("  \"steps\": [\n");
             for (int index = 0; index < steps.size(); index++) {

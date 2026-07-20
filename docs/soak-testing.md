@@ -35,3 +35,10 @@ transaction latency. Unsupported platform metrics are `-1`. The leak heuristic
 ignores two warm-up samples and fails only monotonic growth beyond a documented
 JVM-noise allowance; zero active session/projection/proxy/pack counts, process
 cleanup, port release, and file-handle probes remain absolute requirements.
+
+The client records both accepted resource-pack sessions and hash-matching files
+left in its fresh download cache. Minecraft may reuse one cache file or retain
+one identical file per connection depending on platform. The gate therefore
+requires the client session count to equal the server's applied count and
+requires between one and that count of files, with every counted file matching
+both expected hashes. Cache file multiplicity is not treated as protocol state.
