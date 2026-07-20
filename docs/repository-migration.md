@@ -8,14 +8,19 @@ installation guide.
 
 | Role | Repository | GitHub repository ID | Fork state |
 | --- | --- | ---: | --- |
-| Historical fork | [fadeway37/PolyMc-Reborn-Archive](https://github.com/fadeway37/PolyMc-Reborn-Archive) | `1304319743` | Fork of `TheEpicBlock/PolyMc` |
+| Historical archive | [fadeway37/PolyMc-Reborn-Archive](https://github.com/fadeway37/PolyMc-Reborn-Archive) | `1304319743` | Private standalone archive; originally a fork of `TheEpicBlock/PolyMc` |
 | Active project | [fadeway37/PolyMc-Reborn](https://github.com/fadeway37/PolyMc-Reborn) | `1306637304` | Independent; no parent or source repository |
 
-The historical repository was renamed in place. Its repository ID and fork
-relationship did not change, so GitHub-hosted issues, pull requests, tags,
-releases, Actions history, and other repository records stayed attached to the
-same object. It receives a read-only archive setting only after the active
-repository's RC2 release gates and provenance checks pass.
+The historical repository was renamed in place. At that point its repository
+ID and fork relationship did not change, so GitHub-hosted issues, pull
+requests, tags, releases, Actions history, and other repository records stayed
+attached to the same object. The owner later restricted its visibility;
+GitHub now reports `fork=false` with no `parent` or `source`. The repository ID
+and hosted historical records remain, but the intended preservation of the
+GitHub fork-network relationship is no longer satisfied. Source lineage remains
+auditable through Git commit ancestry, the verified migration bundle, and the
+project attribution files. The read-only archive setting is applied only after
+the active repository's RC2 release gates and provenance checks pass.
 
 The canonical project name was then reused for a newly created empty
 repository. Because that name now identifies a different repository object,
