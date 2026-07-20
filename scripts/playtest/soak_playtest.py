@@ -335,6 +335,13 @@ def _materialize_iteration(staging: Path, target: Path, value: dict[str, Any],
     _write_json(target / "resource-counts.json", resources)
 
 
+def _materialize_failed_iteration(staging: Path, target: Path) -> None:
+    """Preserve the nested process evidence before publishing the failed aggregate."""
+    if not staging.is_dir() or staging.is_symlink():
+        raise SoakFailure("failed iteration staging is missing or unsafe")
+    shutil.copytree(staging, target)
+
+
 def run(iteration_count: int, mode: str) -> int:
     if not 1 <= iteration_count <= 100:
         raise SoakFailure("iteration count must be in [1, 100]")
@@ -346,6 +353,7 @@ def run(iteration_count: int, mode: str) -> int:
     control_log = control_run / "orchestrator.log"
     wrapper = ROOT / ("gradlew.bat" if os.name == "nt" else "gradlew")
     iterations: list[dict[str, Any]] = []
+    failed_staging: dict[int, Path] = {}
     failures: list[str] = []
     baseline_mapping: str | None = None
     baseline_pack: str | None = None
@@ -374,6 +382,8 @@ def run(iteration_count: int, mode: str) -> int:
             (staging / "logs").mkdir(exist_ok=True)
             shutil.copy2(iteration_log, staging / "logs" / "soak-launcher.log")
         if result.returncode != 0 or not staging.is_dir():
+            if staging.is_dir() and not staging.is_symlink():
+                failed_staging[index] = staging
             failures.append(f"iteration {index} launcher/evidence failed with {result.returncode}")
             break
 
@@ -383,6 +393,7 @@ def run(iteration_count: int, mode: str) -> int:
             orchestration = _read_json(staging / "processes.json")
             server_port, pack_port = _parse_ports(staging / "logs" / "orchestrator.log")
         except (OSError, ValueError, json.JSONDecodeError, SoakFailure) as exception:
+            failed_staging[index] = staging
             failures.append(f"iteration {index} evidence parse failed: {exception}")
             break
 
@@ -501,6 +512,8 @@ def run(iteration_count: int, mode: str) -> int:
         target = final_run / f"iteration-{index}"
         _materialize_iteration(staging, target, iteration, iteration["ports"],
                                iteration["cleanup"], iteration["resources"])
+    for index, staging in sorted(failed_staging.items()):
+        _materialize_failed_iteration(staging, final_run / f"failed-iteration-{index}")
     (final_run / "logs").mkdir(exist_ok=True)
     if control_log.is_file():
         shutil.copy2(control_log, final_run / "logs" / "orchestrator.log")

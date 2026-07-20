@@ -9,9 +9,12 @@ The orchestrator writes its live handles under `build/soak-orchestrator/`,
 outside the `build/playtest/` tree cleaned by the nested client run. Evidence
 is staged per iteration, copied only after child processes exit, and finally
 published beneath `build/playtest/soak-runs/<run-id>/`. A failed iteration is
-never converted to success by forced cleanup. The completed sanitized snapshot
-is also copied to `build/playtest/soak/` for CI artifact upload; no live writer
-targets either published directory.
+never converted to success by forced cleanup. If a nested launcher or evidence
+parser fails before iteration assertions can be formed, its sanitized process,
+client, server, screenshot, and log bundle is retained under
+`failed-iteration-<n>/`. The completed snapshot is also copied to
+`build/playtest/soak/` for CI artifact upload; no live writer targets either
+published directory.
 
 Each short iteration covers server/client startup, two connections, required
 pack application, mapped item/block operations, GUI transactions, entity

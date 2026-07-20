@@ -31,6 +31,11 @@
   candidate ref, builds bounded artifacts, generates GitHub-hosted build
   provenance with the official pinned attestation action, independently
   verifies it, and rejects a one-byte-tampered negative sample.
+- Made the 0.3 binary Consumer gate work with least-privilege GitHub Actions:
+  it validates the exact audited workflow artifact and published API hash,
+  with a hash-identical build from the audited commit as the expiry fallback.
+- Preserve the complete sanitized nested client/server evidence when a Soak
+  iteration fails before its operation assertions can be materialized.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.

@@ -101,6 +101,28 @@ class SoakPlaytestTest(unittest.TestCase):
         self.assertIn(b'failures="1"', output)
         self.assertIn(b"child process exited abnormally", output)
 
+    def test_failed_iteration_preserves_nested_process_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            staging = root / "staging"
+            target = root / "published" / "failed-iteration-1"
+            (staging / "logs").mkdir(parents=True)
+            (staging / "client-state.json").write_text(
+                '{"result":"failed"}\n', encoding="utf-8")
+            (staging / "logs" / "client.log").write_text(
+                "bounded failure detail\n", encoding="utf-8")
+
+            soak._materialize_failed_iteration(staging, target)
+
+            self.assertEqual(
+                '{"result":"failed"}\n',
+                (target / "client-state.json").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                "bounded failure detail\n",
+                (target / "logs" / "client.log").read_text(encoding="utf-8"),
+            )
+
     def test_resource_trend_ignores_warmup_and_normal_jvm_noise(self) -> None:
         iterations = []
         for heap in (900, 1200, 1000, 1010, 990, 1020):

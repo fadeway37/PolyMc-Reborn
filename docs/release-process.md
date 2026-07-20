@@ -19,6 +19,12 @@ release-content gates. Its second job creates official GitHub Artifact
 Attestations, independently verifies five subjects with `gh`, and requires a
 one-byte-tampered JAR to fail verification.
 
+The 0.3 binary Consumer obtains its immutable API input through read-only
+access to the audited 0.3 workflow artifact. If retention has expired, it
+reproduces the API from a detached worktree at the exact audited commit and
+still requires the published byte hash; the unpublished 0.3 Draft is never
+modified and no write-capable token is granted to the gate job.
+
 Because later client harnesses intentionally reset their bounded evidence root,
 the release job uploads each Consumer, single-client, multi/pack-policy,
 external-Mod, upgrade/expansion, short-Soak, and long-Soak bundle immediately
