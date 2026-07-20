@@ -8,6 +8,12 @@
   Beta commit without changing Minecraft, mappings, or dependency versions.
 - Creative reverse mapping, packet fallback, and trusted-modded passthrough
   remain fail closed or disabled.
+- Isolated soak orchestration now keeps control logs outside nested playtest
+  cleanup, uses per-iteration staging, validates dynamic-port/process/file-handle
+  cleanup, and retains strict failure evidence on Windows and Linux.
+- Server stop now idempotently clears projected GUI, entity, and resource-pack
+  sessions; production evidence requires every interactive session count to be
+  zero before declaring a run successful.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.

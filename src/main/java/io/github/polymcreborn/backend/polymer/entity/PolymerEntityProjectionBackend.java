@@ -211,12 +211,21 @@ public final class PolymerEntityProjectionBackend {
         }
     }
 
-    private void closeAll() {
+    /**
+     * Closes every live projection. The operation is idempotent so normal
+     * entity unload, disconnect recovery, and server shutdown may race safely.
+     *
+     * @return number of sessions removed by this invocation
+     */
+    public int closeAll() {
+        int removed = 0;
         for (ProjectionSession session : sessions.values()) {
             if (sessions.remove(session.source.getUUID(), session)) {
                 session.close();
+                removed++;
             }
         }
+        return removed;
     }
 
     private InteractionAuthorization.Rejection authorize(ProjectionSession session, ServerPlayer player) {

@@ -107,6 +107,11 @@ public final class GuiProjectionService {
         return sessions.activeCount();
     }
 
+    /** Closes every projected GUI session; safe to call repeatedly. */
+    public int closeAll() {
+        return sessions.clear();
+    }
+
     public long rejectedOpenCount() {
         return rejectedOpenCount.get();
     }

@@ -12,6 +12,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GuiProjectionSessionManagerTest {
+    @Test
+    void clearIsIdempotentAndLeavesNoActiveSessions() {
+        var manager = new GuiProjectionSessionManager(4);
+        manager.open(UUID.randomUUID(), 1, Identifier.parse("test:adapter"));
+        manager.open(UUID.randomUUID(), 2, Identifier.parse("test:adapter"));
+
+        assertEquals(2, manager.clear());
+        assertEquals(0, manager.activeCount());
+        assertEquals(0, manager.clear());
+    }
+
     private static final Identifier ADAPTER = Identifier.parse("demo:menu");
 
     @Test

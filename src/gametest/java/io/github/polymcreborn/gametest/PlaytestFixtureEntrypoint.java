@@ -359,6 +359,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
         }
         server.getPlayerList().getPlayers().forEach(PlaytestFixtureEntrypoint::observeInventory);
         if (Files.exists(stopFile)) {
+            PolyMcReborn.runtime().shutdownInteractiveState();
             writeReport(server, "stop-requested");
             server.halt(false);
         }
@@ -466,7 +467,8 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     && PlaytestProbe.RESOURCE_PACK_PUSH_COUNT.get() == expectedPackPushes
                     && PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() == expectedPackPushes
                     && guiSessions == 0
-                    && entitySessions == 1
+                    && entitySessions == 0
+                    && packStats.activePlayers() == 0
                     && apiConsumerLoaded
                     && supportAudit.valid()
                     && externalLoaded
@@ -493,7 +495,8 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     && packStats.declined() == 2
                     && packStats.failed() == 0
                     && guiSessions == 0
-                    && entitySessions == 1
+                    && entitySessions == 0
+                    && packStats.activePlayers() == 0
                     && apiConsumerLoaded
                     && supportAudit.valid()
                     && productionJarValid
@@ -572,6 +575,7 @@ public final class PlaytestFixtureEntrypoint implements ModInitializer {
                     + PlaytestProbe.RESOURCE_PACK_REQUEST_COUNT.get() + ",\n"
                     + "  \"gui_active_sessions\": " + guiSessions + ",\n"
                     + "  \"entity_projection_sessions\": " + entitySessions + ",\n"
+                    + "  \"resource_pack_active_sessions\": " + packStats.activePlayers() + ",\n"
                     + "  \"api_consumer_loaded\": " + apiConsumerLoaded + ",\n"
                     + "  \"support_bundle_valid\": " + supportAudit.valid() + ",\n"
                     + "  \"support_bundle_sha256\": \"" + supportAudit.sha256() + "\",\n"

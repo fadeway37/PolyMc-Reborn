@@ -348,7 +348,8 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
     expected_values = {
         "client_profile": "VANILLA",
         "gui_active_sessions": 0,
-        "entity_projection_sessions": 1,
+        "entity_projection_sessions": 0,
+        "resource_pack_active_sessions": 0,
         "resource_pack_policy": "REQUIRED",
     }
     for field, expected in expected_values.items():

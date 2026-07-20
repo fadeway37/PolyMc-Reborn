@@ -12,6 +12,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlayerPackStateServiceTest {
     @Test
+    void clearIsIdempotentAndDropsConnectionScopedSessions() {
+        var service = new PlayerPackStateService(ResourcePackPolicy.REQUIRED, 4);
+        service.offered(UUID.randomUUID(), UUID.randomUUID());
+        service.offered(UUID.randomUUID(), UUID.randomUUID());
+
+        assertEquals(2, service.clear());
+        assertEquals(0, service.stats().activePlayers());
+        assertEquals(0, service.clear());
+    }
+
+    @Test
     void recordsIndependentTerminalStatesAndCleansSessions() {
         var service = new PlayerPackStateService(ResourcePackPolicy.OPTIONAL, 2);
         UUID accepted = UUID.randomUUID();

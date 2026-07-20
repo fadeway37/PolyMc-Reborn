@@ -135,6 +135,13 @@ public final class PlayerPackStateService {
         return Map.copyOf(snapshot);
     }
 
+    /** Clears connection-scoped pack sessions during shutdown. */
+    public int clear() {
+        int removed = sessions.size();
+        sessions.clear();
+        return removed;
+    }
+
     public long rejectedCapacityCount() {
         return rejectedCapacity.get();
     }

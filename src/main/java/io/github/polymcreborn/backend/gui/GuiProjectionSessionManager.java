@@ -67,6 +67,13 @@ public final class GuiProjectionSessionManager {
         return before - sessions.size();
     }
 
+    /** Clears all sessions during server shutdown; repeated cleanup is safe. */
+    public synchronized int clear() {
+        int removed = sessions.size();
+        sessions.clear();
+        return removed;
+    }
+
     public synchronized int activeCount() {
         return sessions.size();
     }

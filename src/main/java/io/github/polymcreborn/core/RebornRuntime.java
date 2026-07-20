@@ -168,6 +168,26 @@ public final class RebornRuntime {
                         DiagnosticCollector.Severity.WARNING);
             }
         });
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> shutdownInteractiveState());
+    }
+
+    /**
+     * Idempotently clears all connection- and projection-scoped runtime state.
+     * This is public for deterministic shutdown evidence; it does not mutate
+     * the frozen mapping plan or persistent store.
+     */
+    public InteractiveCleanup shutdownInteractiveState() {
+        int guiRemoved = guiProjectionService.closeAll();
+        int entityRemoved = entityProjectionBackend.closeAll();
+        int packRemoved = playerPackStates.clear();
+        return new InteractiveCleanup(guiRemoved, entityRemoved, packRemoved,
+                guiProjectionService.activeSessionCount(),
+                entityProjectionBackend.activeSessionCount(),
+                playerPackStates.stats().activePlayers());
+    }
+
+    public record InteractiveCleanup(int guiRemoved, int entityRemoved, int packRemoved,
+                                     int guiRemaining, int entityRemaining, int packRemaining) {
     }
 
     public synchronized MappingPlan ensureStaticPlanFrozen() {
