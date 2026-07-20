@@ -30,6 +30,7 @@ jobs:
         -Dorg.gradle.vfs.watch=false
       LIBGL_ALWAYS_SOFTWARE: 'true'
       GALLIUM_DRIVER: llvmpipe
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Check out full history
