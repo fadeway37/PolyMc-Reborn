@@ -421,6 +421,47 @@ class EvidenceAggregatorTest(unittest.TestCase):
         self.assertIn("item_pickup_observed", observations["detail"])
         self.assertIn("basic_item_remaining=1", observations["detail"])
 
+    def test_long_soak_accepts_only_bounded_balanced_gui_counts(self) -> None:
+        server = json.loads((self.input_directory / "server-state.json").read_text(encoding="utf-8"))
+        server.update({
+            "soak_mode": "long",
+            "join_count": 3,
+            "disconnect_count": 3,
+            "admin_command_count": 22,
+            "mapping_dry_run_count": 3,
+            "support_bundle_generation_count": 3,
+            "resource_pack_push_count": 3,
+            "resource_pack_request_count": 3,
+            "resource_pack_applied_count": 3,
+            "soak_gui_cycles": 25,
+            "soak_rejected_transactions": 25,
+            "soak_entity_spawns": 50,
+            "soak_entity_despawns": 50,
+            "soak_tracking_cycles": 10,
+            "dimension_change_count": 20,
+            "transaction_average_millis": 0.5,
+            "transaction_max_millis": 1.0,
+        })
+
+        for gui_count in (28, 29):
+            with self.subTest(gui_count=gui_count):
+                candidate = dict(server, gui_open_count=gui_count, gui_close_count=gui_count)
+                checks = []
+                aggregate_evidence._validate_server_observations(candidate, checks)
+                self.assertTrue(checks[0].passed, checks[0].detail)
+
+        for gui_open_count, gui_close_count in ((27, 27), (30, 30), (28, 29), (True, True)):
+            with self.subTest(gui_open_count=gui_open_count, gui_close_count=gui_close_count):
+                candidate = dict(
+                    server,
+                    gui_open_count=gui_open_count,
+                    gui_close_count=gui_close_count,
+                )
+                checks = []
+                aggregate_evidence._validate_server_observations(candidate, checks)
+                self.assertFalse(checks[0].passed)
+                self.assertIn("gui_open_count=gui_close_count in {28,29}", checks[0].detail)
+
     def test_production_jar_and_mapping_decisions_are_required(self) -> None:
         server = json.loads((self.input_directory / "server-state.json").read_text(encoding="utf-8"))
         server["production_jar_sha256"] = "not-a-hash"

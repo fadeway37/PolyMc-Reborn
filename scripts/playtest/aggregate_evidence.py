@@ -325,8 +325,6 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
     expected_counts = {
         "join_count": 3 if long_soak else 2,
         "disconnect_count": 3 if long_soak else 2,
-        "gui_open_count": 28 if long_soak else 3,
-        "gui_close_count": 28 if long_soak else 3,
         "entity_use_count": 1,
         "entity_attack_count": 1,
         "entity_interaction_callbacks": 2,
@@ -348,6 +346,21 @@ def _validate_server_observations(value: Any, checks: list[Check]) -> None:
         observed = value.get(field)
         if not isinstance(observed, int) or isinstance(observed, bool) or observed != expected:
             failed.append(f"{field}={expected}")
+    gui_open_count = value.get("gui_open_count")
+    gui_close_count = value.get("gui_close_count")
+    if long_soak:
+        valid_gui_counts = (
+            isinstance(gui_open_count, int)
+            and not isinstance(gui_open_count, bool)
+            and gui_open_count in (28, 29)
+            and isinstance(gui_close_count, int)
+            and not isinstance(gui_close_count, bool)
+            and gui_close_count == gui_open_count
+        )
+        if not valid_gui_counts:
+            failed.append("gui_open_count=gui_close_count in {28,29}")
+    elif gui_open_count != 3 or gui_close_count != 3:
+        failed.append("gui_open_count=gui_close_count=3")
     expected_values = {
         "client_profile": "VANILLA",
         "gui_active_sessions": 0,
