@@ -16,6 +16,9 @@
   documentation metadata without rewriting legitimate historical commits.
 - Preserved the hash-locked 0.3 binary Consumer gate after repository migration
   by pinning fallback-build metadata to the audited 0.3 commit.
+- Made long-soak GUI evidence model the deliberately open-at-disconnect session
+  as a bounded finalizer-ordering outcome: only balanced 28/28 or 29/29
+  open/close counts pass, with zero active sessions still mandatory.
 
 ### Compatibility and security
 

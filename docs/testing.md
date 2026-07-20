@@ -201,6 +201,12 @@ Mods, short Soak, and long Soak evidence have separate children under `build/pla
 Each gate uses structured summaries, process exits, loaded Mod lists, hashes,
 redaction metadata, and manifests; harness source alone is not evidence.
 
+Long Soak deliberately opens a final projected GUI immediately before the
+abnormal-disconnect cleanup scenario. The final server observation can be
+captured immediately before or after that one bounded open, so the evidence
+contract accepts only balanced 28/28 or 29/29 open/close counts. Any mismatch,
+value outside that pair, or non-zero active-session count fails the gate.
+
 On a pristine runner, Loom may install the production-server distribution after
 the upgrade harness creates `eula.txt` and replace that bootstrap directory. The
 upgrade harness recognizes only the resulting successful pre-readiness EULA exit,
