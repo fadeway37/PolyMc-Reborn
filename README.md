@@ -236,8 +236,12 @@ worlds, production paths, or a weaponized proof of concept in an issue.
 
 The active source is
 [fadeway37/PolyMc-Reborn](https://github.com/fadeway37/PolyMc-Reborn). The
-former fork and its GitHub-hosted historical records are preserved at
+former fork and its GitHub-hosted historical records are retained in the
+owner-restricted
 [fadeway37/PolyMc-Reborn-Archive](https://github.com/fadeway37/PolyMc-Reborn-Archive).
+Restricting that repository's visibility detached its current GitHub
+fork-network metadata; source lineage remains recorded in Git history and the
+project notices.
 See [project-history.md](docs/project-history.md) for ancestry and the
 independent-repository transition.
 

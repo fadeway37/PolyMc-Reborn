@@ -19,6 +19,10 @@
 - Made long-soak GUI evidence model the deliberately open-at-disconnect session
   as a bounded finalizer-ordering outcome: only balanced 28/28 or 29/29
   open/close counts pass, with zero active sessions still mandatory.
+- Recorded that the historical repository became owner-restricted and GitHub
+  detached its fork-network metadata; its repository ID and hosted historical
+  records remain retained, while source lineage is carried by Git ancestry and
+  attribution.
 
 ### Compatibility and security
 
