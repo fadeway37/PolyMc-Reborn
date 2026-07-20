@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a reproducible PolyMc Reborn defect
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please test with the exact supported platform and remove secrets, world data, player data, and private paths before submitting.
+  - type: input
+    id: reborn-version
+    attributes:
+      label: PolyMc Reborn version
+      placeholder: 0.4.0-rc.2+26.1.2
+    validations:
+      required: true
+  - type: input
+    id: minecraft-version
+    attributes:
+      label: Minecraft version
+      placeholder: 26.1.2
+    validations:
+      required: true
+  - type: input
+    id: loader-version
+    attributes:
+      label: Fabric Loader version
+    validations:
+      required: true
+  - type: input
+    id: fabric-api-version
+    attributes:
+      label: Fabric API version
+    validations:
+      required: true
+  - type: input
+    id: polymer-version
+    attributes:
+      label: Polymer version
+    validations:
+      required: true
+  - type: textarea
+    id: server-mods
+    attributes:
+      label: Server mod list
+      description: Include exact names and versions. A sanitized loader list is preferred.
+    validations:
+      required: true
+  - type: dropdown
+    id: client-kind
+    attributes:
+      label: Client setup
+      options:
+        - Unmodified client with no client-side mods
+        - Isolated Fabric test client
+        - Modded client
+        - Unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: resource-pack
+    attributes:
+      label: Resource-pack state
+      options:
+        - Applied
+        - Offered and declined
+        - Offered and failed
+        - Not offered
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Give the smallest sequence that demonstrates the defect and the expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility-report
+    attributes:
+      label: Sanitized compatibility report
+      description: Paste the relevant decision and warnings, or attach a reviewed report.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Include only the relevant section. Remove tokens, player data, world data, and private paths.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data review
+      options:
+        - label: I reviewed all attachments and removed secrets, personal data, worlds, and private paths.
+          required: true

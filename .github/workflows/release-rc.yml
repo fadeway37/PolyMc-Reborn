@@ -9,7 +9,7 @@ on:
       expected_version:
         description: Exact project version asserted before any gate runs
         required: true
-        default: 0.4.0-rc.1+26.1.2
+        default: 0.4.0-rc.2+26.1.2
       create_draft_release:
         description: Create the annotated tag and draft prerelease after every gate passes
         required: true
@@ -42,13 +42,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test '${{ inputs.expected_version }}' = '0.4.0-rc.1+26.1.2'
+          test '${{ inputs.expected_version }}' = '0.4.0-rc.2+26.1.2'
           test "$(sed -n 's/^mod_version=//p' gradle.properties)" = '${{ inputs.expected_version }}'
           resolved="$(git rev-parse '${{ inputs.release_ref }}^{commit}')"
           test "$(git rev-parse HEAD)" = "$resolved"
           test "$GITHUB_SHA" = "$resolved"
           case '${{ inputs.release_ref }}' in
-            refs/tags/*|v*) test '${{ inputs.release_ref }}' = 'v0.4.0-rc.1+26.1.2' ;;
+            refs/tags/*|v*) test '${{ inputs.release_ref }}' = 'v0.4.0-rc.2+26.1.2' ;;
           esac
 
       - name: Set up Eclipse Temurin 25
@@ -72,6 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           java -version
+          bash .github/scripts/check-public-surface.sh
           bash scripts/ci/check-repository.sh
           ./gradlew --no-daemon --stacktrace clean build test checkApiSignature
           ./gradlew --no-daemon --stacktrace runGameTest runDedicatedServerSmoke
@@ -261,9 +262,9 @@ jobs:
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
-            build/release/polymc-reborn-0.4.0-rc.1+26.1.2.jar
-            build/release/polymc-reborn-api-0.4.0-rc.1+26.1.2.jar
-            build/release/polymc-reborn-0.4.0-rc.1+26.1.2-cyclonedx.json
+            build/release/polymc-reborn-0.4.0-rc.2+26.1.2.jar
+            build/release/polymc-reborn-api-0.4.0-rc.2+26.1.2.jar
+            build/release/polymc-reborn-0.4.0-rc.2+26.1.2-cyclonedx.json
             build/release/SHA256SUMS
             build/release/SHA512SUMS
 
@@ -272,9 +273,9 @@ jobs:
         run: |
           set -euo pipefail
           subjects=(
-            build/release/polymc-reborn-0.4.0-rc.1+26.1.2.jar
-            build/release/polymc-reborn-api-0.4.0-rc.1+26.1.2.jar
-            build/release/polymc-reborn-0.4.0-rc.1+26.1.2-cyclonedx.json
+            build/release/polymc-reborn-0.4.0-rc.2+26.1.2.jar
+            build/release/polymc-reborn-api-0.4.0-rc.2+26.1.2.jar
+            build/release/polymc-reborn-0.4.0-rc.2+26.1.2-cyclonedx.json
             build/release/SHA256SUMS
             build/release/SHA512SUMS
           )
@@ -311,15 +312,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag='v0.4.0-rc.1+26.1.2'
+          tag='v0.4.0-rc.2+26.1.2'
           if git rev-parse "$tag^{commit}" >/dev/null 2>&1; then
             test "$(git rev-parse "$tag^{commit}")" = "$(git rev-parse HEAD)"
           else
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git tag -a "$tag" -m 'PolyMc Reborn 0.4.0 RC1 for Minecraft 26.1.2'
+            git tag -a "$tag" -m 'PolyMc Reborn 0.4.0 RC2 for Minecraft 26.1.2'
             git push origin "$tag"
           fi
           gh release create "$tag" --draft --prerelease --verify-tag \
-            --title 'PolyMc Reborn 0.4.0 RC1 for Minecraft 26.1.2' \
-            --notes-file docs/0.4-rc-release-notes.md build/release/*
+            --title 'PolyMc Reborn 0.4.0 RC2 for Minecraft 26.1.2' \
+            --notes-file docs/releases/0.4.0-rc.2.md build/release/*

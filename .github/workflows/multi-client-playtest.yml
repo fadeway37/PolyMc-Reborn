@@ -2,7 +2,9 @@ name: Production Multi-Client Playtest
 
 on:
   push:
-    branches: ['reborn/**']
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

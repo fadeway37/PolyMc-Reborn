@@ -1,0 +1,73 @@
+name: Compatibility request
+description: Request assessment of a specific mod version and feature
+title: "[Compatibility]: "
+labels:
+  - compatibility
+body:
+  - type: input
+    id: mod-name
+    attributes:
+      label: Mod name
+    validations:
+      required: true
+  - type: input
+    id: project-url
+    attributes:
+      label: Official project URL
+      description: Link to the author's official repository or distribution page.
+    validations:
+      required: true
+  - type: input
+    id: mod-version
+    attributes:
+      label: Exact mod version
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License
+      description: State the declared license and link to its source.
+    validations:
+      required: true
+  - type: dropdown
+    id: server-starts
+    attributes:
+      label: Does the dedicated server start?
+      options:
+        - "Yes"
+        - "No"
+        - Not tested
+    validations:
+      required: true
+  - type: dropdown
+    id: client-connects
+    attributes:
+      label: Does an unmodified client connect?
+      options:
+        - "Yes"
+        - "No"
+        - Not tested
+    validations:
+      required: true
+  - type: textarea
+    id: affected-content
+    attributes:
+      label: Affected registry objects and features
+      description: List exact identifiers and the specific item, block, GUI, entity, or resource behavior requested.
+    validations:
+      required: true
+  - type: textarea
+    id: current-result
+    attributes:
+      label: Current compatibility result
+      description: Include the relevant status, decision chain, warnings, and safe fallback behavior.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope acknowledgement
+      options:
+        - label: I understand that a request is not a promise of whole-mod compatibility.
+          required: true
