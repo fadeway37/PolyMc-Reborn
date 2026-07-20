@@ -4,6 +4,8 @@
 /playtest/client-driver/build/
 /playtest/api-consumer/.gradle/
 /playtest/api-consumer/build/
+/playtest/legacy-api-consumer/.gradle/
+/playtest/legacy-api-consumer/build/
 /playtest/external-cache/
 **/__pycache__/
 *.py[cod]

@@ -14,6 +14,9 @@
 - Server stop now idempotently clears projected GUI, entity, and resource-pack
   sessions; production evidence requires every interactive session count to be
   zero before declaring a run successful.
+- Added an immutable 0.4 RC API signature, a classified compatibility check
+  against the 0.3 Beta signature, and a real-client gate that runs a Consumer
+  compiled only against the published, hash-locked 0.3 API JAR on the RC.
 
 All notable changes are recorded here. The format follows Keep a Changelog
 principles; alpha versions are tied to an exact Minecraft version.

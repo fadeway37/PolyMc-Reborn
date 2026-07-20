@@ -1,12 +1,12 @@
 # External API consumer guide
 
-Resolve the Beta API from the publication repository as a compile-only
+Resolve the RC API from the publication repository as a compile-only
 dependency; the server's PolyMc Reborn Mod supplies the same API classes at
 runtime:
 
 ```groovy
 dependencies {
-    compileOnly 'io.github.polymcreborn:polymc-reborn-api:0.3.0-beta.1+26.1.2'
+    compileOnly 'io.github.polymcreborn:polymc-reborn-api:0.4.0-rc.1+26.1.2'
 }
 ```
 
@@ -25,6 +25,8 @@ publish to an ignored temporary Maven repository and then build the consumer:
 ```text
 ./gradlew publishApiToTestRepository
 ./gradlew buildApiConsumer
+./gradlew runApiConsumerPlaytest
+./gradlew runLegacyApiConsumerPlaytest
 ```
 
 The fixture JAR is test-only. It must never enter the main Mod, API artifact,

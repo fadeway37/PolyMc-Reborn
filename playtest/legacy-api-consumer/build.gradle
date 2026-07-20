@@ -1,0 +1,67 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+group = project.maven_group
+version = project.api_version
+
+base {
+	archivesName = 'polymc-reborn-legacy-api-consumer'
+}
+
+repositories {
+	def configuredRepository = providers.gradleProperty('apiRepository').orNull
+	if (configuredRepository == null || configuredRepository.isBlank()) {
+		throw new GradleException('apiRepository must point at the locked 0.3 API repository')
+	}
+	maven {
+		name = 'PolyMcRebornLockedBetaApi'
+		url = uri(configuredRepository)
+		content {
+			includeGroup 'io.github.polymcreborn'
+		}
+	}
+}
+
+loom {
+	serverOnlyMinecraftJar()
+}
+
+sourceSets.main.java.srcDir '../api-consumer/src/main/java'
+
+dependencies {
+	minecraft "com.mojang:minecraft:${minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+	compileOnly "io.github.polymcreborn:polymc-reborn-api:${api_version}"
+}
+
+processResources {
+	inputs.property 'version', project.version
+	from('../api-consumer/src/main/resources') {
+		exclude 'fabric.mod.json'
+	}
+	filesMatching('fabric.mod.json') {
+		expand version: project.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = 'UTF-8'
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+dependencyLocking {
+	lockAllConfigurations()
+}

@@ -147,12 +147,16 @@ publishing {
 }
 
 def generatedSignature = layout.buildDirectory.file('api-signatures/current.txt')
-def signatureBaseline = layout.projectDirectory.file(
-	'signatures/0.3.0-beta.1.txt')
+def betaSignatureBaseline = layout.projectDirectory.file('signatures/0.3.0-beta.1.txt')
+def rcSignatureBaseline = layout.projectDirectory.file('signatures/0.4.0-rc.1.txt')
+def compatibilityReport = layout.buildDirectory.file(
+	'reports/api-compatibility/0.3.0-beta.1-to-0.4.0-rc.1.json')
+def compatibilityMarkdown = layout.buildDirectory.file(
+	'reports/api-compatibility/0.3.0-beta.1-to-0.4.0-rc.1.md')
 
 tasks.register('generateApiSignature', JavaExec) {
 	group = 'verification'
-	description = 'Generates the deterministic public Beta API signature.'
+	description = 'Generates the deterministic public RC API signature.'
 	dependsOn tasks.named('classes'), tasks.named('signatureToolClasses')
 	classpath = sourceSets.signatureTool.runtimeClasspath + sourceSets.main.runtimeClasspath
 	mainClass = 'io.github.polymcreborn.tools.ApiSignatureGenerator'
@@ -164,22 +168,92 @@ tasks.register('generateApiSignature', JavaExec) {
 
 tasks.register('checkApiSignature', JavaExec) {
 	group = 'verification'
-	description = 'Fails when the generated public API differs from the accepted Beta baseline.'
+	description = 'Fails when the generated public API differs from the accepted RC baseline.'
 	dependsOn tasks.named('generateApiSignature')
-	inputs.file(signatureBaseline)
+	inputs.file(rcSignatureBaseline)
 	classpath = sourceSets.signatureTool.runtimeClasspath + sourceSets.main.runtimeClasspath
 	mainClass = 'io.github.polymcreborn.tools.ApiSignatureGenerator'
 	args '--verify', generatedSignature.get().asFile.absolutePath,
-		signatureBaseline.asFile.absolutePath
+		rcSignatureBaseline.asFile.absolutePath
+}
+
+tasks.register('checkApiCompatibility') {
+	group = 'verification'
+	description = 'Checks the RC signature against the immutable 0.3 Beta compatibility baseline.'
+	dependsOn tasks.named('generateApiSignature')
+	inputs.files(betaSignatureBaseline, generatedSignature)
+	outputs.files(compatibilityReport, compatibilityMarkdown)
+	doLast {
+		def readEntries = { File source ->
+			source.readLines('UTF-8').findAll { line ->
+				!line.isBlank() && !line.startsWith('#') && !line.contains('=')
+			}.toSorted()
+		}
+		def category = { String entry ->
+			def parts = entry.split(' ', 3)
+			parts.length >= 2 ? parts[1] : 'UNKNOWN'
+		}
+		def previous = readEntries(betaSignatureBaseline.asFile)
+		def current = readEntries(generatedSignature.get().asFile)
+		def previousSet = previous as Set
+		def currentSet = current as Set
+		def removed = (previousSet - currentSet).toList().toSorted()
+		def added = (currentSet - previousSet).toList().toSorted()
+		def categories = ['STABLE', 'EXPERIMENTAL', 'INTERNAL',
+			'LEGACY_SUPPORTED', 'LEGACY_ADAPTED', 'LEGACY_ADAPTED_DEPRECATED',
+			'LEGACY_POSTPONED', 'LEGACY_IMPOSSIBLE']
+		def changes = new TreeMap<String, Object>()
+		categories.each { name ->
+			changes[name] = [
+				removed: removed.findAll { category(it) == name },
+				added: added.findAll { category(it) == name }
+			]
+		}
+		def unknownRemoved = removed.findAll { !categories.contains(category(it)) }
+		def stableRemoved = removed.findAll { category(it) == 'STABLE' }
+		def result = stableRemoved.isEmpty() && unknownRemoved.isEmpty()
+		def document = [
+			schema_version: 1,
+			result: result ? 'passed' : 'failed',
+			baseline: '0.3.0-beta.1+26.1.2',
+			candidate: project.version.toString(),
+			stable_binary_breaks: stableRemoved,
+			unknown_removed_entries: unknownRemoved,
+			changes: changes
+		]
+		def output = compatibilityReport.get().asFile.toPath()
+		java.nio.file.Files.createDirectories(output.parent)
+		java.nio.file.Files.writeString(output,
+			groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(document)) + '\n')
+		def lines = [
+			'# API compatibility: 0.3 Beta to 0.4 RC', '',
+			'- Result: **' + document.result.toUpperCase(Locale.ROOT) + '**',
+			'- Stable removals or descriptor changes: `' + stableRemoved.size() + '`',
+			'- Stable additions: `' + changes.STABLE.added.size() + '`',
+			'- Experimental changes: `-' + changes.EXPERIMENTAL.removed.size()
+				+ ' / +' + changes.EXPERIMENTAL.added.size() + '`',
+			'- Internal changes: `-' + changes.INTERNAL.removed.size()
+				+ ' / +' + changes.INTERNAL.added.size() + '`',
+			'- Legacy changes: `-' + changes.findAll { key, value -> key.startsWith('LEGACY_') }
+				.values().sum { it.removed.size() }
+				+ ' / +' + changes.findAll { key, value -> key.startsWith('LEGACY_') }
+				.values().sum { it.added.size() } + '`', ''
+		]
+		java.nio.file.Files.writeString(compatibilityMarkdown.get().asFile.toPath(),
+			lines.join('\n') + '\n')
+		if (!result) {
+			throw new GradleException('0.3 Beta API compatibility failed; inspect ' + output)
+		}
+	}
 }
 
 tasks.register('updateApiSignatureBaseline', Copy) {
 	group = 'build setup'
-	description = 'Explicitly replaces the accepted Beta API signature baseline.'
+	description = 'Explicitly replaces the accepted RC API signature baseline.'
 	dependsOn tasks.named('generateApiSignature')
 	from generatedSignature
 	into layout.projectDirectory.dir('signatures')
-	rename { '0.3.0-beta.1.txt' }
+	rename { '0.4.0-rc.1.txt' }
 }
 
 tasks.named('checkApiSignature') {
@@ -187,5 +261,5 @@ tasks.named('checkApiSignature') {
 }
 
 tasks.named('check') {
-	dependsOn tasks.named('checkApiSignature')
+	dependsOn tasks.named('checkApiSignature'), tasks.named('checkApiCompatibility')
 }

@@ -1,0 +1,352 @@
+# PolyMc Reborn public API signature
+schema=1
+version=0.4.0-rc.1+26.1.2
+minecraft=26.1.2
+namespace=official
+
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition(java.util.Optional<net.minecraft.world.entity.EntityType<?>>,net.minecraft.world.phys.Vec3,java.util.List<io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment>)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment(net.minecraft.world.entity.EquipmentSlot,net.minecraft.world.item.Item)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration(net.minecraft.resources.Identifier,net.minecraft.resources.Identifier,net.minecraft.resources.Identifier,net.minecraft.world.entity.EntityType<?extendsnet.minecraft.world.entity.Entity>,net.minecraft.world.entity.EntityType<?>,double,net.minecraft.world.phys.Vec3,io.github.polymcreborn.api.entity.EntityProjectionComposition,io.github.polymcreborn.api.entity.EntityProjectionInteraction<?extendsnet.minecraft.world.entity.Entity>,io.github.polymcreborn.api.entity.EntityProjectionAdapter<?extendsnet.minecraft.world.entity.Entity>)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry()
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiClickTransaction(int,int,long,java.util.Map<java.lang.Integer,net.minecraft.world.item.ItemStack>,net.minecraft.world.item.ItemStack)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy(boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection(io.github.polymcreborn.api.gui.GuiProjectionKind,net.minecraft.world.Container,int,io.github.polymcreborn.api.gui.GuiSlotMapping,io.github.polymcreborn.api.gui.GuiInteractionPolicy,java.util.Optional<net.minecraft.world.inventory.ContainerData>)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection(net.minecraft.world.Container,int,io.github.polymcreborn.api.gui.GuiSlotMapping,io.github.polymcreborn.api.gui.GuiInteractionPolicy)
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry()
+CONSTRUCTOR EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry(net.minecraft.resources.Identifier,net.minecraft.resources.Identifier,io.github.polymcreborn.api.gui.GuiProjectionAdapter)
+CONSTRUCTOR LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry()
+CONSTRUCTOR STABLE public io.github.polymcreborn.api.ContentDescriptor(java.lang.String,java.lang.String,io.github.polymcreborn.api.ContentType,java.util.SortedMap<java.lang.String,java.lang.String>)
+CONSTRUCTOR STABLE public io.github.polymcreborn.api.MappingContext(io.github.polymcreborn.api.ClientProfile,boolean,boolean,java.util.Map<java.lang.String,java.lang.String>)
+CONSTRUCTOR STABLE public io.github.polymcreborn.api.MappingDecision(io.github.polymcreborn.api.ContentDescriptor,io.github.polymcreborn.api.MappingStatus,java.lang.String,java.lang.String,java.lang.String,java.lang.String,double,int,java.util.List<java.lang.String>,java.util.List<java.lang.String>,java.util.List<java.lang.String>,java.lang.String)
+FIELD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionInteraction#DENY_ALL:io.github.polymcreborn.api.entity.EntityProjectionInteraction<net.minecraft.world.entity.Entity>
+FIELD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionKind#FURNACE:io.github.polymcreborn.api.gui.GuiProjectionKind
+FIELD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionKind#STANDARD_CONTAINER:io.github.polymcreborn.api.gui.GuiProjectionKind
+FIELD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#ENTITY:io.github.theepicblock.polymc.api.item.ItemLocation
+FIELD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#EQUIPMENT:io.github.theepicblock.polymc.api.item.ItemLocation
+FIELD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#INVENTORY:io.github.theepicblock.polymc.api.item.ItemLocation
+FIELD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#SCREEN:io.github.theepicblock.polymc.api.item.ItemLocation
+FIELD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#UNKNOWN:io.github.theepicblock.polymc.api.item.ItemLocation
+FIELD STABLE public io.github.polymcreborn.api.ClientProfile#REBORN_COMPANION:io.github.polymcreborn.api.ClientProfile
+FIELD STABLE public io.github.polymcreborn.api.ClientProfile#TRUSTED_MODDED:io.github.polymcreborn.api.ClientProfile
+FIELD STABLE public io.github.polymcreborn.api.ClientProfile#VANILLA:io.github.polymcreborn.api.ClientProfile
+FIELD STABLE public io.github.polymcreborn.api.ContentType#BLOCK:io.github.polymcreborn.api.ContentType
+FIELD STABLE public io.github.polymcreborn.api.ContentType#ENTITY:io.github.polymcreborn.api.ContentType
+FIELD STABLE public io.github.polymcreborn.api.ContentType#GUI:io.github.polymcreborn.api.ContentType
+FIELD STABLE public io.github.polymcreborn.api.ContentType#ITEM:io.github.polymcreborn.api.ContentType
+FIELD STABLE public io.github.polymcreborn.api.DiagnosticCollector.Severity#ERROR:io.github.polymcreborn.api.DiagnosticCollector.Severity
+FIELD STABLE public io.github.polymcreborn.api.DiagnosticCollector.Severity#INFO:io.github.polymcreborn.api.DiagnosticCollector.Severity
+FIELD STABLE public io.github.polymcreborn.api.DiagnosticCollector.Severity#WARNING:io.github.polymcreborn.api.DiagnosticCollector.Severity
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#ERROR:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#EXPLICIT:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#FALLBACK:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#HEURISTIC:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#LEGACY:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#NATIVE:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#PROFILE:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.MappingStatus#UNSUPPORTED:io.github.polymcreborn.api.MappingStatus
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#ADMIN_FORCE:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#EXPLICIT:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#FALLBACK:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#HEURISTIC:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#LEGACY:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#NATIVE:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#PROFILE:io.github.polymcreborn.api.ProviderTier
+FIELD STABLE public io.github.polymcreborn.api.ProviderTier#UNSUPPORTED:io.github.polymcreborn.api.ProviderTier
+METHOD EXPERIMENTAL public default io.github.polymcreborn.api.entity.EntityProjectionAdapter#composition():io.github.polymcreborn.api.entity.EntityProjectionComposition
+METHOD EXPERIMENTAL public default io.github.polymcreborn.api.entity.EntityProjectionAdapter#interaction():io.github.polymcreborn.api.entity.EntityProjectionInteraction<T>
+METHOD EXPERIMENTAL public default io.github.polymcreborn.api.entity.EntityProjectionAdapter#maxInteractionDistance():double
+METHOD EXPERIMENTAL public default io.github.polymcreborn.api.entity.EntityProjectionAdapter#offset():net.minecraft.world.phys.Vec3
+METHOD EXPERIMENTAL public default io.github.polymcreborn.api.entity.EntityProjectionInteraction#attack(T,net.minecraft.server.level.ServerPlayer):void
+METHOD EXPERIMENTAL public default io.github.polymcreborn.api.entity.EntityProjectionInteraction#use(T,net.minecraft.server.level.ServerPlayer,net.minecraft.world.InteractionHand,net.minecraft.world.phys.Vec3,boolean):void
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionAdapter#id():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionAdapter#of<T extends net.minecraft.world.entity.Entity>(java.lang.String,net.minecraft.world.entity.EntityType<T>,net.minecraft.world.entity.EntityType<?>,io.github.polymcreborn.api.entity.EntityProjectionInteraction<T>):io.github.polymcreborn.api.entity.EntityProjectionAdapter<T>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionAdapter#surrogateType():net.minecraft.world.entity.EntityType<?>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionAdapter#targetType():net.minecraft.world.entity.EntityType<T>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#equals(java.lang.Object):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#equipment():java.util.List<io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#hashCode():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#none():io.github.polymcreborn.api.entity.EntityProjectionComposition
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#passengerOffset():net.minecraft.world.phys.Vec3
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#passengerType():java.util.Optional<net.minecraft.world.entity.EntityType<?>>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition#toString():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment#equals(java.lang.Object):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment#hashCode():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment#item():net.minecraft.world.item.Item
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment#slot():net.minecraft.world.entity.EquipmentSlot
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment#toString():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionInteraction#denyAll<T extends net.minecraft.world.entity.Entity>():io.github.polymcreborn.api.entity.EntityProjectionInteraction<T>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#adapter():io.github.polymcreborn.api.entity.EntityProjectionAdapter<?extendsnet.minecraft.world.entity.Entity>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#adapterId():net.minecraft.resources.Identifier
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#compareTo(io.github.polymcreborn.api.entity.EntityProjectionRegistration):int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#composition():io.github.polymcreborn.api.entity.EntityProjectionComposition
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#equals(java.lang.Object):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#hashCode():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#interaction():io.github.polymcreborn.api.entity.EntityProjectionInteraction<?extendsnet.minecraft.world.entity.Entity>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#maxInteractionDistance():double
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#offset():net.minecraft.world.phys.Vec3
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#surrogateType():net.minecraft.world.entity.EntityType<?>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#surrogateTypeId():net.minecraft.resources.Identifier
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#targetType():net.minecraft.world.entity.EntityType<?extendsnet.minecraft.world.entity.Entity>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#targetTypeId():net.minecraft.resources.Identifier
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistration#toString():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry#freeze():io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry#isFrozen():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry#register(io.github.polymcreborn.api.entity.EntityProjectionAdapter<?extendsnet.minecraft.world.entity.Entity>):void
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry#snapshot():io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot#entries():java.util.List<io.github.polymcreborn.api.entity.EntityProjectionRegistration>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot#find(net.minecraft.resources.Identifier):java.util.Optional<io.github.polymcreborn.api.entity.EntityProjectionRegistration>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot#find(net.minecraft.world.entity.EntityType<?>):java.util.Optional<io.github.polymcreborn.api.entity.EntityProjectionRegistration>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot#size():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiClickTransaction#carriedStack():net.minecraft.world.item.ItemStack
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiClickTransaction#changedSlots():java.util.Map<java.lang.Integer,net.minecraft.world.item.ItemStack>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiClickTransaction#containerId():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiClickTransaction#sequence():long
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiClickTransaction#stateId():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#allows(net.minecraft.world.inventory.ContainerInput,int,int,boolean):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#creativeClone():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#equals(java.lang.Object):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#hashCode():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#hotbarSwap():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#offhandSwap():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#outsidePickup():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#pickup():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#pickupAll():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#quickCraftDrag():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#quickMove():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#readOnly():io.github.polymcreborn.api.gui.GuiInteractionPolicy
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#safeStandard():io.github.polymcreborn.api.gui.GuiInteractionPolicy
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#throwAction():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiInteractionPolicy#toString():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#authoritativeContainer():net.minecraft.world.Container
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#equals(java.lang.Object):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#furnace(net.minecraft.world.Container,net.minecraft.world.inventory.ContainerData,io.github.polymcreborn.api.gui.GuiInteractionPolicy):io.github.polymcreborn.api.gui.GuiProjection
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#hashCode():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#interactionPolicy():io.github.polymcreborn.api.gui.GuiInteractionPolicy
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#kind():io.github.polymcreborn.api.gui.GuiProjectionKind
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#propertyData():java.util.Optional<net.minecraft.world.inventory.ContainerData>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#rows():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#slotMapping():io.github.polymcreborn.api.gui.GuiSlotMapping
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjection#toString():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionAdapter#id():net.minecraft.resources.Identifier
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionAdapter#project(net.minecraft.world.inventory.AbstractContainerMenu,net.minecraft.server.level.ServerPlayer):io.github.polymcreborn.api.gui.GuiProjection
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionAdapter#serverMenuType():net.minecraft.world.inventory.MenuType<?>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionKind#valueOf(java.lang.String):io.github.polymcreborn.api.gui.GuiProjectionKind
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionKind#values():io.github.polymcreborn.api.gui.GuiProjectionKind[]
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry#freeze():io.github.polymcreborn.api.gui.GuiProjectionRegistry.Snapshot
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry#isFrozen():boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry#register(io.github.polymcreborn.api.gui.GuiProjectionAdapter):void
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry#adapter():io.github.polymcreborn.api.gui.GuiProjectionAdapter
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry#adapterId():net.minecraft.resources.Identifier
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry#equals(java.lang.Object):boolean
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry#hashCode():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry#menuTypeId():net.minecraft.resources.Identifier
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry#toString():java.lang.String
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Snapshot#entries():java.util.List<io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiProjectionRegistry.Snapshot#find(net.minecraft.world.inventory.MenuType<?>):java.util.Optional<io.github.polymcreborn.api.gui.GuiProjectionAdapter>
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#clientSlotForServer(int):java.util.OptionalInt
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#clientToServer():int[]
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#fromClientToServer(int,int[]):io.github.polymcreborn.api.gui.GuiSlotMapping
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#identity(int):io.github.polymcreborn.api.gui.GuiSlotMapping
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#projectedSlotCount():int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#serverSlotForClient(int):int
+METHOD EXPERIMENTAL public io.github.polymcreborn.api.gui.GuiSlotMapping#sourceContainerSize():int
+METHOD LEGACY_ADAPTED_DEPRECATED public default io.github.theepicblock.polymc.api.PolyMcEntrypoint#registerModSpecificResources(io.github.theepicblock.polymc.api.resource.ModdedResources,io.github.theepicblock.polymc.api.resource.PolyMcResourcePack,io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#getBlockPoly(net.minecraft.world.level.block.Block):io.github.theepicblock.polymc.api.block.BlockPoly
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#getClientItem(net.minecraft.world.item.ItemStack,net.minecraft.server.level.ServerPlayer,io.github.theepicblock.polymc.api.item.ItemLocation):net.minecraft.world.item.ItemStack
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#getClientState(net.minecraft.world.level.block.state.BlockState,net.minecraft.server.level.ServerPlayer):net.minecraft.world.level.block.state.BlockState
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#getEntityPoly<T extends net.minecraft.world.entity.Entity>(net.minecraft.world.entity.EntityType<T>):io.github.theepicblock.polymc.api.entity.EntityPoly<T>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#getGuiPoly(net.minecraft.world.inventory.MenuType<?>):io.github.theepicblock.polymc.api.gui.GuiPoly
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#getItemPoly(net.minecraft.world.item.Item):io.github.theepicblock.polymc.api.item.ItemPoly
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMap#isVanillaLikeMap():boolean
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyMcEntrypoint#registerPolys(io.github.theepicblock.polymc.api.PolyRegistry):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#blockPolys():java.util.Map<net.minecraft.world.level.block.Block,io.github.theepicblock.polymc.api.block.BlockPoly>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#build():io.github.theepicblock.polymc.api.PolyMap
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#entityPolys():java.util.Map<net.minecraft.world.entity.EntityType<?>,io.github.theepicblock.polymc.api.entity.EntityPoly<?>>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#globalItemPolys():java.util.List<io.github.theepicblock.polymc.api.item.ItemTransformer>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#guiPolys():java.util.Map<net.minecraft.world.inventory.MenuType<?>,io.github.theepicblock.polymc.api.gui.GuiPoly>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#hasBlockPoly(net.minecraft.world.level.block.Block):boolean
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#hasEntityPoly(net.minecraft.world.entity.EntityType<?>):boolean
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#hasGlobalItemPolys():boolean
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#hasGuiPoly(net.minecraft.world.inventory.MenuType<?>):boolean
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#hasItemPoly(net.minecraft.world.item.Item):boolean
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#itemPolys():java.util.Map<net.minecraft.world.item.Item,io.github.theepicblock.polymc.api.item.ItemPoly>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#registerBlockPoly(net.minecraft.world.level.block.Block,io.github.theepicblock.polymc.api.block.BlockPoly):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#registerEntityPoly<T extends net.minecraft.world.entity.Entity>(net.minecraft.world.entity.EntityType<T>,io.github.theepicblock.polymc.api.entity.EntityPoly<T>):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#registerGlobalItemPoly(io.github.theepicblock.polymc.api.item.ItemTransformer):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#registerGuiPoly(net.minecraft.world.inventory.MenuType<?>,io.github.theepicblock.polymc.api.gui.GuiPoly):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.PolyRegistry#registerItemPoly(net.minecraft.world.item.Item,io.github.theepicblock.polymc.api.item.ItemPoly):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.block.BlockPoly#getClientBlock(net.minecraft.world.level.block.state.BlockState):net.minecraft.world.level.block.state.BlockState
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.entity.EntityPoly#diagnosticStrategy():java.lang.String
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.gui.GuiPoly#replaceScreenHandler(net.minecraft.world.inventory.AbstractContainerMenu,net.minecraft.server.level.ServerPlayer,int):net.minecraft.world.inventory.AbstractContainerMenu
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#valueOf(java.lang.String):io.github.theepicblock.polymc.api.item.ItemLocation
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemLocation#values():io.github.theepicblock.polymc.api.item.ItemLocation[]
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemPoly#getClientItem(net.minecraft.world.item.ItemStack,net.minecraft.server.level.ServerPlayer,io.github.theepicblock.polymc.api.item.ItemLocation):net.minecraft.world.item.ItemStack
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.item.ItemTransformer#transform(net.minecraft.world.item.ItemStack,net.minecraft.world.item.ItemStack,io.github.theepicblock.polymc.api.PolyMap,net.minecraft.server.level.ServerPlayer,io.github.theepicblock.polymc.api.item.ItemLocation):net.minecraft.world.item.ItemStack
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.resource.ModdedResources#getResource(java.lang.String):byte[]
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.resource.ModdedResources#paths():java.util.Set<java.lang.String>
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.api.resource.PolyMcResourcePack#setAsset(java.lang.String,byte[]):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger#error(java.lang.String,java.lang.Throwable):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger#info(java.lang.String):void
+METHOD LEGACY_ADAPTED_DEPRECATED public io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger#warn(java.lang.String):void
+METHOD STABLE public default io.github.polymcreborn.api.CompatibilityProvider#explainNotApplicable(io.github.polymcreborn.api.ContentDescriptor,io.github.polymcreborn.api.MappingContext):java.lang.String
+METHOD STABLE public default io.github.polymcreborn.api.PolyMcRebornEntrypoint#registerCompatibility(io.github.polymcreborn.api.PolyMcRebornEntrypoint.ExtensionRegistry):void
+METHOD STABLE public default io.github.polymcreborn.api.PolyMcRebornEntrypoint#registerEntityProjections(io.github.polymcreborn.api.entity.EntityProjectionRegistry):void
+METHOD STABLE public default io.github.polymcreborn.api.PolyMcRebornEntrypoint#registerGuiProjections(io.github.polymcreborn.api.gui.GuiProjectionRegistry):void
+METHOD STABLE public default io.github.polymcreborn.api.PolyMcRebornEntrypoint#registerResources(io.github.polymcreborn.api.PolyMcRebornEntrypoint.ResourceRegistry):void
+METHOD STABLE public io.github.polymcreborn.api.ClientProfile#safeDefault(io.github.polymcreborn.api.ClientProfile):io.github.polymcreborn.api.ClientProfile
+METHOD STABLE public io.github.polymcreborn.api.ClientProfile#valueOf(java.lang.String):io.github.polymcreborn.api.ClientProfile
+METHOD STABLE public io.github.polymcreborn.api.ClientProfile#values():io.github.polymcreborn.api.ClientProfile[]
+METHOD STABLE public io.github.polymcreborn.api.CompatibilityBackend#apply(io.github.polymcreborn.api.MappingDecision,io.github.polymcreborn.api.DiagnosticCollector):void
+METHOD STABLE public io.github.polymcreborn.api.CompatibilityBackend#id():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.CompatibilityBackend#supports(io.github.polymcreborn.api.ContentType):boolean
+METHOD STABLE public io.github.polymcreborn.api.CompatibilityProvider#evaluate(io.github.polymcreborn.api.ContentDescriptor,io.github.polymcreborn.api.MappingContext):java.util.Optional<io.github.polymcreborn.api.MappingDecision>
+METHOD STABLE public io.github.polymcreborn.api.CompatibilityProvider#id():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.CompatibilityProvider#tier():io.github.polymcreborn.api.ProviderTier
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#attributes():java.util.SortedMap<java.lang.String,java.lang.String>
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#booleanAttribute(java.lang.String):boolean
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#compareTo(io.github.polymcreborn.api.ContentDescriptor):int
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#contentType():io.github.polymcreborn.api.ContentType
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#equals(java.lang.Object):boolean
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#hashCode():int
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#key():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#of(java.lang.String,java.lang.String,io.github.polymcreborn.api.ContentType,java.util.Map<java.lang.String,java.lang.String>):io.github.polymcreborn.api.ContentDescriptor
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#ownerMod():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#registryId():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.ContentDescriptor#toString():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.ContentType#valueOf(java.lang.String):io.github.polymcreborn.api.ContentType
+METHOD STABLE public io.github.polymcreborn.api.ContentType#values():io.github.polymcreborn.api.ContentType[]
+METHOD STABLE public io.github.polymcreborn.api.DiagnosticCollector#record(java.lang.String,java.lang.String,java.lang.String,io.github.polymcreborn.api.DiagnosticCollector.Severity):void
+METHOD STABLE public io.github.polymcreborn.api.DiagnosticCollector.Severity#valueOf(java.lang.String):io.github.polymcreborn.api.DiagnosticCollector.Severity
+METHOD STABLE public io.github.polymcreborn.api.DiagnosticCollector.Severity#values():io.github.polymcreborn.api.DiagnosticCollector.Severity[]
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#clientProfile():io.github.polymcreborn.api.ClientProfile
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#equals(java.lang.Object):boolean
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#hashCode():int
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#options():java.util.Map<java.lang.String,java.lang.String>
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#overrideNativePolymer():boolean
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#safeMode():boolean
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#toString():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingContext#vanillaSafe():io.github.polymcreborn.api.MappingContext
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#backend():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#clientCarrier():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#confidence():double
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#degradation():int
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#descriptor():io.github.polymcreborn.api.ContentDescriptor
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#equals(java.lang.Object):boolean
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#failureReason():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#hashCode():int
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#provider():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#reasonChain():java.util.List<java.lang.String>
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#resourceDependencies():java.util.List<java.lang.String>
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#status():io.github.polymcreborn.api.MappingStatus
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#strategy():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#toString():java.lang.String
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#warnings():java.util.List<java.lang.String>
+METHOD STABLE public io.github.polymcreborn.api.MappingDecision#withProvider(java.lang.String,io.github.polymcreborn.api.MappingStatus):io.github.polymcreborn.api.MappingDecision
+METHOD STABLE public io.github.polymcreborn.api.MappingStatus#valueOf(java.lang.String):io.github.polymcreborn.api.MappingStatus
+METHOD STABLE public io.github.polymcreborn.api.MappingStatus#values():io.github.polymcreborn.api.MappingStatus[]
+METHOD STABLE public io.github.polymcreborn.api.PolyMcRebornEntrypoint.ExtensionRegistry#registerProvider(io.github.polymcreborn.api.CompatibilityProvider):void
+METHOD STABLE public io.github.polymcreborn.api.PolyMcRebornEntrypoint.ResourceRegistry#register(java.lang.String,io.github.polymcreborn.api.ResourceContributor):void
+METHOD STABLE public io.github.polymcreborn.api.ProviderTier#valueOf(java.lang.String):io.github.polymcreborn.api.ProviderTier
+METHOD STABLE public io.github.polymcreborn.api.ProviderTier#values():io.github.polymcreborn.api.ProviderTier[]
+METHOD STABLE public io.github.polymcreborn.api.ResourceContributor#contribute(io.github.polymcreborn.api.ResourceContributor.ResourceSink) throws java.lang.Exception:void
+METHOD STABLE public io.github.polymcreborn.api.ResourceContributor.ResourceSink#put(java.lang.String,byte[],java.lang.String):void
+RECORD_COMPONENT io.github.polymcreborn.api.ContentDescriptor attributes:java.util.SortedMap<java.lang.String,java.lang.String>
+RECORD_COMPONENT io.github.polymcreborn.api.ContentDescriptor contentType:io.github.polymcreborn.api.ContentType
+RECORD_COMPONENT io.github.polymcreborn.api.ContentDescriptor ownerMod:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.ContentDescriptor registryId:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.MappingContext clientProfile:io.github.polymcreborn.api.ClientProfile
+RECORD_COMPONENT io.github.polymcreborn.api.MappingContext options:java.util.Map<java.lang.String,java.lang.String>
+RECORD_COMPONENT io.github.polymcreborn.api.MappingContext overrideNativePolymer:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.MappingContext safeMode:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision backend:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision clientCarrier:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision confidence:double
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision degradation:int
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision descriptor:io.github.polymcreborn.api.ContentDescriptor
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision failureReason:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision provider:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision reasonChain:java.util.List<java.lang.String>
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision resourceDependencies:java.util.List<java.lang.String>
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision status:io.github.polymcreborn.api.MappingStatus
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision strategy:java.lang.String
+RECORD_COMPONENT io.github.polymcreborn.api.MappingDecision warnings:java.util.List<java.lang.String>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionComposition equipment:java.util.List<io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionComposition passengerOffset:net.minecraft.world.phys.Vec3
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionComposition passengerType:java.util.Optional<net.minecraft.world.entity.EntityType<?>>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment item:net.minecraft.world.item.Item
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment slot:net.minecraft.world.entity.EquipmentSlot
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration adapter:io.github.polymcreborn.api.entity.EntityProjectionAdapter<?extendsnet.minecraft.world.entity.Entity>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration adapterId:net.minecraft.resources.Identifier
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration composition:io.github.polymcreborn.api.entity.EntityProjectionComposition
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration interaction:io.github.polymcreborn.api.entity.EntityProjectionInteraction<?extendsnet.minecraft.world.entity.Entity>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration maxInteractionDistance:double
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration offset:net.minecraft.world.phys.Vec3
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration surrogateType:net.minecraft.world.entity.EntityType<?>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration surrogateTypeId:net.minecraft.resources.Identifier
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration targetType:net.minecraft.world.entity.EntityType<?extendsnet.minecraft.world.entity.Entity>
+RECORD_COMPONENT io.github.polymcreborn.api.entity.EntityProjectionRegistration targetTypeId:net.minecraft.resources.Identifier
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy creativeClone:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy hotbarSwap:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy offhandSwap:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy outsidePickup:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy pickup:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy pickupAll:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy quickCraftDrag:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy quickMove:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiInteractionPolicy throwAction:boolean
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjection authoritativeContainer:net.minecraft.world.Container
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjection interactionPolicy:io.github.polymcreborn.api.gui.GuiInteractionPolicy
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjection kind:io.github.polymcreborn.api.gui.GuiProjectionKind
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjection propertyData:java.util.Optional<net.minecraft.world.inventory.ContainerData>
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjection rows:int
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjection slotMapping:io.github.polymcreborn.api.gui.GuiSlotMapping
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry adapter:io.github.polymcreborn.api.gui.GuiProjectionAdapter
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry adapterId:net.minecraft.resources.Identifier
+RECORD_COMPONENT io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry menuTypeId:net.minecraft.resources.Identifier
+TYPE EXPERIMENTAL class io.github.polymcreborn.api.entity.EntityProjectionRegistry
+TYPE EXPERIMENTAL class io.github.polymcreborn.api.entity.EntityProjectionRegistry.Snapshot
+TYPE EXPERIMENTAL class io.github.polymcreborn.api.gui.GuiClickTransaction
+TYPE EXPERIMENTAL class io.github.polymcreborn.api.gui.GuiProjectionRegistry
+TYPE EXPERIMENTAL class io.github.polymcreborn.api.gui.GuiProjectionRegistry.Snapshot
+TYPE EXPERIMENTAL class io.github.polymcreborn.api.gui.GuiSlotMapping
+TYPE EXPERIMENTAL enum io.github.polymcreborn.api.gui.GuiProjectionKind
+TYPE EXPERIMENTAL interface io.github.polymcreborn.api.entity.EntityProjectionAdapter<T extends net.minecraft.world.entity.Entity>
+TYPE EXPERIMENTAL interface io.github.polymcreborn.api.entity.EntityProjectionInteraction<T extends net.minecraft.world.entity.Entity>
+TYPE EXPERIMENTAL interface io.github.polymcreborn.api.gui.GuiProjectionAdapter
+TYPE EXPERIMENTAL record io.github.polymcreborn.api.entity.EntityProjectionComposition
+TYPE EXPERIMENTAL record io.github.polymcreborn.api.entity.EntityProjectionComposition.Equipment
+TYPE EXPERIMENTAL record io.github.polymcreborn.api.entity.EntityProjectionRegistration implements java.lang.Comparable<io.github.polymcreborn.api.entity.EntityProjectionRegistration>
+TYPE EXPERIMENTAL record io.github.polymcreborn.api.gui.GuiInteractionPolicy
+TYPE EXPERIMENTAL record io.github.polymcreborn.api.gui.GuiProjection
+TYPE EXPERIMENTAL record io.github.polymcreborn.api.gui.GuiProjectionRegistry.Entry
+TYPE LEGACY_ADAPTED_DEPRECATED class io.github.theepicblock.polymc.api.PolyMap
+TYPE LEGACY_ADAPTED_DEPRECATED class io.github.theepicblock.polymc.api.PolyRegistry
+TYPE LEGACY_ADAPTED_DEPRECATED enum io.github.theepicblock.polymc.api.item.ItemLocation
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.PolyMcEntrypoint
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.block.BlockPoly
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.entity.EntityPoly<T extends net.minecraft.world.entity.Entity>
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.gui.GuiPoly
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.item.ItemPoly
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.item.ItemTransformer
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.resource.ModdedResources
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.api.resource.PolyMcResourcePack
+TYPE LEGACY_ADAPTED_DEPRECATED interface io.github.theepicblock.polymc.impl.misc.logging.SimpleLogger
+TYPE STABLE annotation io.github.polymcreborn.api.annotation.Experimental extends java.lang.annotation.Annotation
+TYPE STABLE annotation io.github.polymcreborn.api.annotation.Internal extends java.lang.annotation.Annotation
+TYPE STABLE annotation io.github.polymcreborn.api.annotation.Stable extends java.lang.annotation.Annotation
+TYPE STABLE enum io.github.polymcreborn.api.ClientProfile
+TYPE STABLE enum io.github.polymcreborn.api.ContentType
+TYPE STABLE enum io.github.polymcreborn.api.DiagnosticCollector.Severity
+TYPE STABLE enum io.github.polymcreborn.api.MappingStatus
+TYPE STABLE enum io.github.polymcreborn.api.ProviderTier
+TYPE STABLE interface io.github.polymcreborn.api.CompatibilityBackend
+TYPE STABLE interface io.github.polymcreborn.api.CompatibilityProvider
+TYPE STABLE interface io.github.polymcreborn.api.DiagnosticCollector
+TYPE STABLE interface io.github.polymcreborn.api.PolyMcRebornEntrypoint
+TYPE STABLE interface io.github.polymcreborn.api.PolyMcRebornEntrypoint.ExtensionRegistry
+TYPE STABLE interface io.github.polymcreborn.api.PolyMcRebornEntrypoint.ResourceRegistry
+TYPE STABLE interface io.github.polymcreborn.api.ResourceContributor
+TYPE STABLE interface io.github.polymcreborn.api.ResourceContributor.ResourceSink
+TYPE STABLE record io.github.polymcreborn.api.ContentDescriptor implements java.lang.Comparable<io.github.polymcreborn.api.ContentDescriptor>
+TYPE STABLE record io.github.polymcreborn.api.MappingContext
+TYPE STABLE record io.github.polymcreborn.api.MappingDecision

@@ -229,6 +229,9 @@ if [[ "${#orchestration_failure_messages[@]}" -eq 0 ]]; then
       "-PplaytestExternalBlockId=${POLYMC_REBORN_EXTERNAL_BLOCK_ID:-none}"
     )
   fi
+  if [[ -n "${POLYMC_REBORN_API_CONSUMER_JAR:-}" ]]; then
+    server_gradle_args+=("-PplaytestApiConsumerJar=$POLYMC_REBORN_API_CONSUMER_JAR")
+  fi
   server_gradle_args+=(runProductionServerPlaytest)
   if command -v setsid >/dev/null 2>&1; then
     setsid ./gradlew "${server_gradle_args[@]}" \

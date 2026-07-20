@@ -140,6 +140,9 @@ def productionArtifactReport = layout.buildDirectory.file('reports/release/produ
 def apiConsumerDirectory = layout.projectDirectory.dir('playtest/api-consumer')
 def apiConsumerJar = apiConsumerDirectory.file(
 	'build/libs/polymc-reborn-api-consumer-' + project.version + '.jar')
+def playtestApiConsumerJar = providers.gradleProperty('playtestApiConsumerJar')
+def selectedApiConsumerJar = playtestApiConsumerJar.map { file(it) }
+	.orElse(providers.provider { apiConsumerJar.asFile })
 
 tasks.register('verifyProductionArtifactSemantics') {
 	group = 'verification'
@@ -374,9 +377,12 @@ tasks.register('assemblePlaytestServer') {
 
 tasks.register('runProductionServerPlaytest', net.fabricmc.loom.task.prod.ServerProductionRunTask) {
 	dependsOn tasks.named('verifyProductionArtifactSemantics'), tasks.named('playtestFixturesJar'),
-		tasks.named('prepareProductionServerPlaytest'), 'buildApiConsumer'
+		tasks.named('prepareProductionServerPlaytest')
+	if (!playtestApiConsumerJar.isPresent()) {
+		dependsOn 'buildApiConsumer'
+	}
 	mods.setFrom(productionReleaseJar, configurations.named('productionRuntimeMods'),
-		tasks.named('playtestFixturesJar').flatMap { it.archiveFile }, apiConsumerJar)
+		tasks.named('playtestFixturesJar').flatMap { it.archiveFile }, selectedApiConsumerJar)
 	if (playtestExternalModJar.isPresent()) {
 		mods.from(file(playtestExternalModJar.get()))
 	}
@@ -574,6 +580,18 @@ tasks.register('runApiConsumerPlaytest') {
 		if (summary.api_consumer_loaded != true) {
 			throw new GradleException('Production server did not load the independent API consumer')
 		}
+	}
+}
+
+tasks.register('runLegacyApiConsumerPlaytest', Exec) {
+	group = 'verification'
+	description = 'Runs a consumer compiled only against the exact 0.3 Beta API JAR on the RC.'
+	dependsOn tasks.named('verifyPlaytestClientIsolation')
+	workingDir rootDir
+	if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+		commandLine 'python', file('scripts/playtest/legacy_api_consumer_playtest.py').absolutePath
+	} else {
+		commandLine 'python3', file('scripts/playtest/legacy_api_consumer_playtest.py').absolutePath
 	}
 }
 

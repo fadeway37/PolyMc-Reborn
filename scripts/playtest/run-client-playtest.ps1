@@ -177,6 +177,11 @@ try {
             "-PplaytestExternalBlockId=$($env:POLYMC_REBORN_EXTERNAL_BLOCK_ID)"
         ) + $serverArguments
     }
+    if ($env:POLYMC_REBORN_API_CONSUMER_JAR) {
+        $serverArguments = @(
+            "-PplaytestApiConsumerJar=$($env:POLYMC_REBORN_API_CONSUMER_JAR)"
+        ) + $serverArguments
+    }
     $serverProcess = Start-Process -FilePath (Join-Path $projectRoot 'gradlew.bat') `
         -ArgumentList $serverArguments -WorkingDirectory $projectRoot -PassThru `
         -RedirectStandardOutput $serverStdout -RedirectStandardError $serverStderr -WindowStyle Hidden

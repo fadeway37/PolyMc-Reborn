@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "polymc-reborn-api-consumer",
+  "version": "${version}",
+  "name": "PolyMc Reborn 0.3 binary API consumer fixture",
+  "description": "Server-only consumer compiled solely against the exact 0.3 Beta API artifact.",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "io.github.polymcreborn.consumer.ApiConsumerMod"
+    ],
+    "polymc-reborn": [
+      "io.github.polymcreborn.consumer.ApiConsumerMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "fabric-api": ">=0.155.2+26.1.2",
+    "minecraft": "=26.1.2",
+    "java": ">=25",
+    "polymc-reborn": ">=0.3.0-beta.1+26.1.2 <=0.4.0-rc.1+26.1.2"
+  }
+}
