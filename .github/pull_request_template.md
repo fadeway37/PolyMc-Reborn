@@ -20,8 +20,10 @@ do not infer one test layer from another.
 
 ## Documentation
 
-List the README, focused documentation, report shape, migration note, and
-changelog updates required by this change.
+List product README, report shape, migration, and changelog changes. Put
+installation, troubleshooting, and Adapter guide changes in the independent
+[documentation repository](https://github.com/fadeway37/PolyMc-Reborn-Docs)
+and update both languages.
 
 ## Security
 
