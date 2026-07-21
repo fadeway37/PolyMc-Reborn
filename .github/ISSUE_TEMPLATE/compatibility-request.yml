@@ -4,6 +4,10 @@ title: "[Compatibility]: "
 labels:
   - compatibility
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Read the [known limitations](https://polymc-reborn-docs.pages.dev/#/en/reference/known-limitations) before requesting an assessment. One tested feature or registry ID does not establish whole-mod compatibility.
   - type: input
     id: mod-name
     attributes:

@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Please test with the exact supported platform and remove secrets, world data, player data, and private paths before submitting.
+        Start with the [troubleshooting guide](https://polymc-reborn-docs.pages.dev/#/en/troubleshooting/start-here). Test with the exact supported platform and remove secrets, world data, player data, and private paths before submitting.
   - type: input
     id: reborn-version
     attributes:
@@ -81,7 +81,7 @@ body:
     id: compatibility-report
     attributes:
       label: Sanitized compatibility report
-      description: Paste the relevant decision and warnings, or attach a reviewed report.
+      description: Paste the relevant decision and warnings, or attach a reviewed report. The support guide explains how to create and inspect a local bundle.
   - type: textarea
     id: logs
     attributes:

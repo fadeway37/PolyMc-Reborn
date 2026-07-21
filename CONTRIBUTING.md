@@ -1,81 +1,40 @@
 # Contributing to PolyMc Reborn
 
-Thank you for helping build a conservative compatibility layer. The most useful
-contributions are small, reproducible, and honest about fidelity limits.
+PolyMc Reborn keeps real modded objects authoritative on the server and fails closed when a client representation cannot be made safe. Contributions must preserve that boundary and describe their compatibility scope honestly.
 
-## Before opening a change
+## Choose the right repository
 
-- Read `AGENTS.md`, `docs/architecture.md`, and the ADRs.
-- Search existing issues and compatibility profiles.
-- Use Minecraft 26.1.2 and Java 25. Do not port by mechanically replacing Yarn
-  names; this project uses official Minecraft names.
-- For a mod compatibility report, include exact mod versions, the sanitized
-  compatibility report, the relevant decision chain, and minimal reproduction
-  steps. Do not attach a world or log containing secrets without reviewing it.
+Product code, schemas, build logic, and runtime behavior belong here. User guides, troubleshooting, and Adapter tutorials belong in [PolyMc-Reborn-Docs](https://github.com/fadeway37/PolyMc-Reborn-Docs). Report a documentation error there and update both languages together.
 
-## Development workflow
+The published [development guide](https://polymc-reborn-docs.pages.dev/#/en/development/setup) explains how an external developer consumes the API. This file covers contributions to the product itself.
 
-Create a focused topic branch from `main`. Release-candidate preparation uses
-`release/<version>`; ordinary changes should use a short purpose-based prefix
-such as `fix/`, `feat/`, `docs/`, or `ci/`. Keep planning/API, backend behavior,
-persistence/resources, diagnostics/legacy, tests, and documentation reviewable
-independently when practical.
+## Before changing code
 
-Run:
+- Read `AGENTS.md`, the maintainer notes in `docs/development.md`, and the relevant [architecture decisions](docs/adr/).
+- Start a focused branch from the active repository's `main`. Keep historical and upstream remotes read-only.
+- Use Java 25, official Minecraft names, and the exact dependency pins in `gradle.properties`. Do not add Yarn, dynamic versions, local dependency JARs, or runtime downloads.
+- Keep public API contracts backend-neutral and direct Polymer types inside `backend.polymer`.
+- Preserve upstream copyright and license headers. New Java files start with `/* SPDX-License-Identifier: LGPL-3.0-or-later */`.
 
-```text
-java -version
-./gradlew clean build
-./gradlew test
-./gradlew checkApiSignature
-./gradlew runGameTest
-./gradlew runDedicatedServerSmoke
-./gradlew runProductionClientPlaytest
-./gradlew runProductionMultiClientPlaytest
-git diff --check
-```
+## Implementation and verification
 
-Use `gradlew.bat` on Windows. If an integration task cannot run, state exactly
-why and provide the unit or serialization coverage used instead. A pull request
-must never imply that a real vanilla client logged in unless that test really
-occurred.
+Register providers and adapters before plan freeze. Preserve native Polymer behavior unless a narrow rule and the explicit dangerous gate both authorize replacement. Persistence and reports must use stable order, and corrupted state must never be silently replaced.
 
-## Compatibility changes
+Add positive and negative coverage for every behavior change. Run `java -version` before Gradle, use `gradlew.bat` on Windows, and execute every check required by `AGENTS.md` and the change's documented scope. A skipped, timed-out, or uninspected layer is not a pass. State exactly what ran and what did not.
 
-A provider or profile must be deterministic, explainable, and conservative.
-Show that it preserves a pre-existing native Polymer implementation. Add
-negative tests for unsupported shapes/components and for hostile or malformed
-input. A new persistent representation needs a schema/algorithm migration and
-byte-determinism tests.
+Never commit build output, test evidence, worlds, downloaded mod JARs, secrets, private paths, or client-driver classes.
 
-Do not solve compatibility by dropping broad packet classes, trusting any
-Fabric client, loading arbitrary classes from JSON, running scripts, or
-downloading executable code. Do not copy PolyMc-Extra source.
+## Pull request
 
-## Pull request checklist
+A pull request must explain:
 
-- [ ] Scope is limited and architecture boundaries are respected.
-- [ ] New Java files have `SPDX-License-Identifier: LGPL-3.0-or-later`.
-- [ ] Adapted upstream files preserve their original notice.
-- [ ] Unit tests and applicable integration tasks were run and reported.
-- [ ] Mapping/resource outputs remain deterministic.
-- [ ] Diagnostics explain new decisions and reports omit sensitive paths.
-- [ ] Documentation and `CHANGELOG.md` describe actual behavior.
-- [ ] No generated build output, local JAR, secret, or temporary clone is added.
+- the bounded user-visible or developer-visible outcome;
+- compatibility, mapping, persistence, and security impact;
+- exact positive and negative tests run;
+- any applicable test not run and the reason;
+- report, changelog, and documentation changes;
+- rollback or migration needs.
 
-By contributing, you agree that your contribution is licensed under
-`LGPL-3.0-or-later`.
+Update `CHANGELOG.md` and focused product metadata when behavior changes. Send user-facing documentation changes to the documentation repository instead of recreating a second guide here.
 
-Public API changes additionally require `checkApiSignature`,
-`runLegacyApiConsumerPlaytest`, `runApiConsumerPlaytest`, stability/migration
-notes, and an intentional baseline review. Pack, GUI, entity, persistence, or
-diagnostics behavior changes require their applicable production evidence gate,
-not only a unit test. Release claims also require inspected hosted evidence;
-green Workflow status alone is insufficient.
-
-Open PolyMc Reborn pull requests against this repository's `main` branch.
-Keep the historical `archive` and upstream remotes read-only; never open a
-Reborn pull request against `TheEpicBlock/PolyMc`. Pull request descriptions
-must state compatibility impact, exact tests actually run, documentation
-changes, and relevant security boundaries without including private paths or
-full production logs.
+By contributing, you agree that your contribution is licensed under `LGPL-3.0-or-later`.

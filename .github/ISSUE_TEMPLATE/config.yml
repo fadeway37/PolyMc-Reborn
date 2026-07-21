@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/fadeway37/PolyMc-Reborn/security/advisories/new
     about: Report vulnerabilities privately instead of opening a public issue.
   - name: Documentation
-    url: https://github.com/fadeway37/PolyMc-Reborn/tree/main/docs
-    about: Review installation, compatibility, migration, and testing documentation.
+    url: https://polymc-reborn-docs.pages.dev
+    about: Read installation, administration, troubleshooting, and development guides.
