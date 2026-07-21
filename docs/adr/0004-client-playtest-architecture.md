@@ -45,7 +45,7 @@ entrypoints are `verifyPlaytestClientIsolation`, `runClientPlaytest`, and
 
 Required evidence is rooted at `build/playtest/`: summary JSON/Markdown, JUnit
 XML, loaded-client mods, independent server/client state, three logs, and the
-17 exact screenshots documented in `docs/client-playtest.md`.
+bounded screenshots retained with the corresponding workflow evidence.
 
 ## Terminology and acceptance
 

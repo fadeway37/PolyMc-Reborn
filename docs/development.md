@@ -1,154 +1,63 @@
-# Development
+# Maintainer workflow
 
-## Prerequisites
+This file contains repository-specific maintenance rules that do not belong in the public installation or Adapter guides. Public development documentation is maintained in [PolyMc-Reborn-Docs](https://polymc-reborn-docs.pages.dev/#/en/development/setup).
 
-- A Git clone with full history and `origin` pointing to the independent
-  PolyMc-Reborn repository. The optional read-only `archive` and `upstream`
-  remotes preserve historical and upstream context.
-- Java 25 available locally, or a Gradle JVM capable of starting the wrapper so
-  the Foojay resolver can provision a Java 25 toolchain.
-- Network access to Fabric Maven, Maven Central/Gradle Plugin Portal, and the
-  narrowly scoped Nucleoid Maven repository.
+## Repository invariants
 
-Run this before Gradle:
+Use Java 25 and the exact versions in `gradle.properties`. Minecraft names are official; Yarn is not a dependency. Keep backend-neutral public contracts in `io.github.polymcreborn.api` and Polymer implementation types in `backend.polymer`. Common and server initialization must not reference client-only classes.
 
-```text
-java -version
-```
+New Java files use the Reborn SPDX header. Adapted upstream files retain their original notices. Release archives never contain fixtures, client drivers, worlds, local paths, test evidence, downloaded content-mod JARs, or secrets.
 
-Java 21 is not a fallback. `build.gradle` sets both the Java toolchain language
-version and compiler `--release` to 25.
+## Change workflow
 
-## Pinned build
+1. Start from clean `main` and use a focused topic branch.
+2. Read the relevant ADRs before changing an accepted boundary.
+3. Register providers, resources, and projections before freeze; commands do not mutate a frozen plan.
+4. Keep persisted and reported output deterministic. Corruption must fail closed.
+5. Add positive and negative coverage, update diagnostics and `CHANGELOG.md`, and update the external bilingual documentation when public behavior changes.
+6. Run `java -version`, then every applicable check in `AGENTS.md`. Use `gradlew.bat` on Windows.
+7. Inspect outputs instead of treating a task or workflow conclusion as proof.
 
-`gradle.properties` is the single readable list of target versions:
+The main source sets are `src/main` for the distributable server mod, `api/src/main` for the standalone API, `src/test` for unit tests, `src/gametest` for internal game fixtures, and `playtest` for isolated external processes. Test-only code and evidence must remain outside release artifacts.
 
-```text
-minecraft_version=26.1.2
-loader_version=0.19.3
-loom_version=1.17.16
-fabric_api_version=0.155.2+26.1.2
-polymer_version=0.16.5+26.1.2
-junit_version=5.13.4
-mod_version=0.4.0-rc.2+26.1.2
-```
+## API compatibility
 
-The Gradle wrapper is 9.5.1. Dependencies must remain exact; do not introduce
-`+`, ranges, snapshots, or locally copied JARs. Loom supplies Mojang's official
-names directly for Minecraft 26.1.2; there is intentionally no `mappings`
-dependency.
+The standalone coordinate is
+`io.github.polymcreborn:polymc-reborn-api:0.4.0-rc.2+26.1.2`. `@Stable`
+contracts preserve the accepted Beta baseline through the RC line.
+`@Experimental` contracts are public but may change with migration notes;
+the explicit GUI and entity APIs currently have this status. `@Internal`
+types are not external contracts. The adapted legacy package is a source
+migration surface, not binary compatibility with old Minecraft JARs.
 
-## Common commands
+Signature baselines under `api/signatures/` change only through intentional
+API review. A public API change requires the signature, compatibility, current
+consumer, and legacy consumer checks; never update a baseline merely to make a
+check pass.
 
-Use `./gradlew` on Unix-like hosts and `gradlew.bat` on Windows.
+## Evidence boundaries
 
-```text
-./gradlew clean build
-./gradlew test
-./gradlew checkApiSignature
-./gradlew runLegacyApiConsumerPlaytest
-./gradlew runApiConsumerPlaytest
-./gradlew runGameTest
-./gradlew runDedicatedServerSmoke
-./gradlew verifyPlaytestClientIsolation
-./gradlew runClientPlaytest
-./gradlew runProductionClientPlaytest
-./gradlew runPlaytest
-./gradlew runProductionMultiClientPlaytest
-./gradlew runExternalModMatrix
-./gradlew runRcUpgradePlaytest
-./gradlew runWindowsSoakPlaytest
-./gradlew runLinuxSoakPlaytest
-./gradlew runLongSoakPlaytest
-./gradlew dependencies
-./gradlew dependencyInsight --dependency polymer-core
-./gradlew javadoc sourcesJar
-```
+Unit tests, GameTest, dedicated-server smoke, production client, multi-client, external-mod, upgrade, expansion, soak, reproducibility, and release-artifact checks prove different things. Report each layer separately. A skipped, timed-out, force-terminated, or uninspected layer is not a pass.
 
-`clean build` runs compilation, unit tests, and archive tasks wired to the
-build lifecycle. Server GameTest, dedicated-server smoke, and two-process
-client playtests are distinct integration layers. Invoke and report them
-separately unless a named aggregate wires them together. `runPlaytest` is the
-canonical interactive aggregate; its evidence root is `build/playtest/`.
-Check `docs/testing.md` for exact acceptance details.
+Client playtests use isolated test drivers and must not be described as automated pure zero-mod vanilla login. External-mod claims are limited to the exact version, registry IDs, and scenarios recorded by the lock and result.
 
-## Source sets
+API changes require signature and compatibility checks plus both current and legacy consumer validation. Mapping changes require migration, backup, restart, determinism, and expansion coverage. Pack, GUI, entity, persistence, or diagnostic changes require their relevant production evidence.
 
-- `src/main/java` and `src/main/resources`: distributable server mod.
-- `src/test/java` and `src/test/resources`: JUnit 5 tests that can run without a
-  live game where possible.
-- `src/gametest/java` and `src/gametest/resources`: internal content fixtures and
-  Fabric GameTest entrypoints, not included as a public API or release mod.
-- `playtest/client-driver`: separate client-only Loom project containing the
-  minimal Fabric Client GameTest driver. It has no root-project, Polymer, or
-  fixture dependency and must never be packaged into the release JAR.
-- production playtest server fixtures are built as a separate non-release JAR;
-  generated worlds, logs, reports, and screenshots live under
-  `build/playtest/` and are ignored.
+## Release maintenance
 
-Test fixtures include ordinary/semantic items, safe and unsafe block shapes,
-block entity/entity/menu registrations, native Polymer content, and a legacy
-`polymc` entrypoint.
+Release candidates use `release/<version>` from current `main`. Update version metadata, changelog, release note, signatures, manifests, checksums, SBOM inputs, and workflow expectations together. The workflow-consumed release note for RC2 is `docs/releases/0.4.0-rc.2.md`; do not move or delete it while the workflow references it.
 
-## Coding rules
+Before tagging or changing a draft release:
 
-Use official Minecraft class/method names from the target sources. Do not infer
-a 26.1 name by mechanically translating an old Yarn class. Keep direct Polymer
-usage in `backend.polymer`; API/provider contracts should remain backend-neutral.
+- run and inspect the applicable local and hosted gates on the exact candidate;
+- verify repository and commit identity in every artifact;
+- inspect the main/API JARs, SBOM, checksums, build manifest, API signature, licenses, notices, and provenance;
+- confirm the release allow-list excludes test and private material;
+- verify positive provenance and the tampered negative;
+- keep the release as a draft pre-release until every required layer passes.
 
-All new Java files begin with
-`/* SPDX-License-Identifier: LGPL-3.0-or-later */`. Preserve full original
-headers in adapted upstream files. Use UTF-8 and four-space Java indentation.
+If a merge changes commit identity, repeat commit-bound release evidence on final `main`. Never reuse historical provenance as proof for a new repository or commit.
 
-Favor immutable records/value objects after validation. Stable persisted output
-must use an explicit comparator. Never rely on filesystem enumeration order,
-ZIP input order, locale-sensitive case conversion, default charset/time zone,
-or `HashMap` iteration.
+## Git hygiene
 
-## Adding or changing a provider
-
-Follow `AGENTS.md` and `compatibility-model.md`. A provider returns a candidate
-with reasons; it does not write a mapping or directly install a Polymer overlay.
-Add positive and negative tests, a native-Polymer non-override test, stable
-ordering, report assertions, and capacity/persistence coverage where relevant.
-
-If behavior affects existing allocations, increment the mapping algorithm
-version and implement a validated migration. Create a backup before an
-incompatible rewrite; never regenerate silently.
-
-## Configuration changes
-
-The JSON Schema is the portable structural contract; the strict Java decoder is
-the runtime authority and additionally enforces cross-field limits such as
-`max_single_file_bytes <= max_total_bytes`. Keep field sets, primitive types,
-action domains, and numeric bounds synchronized in tests. Add path-specific
-decoder errors, update the example, and update `compat-profile-schema.md`.
-Unknown fields use the project-wide strict policy. Mapping-affecting changes
-apply only on restart.
-
-## Reproducible artifacts
-
-Archives disable file timestamps and use reproducible entry order. Generated
-pack writers additionally normalize entry timestamps/content ordering. The main
-JAR manifest records the project/Minecraft version, Git commit, and dirty flag;
-it must not include absolute paths. Sources and Javadoc JARs are generated.
-
-Before pushing:
-
-```text
-git diff --check
-git status --short
-git ls-files build .gradle run
-```
-
-Inspect the distributable JAR's manifest and `fabric.mod.json`, review dependency
-output for local/unknown repositories, and ensure config/cache/report artifacts
-and temporary research clones are not tracked.
-
-## Git workflow
-
-Create topic and release branches from `main`. Keep `archive` and `upstream`
-read-only and never open a Reborn pull request against TheEpicBlock/PolyMc.
-Use focused commits whose messages explain the purpose. Push a branch only
-after the build is in a reasonably reliable state and report any integration
-task that was skipped or failed.
+Use focused commits and open pull requests only against the active repository. Preserve historical remotes as read-only. Before pushing, inspect `git diff --check`, `git status --short`, tracked build directories, and the intended archive contents.
