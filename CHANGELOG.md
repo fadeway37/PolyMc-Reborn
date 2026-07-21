@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- Moved installation, administration, troubleshooting, and Adapter guidance to
+  the bilingual documentation site and removed duplicate product-repository
+  guides after the replacement pages were deployed.
+- Reworked the project README as a concise product entry point and retained one
+  repository-specific maintainer workflow alongside ADRs and required release
+  metadata.
+
 ## 0.4.0-rc.2+26.1.2
 
 ### Changed
